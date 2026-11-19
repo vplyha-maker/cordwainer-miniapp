@@ -39,12 +39,13 @@ function getWin(): ExtendedWindow {
 }
 
 // ---------------------------------------------------------------------------
-// 0. FREE COMMERCIAL-SAFE CALLIGRAPHIC FONT LOADER (Great Vibes — SIL OFL)
+// 0. FREE COMMERCIAL-SAFE COPPERPLATE SCRIPT FONT (Monsieur La Doulaise — SIL OFL)
+// Delicate hairline contrast & 1930s bespoke hand-lettered signature aesthetic
 // ---------------------------------------------------------------------------
 const BRAND_WORDMARK = 'Cordwaine'
-const BRAND_FONT_FAMILY = 'Great Vibes'
+const BRAND_FONT_FAMILY = 'Monsieur La Doulaise'
 const BRAND_FONT_CSS_URL =
-  'https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap'
+  'https://fonts.googleapis.com/css2?family=Monsieur+La+Doulaise&display=swap'
 
 let brandFontReady = false
 let brandFontPromise: Promise<boolean> | null = null
@@ -58,7 +59,6 @@ function ensureBrandFont(): Promise<boolean> {
 
   brandFontPromise = (async () => {
     try {
-      // Inject Google Fonts stylesheet once into <head> (100% CSP-compatible with fonts.googleapis.com)
       const linkId = 'cordwaine-brand-font-css'
       if (!document.getElementById(linkId)) {
         const link = document.createElement('link')
@@ -69,9 +69,9 @@ function ensureBrandFont(): Promise<boolean> {
       }
 
       if (document.fonts && typeof document.fonts.load === 'function') {
-        await document.fonts.load(`64px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
+        await document.fonts.load(`72px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
         await document.fonts.ready
-        brandFontReady = document.fonts.check(`64px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
+        brandFontReady = document.fonts.check(`72px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
         return brandFontReady
       }
     } catch {
@@ -272,8 +272,8 @@ class SoundEngine {
     if (!c || !dest) return
     try {
       const t0 = c.currentTime
-      const freqs = [146.83, 220.0, 369.99, 440.0, 659.25]
-      const amps = [0.24, 0.19, 0.15, 0.12, 0.09]
+      const freqs = [220.0, 293.66, 369.99, 440.0, 659.25]
+      const amps = [0.18, 0.16, 0.14, 0.11, 0.08]
       freqs.forEach((f, idx) => {
         const osc = c.createOscillator()
         const filter = c.createBiquadFilter()
@@ -284,18 +284,18 @@ class SoundEngine {
 
         filter.type = 'lowpass'
         filter.frequency.setValueAtTime(1150 - idx * 90, t0)
-        filter.frequency.exponentialRampToValueAtTime(340, t0 + 2.4)
+        filter.frequency.exponentialRampToValueAtTime(360, t0 + 2.2)
 
         const onset = t0 + idx * 0.032
         gain.gain.setValueAtTime(0.0001, onset)
         gain.gain.linearRampToValueAtTime(amps[idx], onset + 0.045)
-        gain.gain.exponentialRampToValueAtTime(0.0001, onset + 2.5)
+        gain.gain.exponentialRampToValueAtTime(0.0001, onset + 2.3)
 
         osc.connect(filter)
         filter.connect(gain)
         gain.connect(dest)
         osc.start(onset)
-        osc.stop(onset + 2.55)
+        osc.stop(onset + 2.35)
       })
     } catch {}
   }
@@ -340,7 +340,7 @@ class SoundEngine {
       osc.frequency.setValueAtTime(520 * pitch, t0)
       osc.frequency.exponentialRampToValueAtTime(150 * pitch, t0 + 0.028)
 
-      gain.gain.setValueAtTime(0.24, t0)
+      gain.gain.setValueAtTime(0.2, t0)
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.028)
 
       osc.connect(gain)
@@ -354,7 +354,7 @@ class SoundEngine {
 const sound = new SoundEngine()
 
 // ---------------------------------------------------------------------------
-// 3. GENTLE 3-CHANNEL HAPTIC ENGINE (Buttons Only — Softened Strength)
+// 3. GENTLE HAPTIC ENGINE (Strictly for Interactive Buttons Only)
 // ---------------------------------------------------------------------------
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
   const tgStyle: 'light' | 'medium' =
@@ -377,47 +377,9 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
 
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      const ms = style === 'heavy' ? 18 : style === 'medium' ? 12 : 8
+      const ms = style === 'heavy' ? 16 : style === 'medium' ? 11 : 7
       navigator.vibrate(ms)
     }
-  } catch {}
-
-  try {
-    const c = sound.getContext()
-    const dest = sound.getDestination()
-    if (!c || !dest) return
-    const t0 = c.currentTime
-    const dur = style === 'heavy' ? 0.042 : style === 'medium' ? 0.032 : 0.024
-    const peakGain = style === 'heavy' ? 0.24 : style === 'medium' ? 0.16 : 0.1
-
-    const subOsc = c.createOscillator()
-    const clickOsc = c.createOscillator()
-    const subGain = c.createGain()
-    const clickGain = c.createGain()
-
-    subOsc.type = 'sine'
-    subOsc.frequency.setValueAtTime(160, t0)
-    subOsc.frequency.exponentialRampToValueAtTime(48, t0 + dur)
-
-    clickOsc.type = 'triangle'
-    clickOsc.frequency.setValueAtTime(1850, t0)
-    clickOsc.frequency.exponentialRampToValueAtTime(340, t0 + 0.012)
-
-    subGain.gain.setValueAtTime(peakGain, t0)
-    subGain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
-
-    clickGain.gain.setValueAtTime(peakGain * 0.5, t0)
-    clickGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.012)
-
-    subOsc.connect(subGain)
-    clickOsc.connect(clickGain)
-    subGain.connect(dest)
-    clickGain.connect(dest)
-
-    subOsc.start(t0)
-    clickOsc.start(t0)
-    subOsc.stop(t0 + dur + 0.005)
-    clickOsc.stop(t0 + 0.016)
   } catch {}
 }
 
@@ -670,7 +632,7 @@ export function WelcomePage({
   }[lang]
 
   // -------------------------------------------------------------------------
-  // SINGLE-CANVAS CALLIGRAPHIC SIGNATURE ENGINE (Great Vibes — SIL OFL)
+  // SINGLE-CANVAS CALLIGRAPHIC SIGNATURE ENGINE (Zero Haptics During Intro)
   // -------------------------------------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current
@@ -712,7 +674,7 @@ export function WelcomePage({
     let simTime = 0.0
     let waitTimeForFont = 0.0
 
-    const FONT_SPEC = `400 66px "${BRAND_FONT_FAMILY}", "Cormorant Garamond", Georgia, serif`
+    const FONT_SPEC = `400 72px "${BRAND_FONT_FAMILY}", "Cormorant Garamond", Georgia, serif`
 
     const measureWordBounds = () => {
       ctx.save()
@@ -750,7 +712,7 @@ export function WelcomePage({
       const fontLoadedNow =
         brandFontReady ||
         (typeof document !== 'undefined' &&
-          Boolean(document.fonts?.check?.(`66px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)))
+          Boolean(document.fonts?.check?.(`72px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)))
 
       if (skipRequestedRef.current && simTime < 3.6) {
         simTime = 3.6
@@ -762,7 +724,6 @@ export function WelcomePage({
       }
       const elapsed = simTime
 
-      // Sound cues only during signature writing (haptics disabled during intro)
       if (!skipRequestedRef.current) {
         if (!mCrown && elapsed >= 0.08) {
           mCrown = true
@@ -973,7 +934,6 @@ export function WelcomePage({
 
   const handleReplayOrSkip = useCallback(() => {
     sound.unlock()
-    haptic('light')
     sound.softTick(1.05)
     if (phase !== 'complete') {
       skipRequestedRef.current = true
@@ -1025,7 +985,7 @@ export function WelcomePage({
         touchAction: 'manipulation',
       }}
     >
-      {/* Hidden DOM font-preloader so browser fetches Great Vibes from Google Fonts immediately */}
+      {/* Hidden DOM font-preloader */}
       <span
         aria-hidden="true"
         className="fixed -top-96 left-0 opacity-0 pointer-events-none select-none"
