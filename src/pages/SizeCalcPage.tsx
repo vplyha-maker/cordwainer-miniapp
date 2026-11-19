@@ -64,6 +64,8 @@ const UI_LABELS: Record<
     groupSport: string
     groupClassic: string
     footerBrand: string
+    reservePrefix: string
+    reserveWidthPrefix: string
   }
 > = {
   uk: {
@@ -72,6 +74,8 @@ const UI_LABELS: Record<
     groupSport: 'Спорт і кросівки',
     groupClassic: 'Класика і шкіра',
     footerBrand: 'Cordwaine · Калькулятор розмірів',
+    reservePrefix: 'Із запасом',
+    reserveWidthPrefix: 'Запас по повноті',
   },
   ru: {
     styleSection: 'Тип обуви и запас',
@@ -79,6 +83,8 @@ const UI_LABELS: Record<
     groupSport: 'Спорт и кроссовки',
     groupClassic: 'Классика и кожа',
     footerBrand: 'Cordwaine · Калькулятор размеров',
+    reservePrefix: 'С запасом',
+    reserveWidthPrefix: 'Запас по полноте',
   },
   en: {
     styleSection: 'Footwear Type & Allowance',
@@ -86,6 +92,8 @@ const UI_LABELS: Record<
     groupSport: 'Sport & Sneakers',
     groupClassic: 'Classic & Leather',
     footerBrand: 'Cordwaine · Size Calculator',
+    reservePrefix: 'With reserve',
+    reserveWidthPrefix: 'Width reserve',
   },
   de: {
     styleSection: 'Schuhtyp & Zugabe',
@@ -93,6 +101,8 @@ const UI_LABELS: Record<
     groupSport: 'Sport & Sneaker',
     groupClassic: 'Klassik & Leder',
     footerBrand: 'Cordwaine · Größenrechner',
+    reservePrefix: 'Mit Zugabe',
+    reserveWidthPrefix: 'Weitenzugabe',
   },
 }
 
@@ -582,7 +592,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const usLabel = gender === 'kids' ? 'US K' : gender === 'men' ? 'US M' : 'US W'
 
-  // Палитра Ivory / Graphite / Gold с повышенной читаемостью вспомогательного текста
   const bgPage = isDark ? 'bg-[#0B0B0C]' : 'bg-[#F7F4EE]'
   const bgHeader = isDark ? 'bg-[#0B0B0C]/90' : 'bg-[#F7F4EE]/90'
   const bgSurface = isDark ? 'bg-[#141416]' : 'bg-[#EFEAE1]'
@@ -613,6 +622,43 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     running: t.styleRunning,
     sandals: t.styleSandals,
   }
+
+  const widthLabels: Record<WidthFit, string> = {
+    narrow: t.widthNarrow,
+    standard: t.widthStandard,
+    wide: t.widthWide,
+    extraWide: t.widthExtraWide,
+  }
+
+  // Точный статус под главным размером в зависимости от реального источника запаса
+  const fitStatusBadge = useMemo(() => {
+    if (!proFit.hasReserveShift) {
+      return `${t.baseFitBadge} · JP ${formatSize(activeResult.jp)}`
+    }
+    const isSeasonalStyle = shoeStyle === 'winter' || shoeStyle === 'running'
+    const isWideFoot = widthFit === 'wide' || widthFit === 'extraWide'
+
+    if (isSeasonalStyle && isWideFoot) {
+      return `${ui.reservePrefix} · ${styleLabels[shoeStyle]} · ${widthLabels[widthFit]}`
+    }
+    if (isSeasonalStyle) {
+      return `${ui.reservePrefix} · ${styleLabels[shoeStyle]}`
+    }
+    if (isWideFoot) {
+      return `${ui.reserveWidthPrefix} · ${widthLabels[widthFit]}`
+    }
+    return `${ui.reservePrefix} · ${styleLabels[shoeStyle]}`
+  }, [
+    proFit.hasReserveShift,
+    t.baseFitBadge,
+    activeResult.jp,
+    shoeStyle,
+    widthFit,
+    ui.reservePrefix,
+    ui.reserveWidthPrefix,
+    styleLabels,
+    widthLabels,
+  ])
 
   const worldSystems = [
     {
@@ -924,7 +970,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </button>
           </div>
 
-          {/* 3-уровневая градуированная шкала с точным указателем */}
           <div className="relative w-full pt-1 pb-0.5">
             <input
               type="range"
@@ -946,13 +991,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             />
 
             <div className="relative mx-3.5 h-11 flex items-end justify-between pb-2 pointer-events-none">
-              {/* Базовая ось шкалы */}
               <div
                 className="absolute inset-x-0 bottom-2 h-[2px] rounded-full"
                 style={{ backgroundColor: trackIdleHex }}
               />
 
-              {/* Активная зона шкалы */}
               <div
                 className="absolute left-0 bottom-2 h-[2.5px] rounded-full transition-all duration-75"
                 style={{
@@ -961,7 +1004,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 }}
               />
 
-              {/* Деления шкалы */}
               {Array.from({ length: RULER_TICKS }).map((_, idx) => {
                 const tickPct = (idx / (RULER_TICKS - 1)) * 100
                 const dist = Math.abs(tickPct - pct)
@@ -986,7 +1028,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 )
               })}
 
-              {/* Точный указатель и ползунок */}
               <div
                 className="absolute bottom-2 z-20 pointer-events-none transition-transform duration-100"
                 style={{
@@ -1073,9 +1114,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               className="font-medium tracking-wide"
               style={{ color: proFit.hasReserveShift ? accentHex : undefined }}
             >
-              {proFit.hasReserveShift
-                ? t.reserveActiveBadge
-                : `${t.baseFitBadge} · JP ${formatSize(activeResult.jp)}`}
+              {fitStatusBadge}
             </span>
           </div>
 
