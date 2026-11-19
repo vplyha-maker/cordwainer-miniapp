@@ -1340,9 +1340,11 @@ export function ensureCleanGlbSegmentation(THREE: ThreeLib, root: THREE_TYPES.Ob
     }
   })
 
-  // Авто-разделение цельного меша подошвы+берцев на NEXUS X1 (sockbottom) в мировых координатах Y
+  // Авто-разделение подошвы (midsole) и берцев (quarters) на NEXUS X1 ровно по 3D-канту (curve)
   root.updateMatrixWorld(true)
   const nexusBottomMeshes: THREE_TYPES.Mesh[] = []
+  const nexusPipeMeshes: THREE_TYPES.Mesh[] = []
+
   root.traverse((obj) => {
     const m = obj as THREE_TYPES.Mesh
     if (!m.isMesh || !m.geometry) return
@@ -1356,6 +1358,8 @@ export function ensureCleanGlbSegmentation(THREE: ThreeLib, root: THREE_TYPES.Ob
     ).toLowerCase()
     if (combined.includes('sockbottom')) {
       nexusBottomMeshes.push(m)
+    } else if (combined.includes('curve')) {
+      nexusPipeMeshes.push(m)
     }
   })
 
@@ -1364,34 +1368,97 @@ export function ensureCleanGlbSegmentation(THREE: ThreeLib, root: THREE_TYPES.Ob
     const idxAttr = nbMesh.geometry.index
     if (!pos || nbMesh.geometry.userData?.soleSplitDone) return
 
-    // Вычисляем реальный вертикальный диапазон в world-пространстве (учитывая Z-up повороты GLTF)
     const vTmp = new THREE.Vector3()
-    let minY = Infinity
-    let maxY = -Infinity
+    let minX = Infinity, maxX = -Infinity
+    let minY = Infinity, maxY = -Infinity
+    let minZ = Infinity, maxZ = -Infinity
+
     for (let i = 0; i < pos.count; i++) {
       vTmp.fromBufferAttribute(pos, i).applyMatrix4(nbMesh.matrixWorld)
+      if (vTmp.x < minX) minX = vTmp.x
+      if (vTmp.x > maxX) maxX = vTmp.x
       if (vTmp.y < minY) minY = vTmp.y
       if (vTmp.y > maxY) maxY = vTmp.y
+      if (vTmp.z < minZ) minZ = vTmp.z
+      if (vTmp.z > maxZ) maxZ = vTmp.z
     }
 
     const heightY = maxY - minY
     if (!Number.isFinite(heightY) || heightY <= 0.02) return
 
-    // Нижние 30% по высоте — чистая подошва (midsole), всё выше окантовки — боковые берцы (quarters)
-    const yCut = minY + heightY * 0.30
+    // Определяем продольную ось обуви (X или Z) для точного профиля канта от пятки до мыска
+    const useAxisX = maxX - minX >= maxZ - minZ
+    const axisMin = useAxisX ? minX : minZ
+    const axisSpan = Math.max(1e-5, (useAxisX ? maxX : maxZ) - axisMin)
+
+    const BINS = 40
+    const pipeSumY = new Float64Array(BINS)
+    const pipeCount = new Int32Array(BINS)
+
+    nexusPipeMeshes.forEach((pm) => {
+      const pPos = pm.geometry.attributes.position
+      if (!pPos) return
+      for (let i = 0; i < pPos.count; i++) {
+        vTmp.fromBufferAttribute(pPos, i).applyMatrix4(pm.matrixWorld)
+        const axisVal = useAxisX ? vTmp.x : vTmp.z
+        const bin = Math.max(0, Math.min(BINS - 1, Math.floor(((axisVal - axisMin) / axisSpan) * BINS)))
+        pipeSumY[bin] += vTmp.y
+        pipeCount[bin] += 1
+      }
+    })
+
+    const hasPipe = pipeCount.some((c) => c > 0)
+    const pipeProfile = new Float64Array(BINS)
+    const fallbackCutY = minY + heightY * 0.26
+
+    if (hasPipe) {
+      for (let b = 0; b < BINS; b++) {
+        pipeProfile[b] = pipeCount[b] > 0 ? pipeSumY[b] / pipeCount[b] : NaN
+      }
+      // Заполняем пустые сегменты линейной интерполяцией между ближайшими точками канта
+      for (let b = 0; b < BINS; b++) {
+        if (!Number.isNaN(pipeProfile[b])) continue
+        let left = b - 1
+        while (left >= 0 && Number.isNaN(pipeProfile[left])) left--
+        let right = b + 1
+        while (right < BINS && Number.isNaN(pipeProfile[right])) right++
+        if (left >= 0 && right < BINS) {
+          const frac = (b - left) / (right - left)
+          pipeProfile[b] = pipeProfile[left] * (1 - frac) + pipeProfile[right] * frac
+        } else if (left >= 0) {
+          pipeProfile[b] = pipeProfile[left]
+        } else if (right < BINS) {
+          pipeProfile[b] = pipeProfile[right]
+        } else {
+          pipeProfile[b] = fallbackCutY
+        }
+      }
+    }
+
     const soleIdx: number[] = []
     const sideIdx: number[] = []
-
     const triCount = idxAttr ? idxAttr.count : pos.count
+
     for (let i = 0; i < triCount; i += 3) {
       const i0 = idxAttr ? idxAttr.getX(i) : i
       const i1 = idxAttr ? idxAttr.getX(i + 1) : i + 1
       const i2 = idxAttr ? idxAttr.getX(i + 2) : i + 2
 
-      const y0 = vTmp.fromBufferAttribute(pos, i0).applyMatrix4(nbMesh.matrixWorld).y
-      const y1 = vTmp.fromBufferAttribute(pos, i1).applyMatrix4(nbMesh.matrixWorld).y
-      const y2 = vTmp.fromBufferAttribute(pos, i2).applyMatrix4(nbMesh.matrixWorld).y
+      vTmp.fromBufferAttribute(pos, i0).applyMatrix4(nbMesh.matrixWorld)
+      const y0 = vTmp.y, a0 = useAxisX ? vTmp.x : vTmp.z
+      vTmp.fromBufferAttribute(pos, i1).applyMatrix4(nbMesh.matrixWorld)
+      const y1 = vTmp.y, a1 = useAxisX ? vTmp.x : vTmp.z
+      vTmp.fromBufferAttribute(pos, i2).applyMatrix4(nbMesh.matrixWorld)
+      const y2 = vTmp.y, a2 = useAxisX ? vTmp.x : vTmp.z
+
       const cy = (y0 + y1 + y2) / 3
+      const ca = (a0 + a1 + a2) / 3
+
+      let yCut = fallbackCutY
+      if (hasPipe) {
+        const bin = Math.max(0, Math.min(BINS - 1, Math.floor(((ca - axisMin) / axisSpan) * BINS)))
+        yCut = pipeProfile[bin]
+      }
 
       if (cy <= yCut) {
         soleIdx.push(i0, i1, i2)
