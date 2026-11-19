@@ -1,4 +1,4 @@
-import React, { Component, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Component, memo, useCallback, useEffect, useRef, useState } from 'react'
 import type * as THREE_TYPES from 'three'
 import type { SneakerColors, SneakerZoneKey } from './colorEngine'
 import { hapticReset } from './haptics'
@@ -17,7 +17,11 @@ import {
   type SneakerModelId,
   type ZoneMaterialRegistry,
 } from './sneakerGeometry'
-import { getThemeTokens } from './themeSystem'
+import {
+  getThemeTokens,
+  resolveStudioStageStyle,
+  type PerformanceMode,
+} from './themeSystem'
 
 export type Sneaker3DProps = {
   sneakerColors: SneakerColors
@@ -28,6 +32,9 @@ export type Sneaker3DProps = {
   loading3DLabel?: string
   webglFallbackLabel?: string
   compact?: boolean
+  studioBgHex?: string
+  autoContrast?: boolean
+  performanceMode?: PerformanceMode
 }
 
 function isAndroidDevice(): boolean {
@@ -38,13 +45,25 @@ function isAndroidDevice(): boolean {
   }
 }
 
+function isLowMemoryDevice(): boolean {
+  try {
+    if (typeof navigator === 'undefined') return false
+    const nav = navigator as Navigator & { deviceMemory?: number }
+    const mem = typeof nav.deviceMemory === 'number' ? nav.deviceMemory : 8
+    const cores = typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : 8
+    return mem <= 4 || cores <= 4
+  } catch {
+    return false
+  }
+}
+
 function SneakerFallbackCard({
   sneakerColors,
-  isDark,
+  isDarkStage,
   label,
 }: {
   sneakerColors: SneakerColors
-  isDark: boolean
+  isDarkStage: boolean
   label?: string
 }) {
   const previewZones: string[] = [
@@ -59,7 +78,7 @@ function SneakerFallbackCard({
     <div
       className={
         'w-full h-full flex flex-col items-center justify-center border border-dashed rounded-2xl px-4 text-center ' +
-        (isDark ? 'border-white/15 text-[#F4F0E8]/70' : 'border-black/15 text-[#1C1816]/70')
+        (isDarkStage ? 'border-white/15 text-[#F4F0E8]/75' : 'border-black/15 text-[#1C1816]/75')
       }
     >
       <div className="flex gap-2 mb-2.5">
@@ -80,7 +99,7 @@ function SneakerFallbackCard({
 
 type ErrorBoundaryProps = {
   sneakerColors: SneakerColors
-  isDark: boolean
+  isDarkStage: boolean
   fallbackLabel?: string
   children: React.ReactNode
 }
@@ -105,10 +124,10 @@ class SneakerErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render() {
     if (this.state.hasError) {
       return (
-        <div className="relative w-full h-[200px] sm:h-[240px] md:h-[280px] select-none">
+        <div className="relative w-full h-[196px] sm:h-[236px] select-none">
           <SneakerFallbackCard
             sneakerColors={this.props.sneakerColors}
-            isDark={this.props.isDark}
+            isDarkStage={this.props.isDarkStage}
             label={this.props.fallbackLabel}
           />
         </div>
@@ -127,7 +146,14 @@ function Sneaker3DCanvas({
   loading3DLabel,
   webglFallbackLabel,
   compact = false,
+  studioBgHex,
+  autoContrast = true,
+  performanceMode = 'auto',
 }: Sneaker3DProps) {
+  const uiTokens = getThemeTokens(isDark)
+  const effectiveStageHex = studioBgHex || uiTokens.pageBg
+  const stageStyle = resolveStudioStageStyle(effectiveStageHex, autoContrast, uiTokens)
+
   const mountRef = useRef<HTMLDivElement>(null)
   const matsRef = useRef<SneakerMaterials | null>(null)
   const zoneRegistryRef = useRef<ZoneMaterialRegistry | null>(null)
@@ -135,12 +161,11 @@ function Sneaker3DCanvas({
 
   const latestColorsRef = useRef<SneakerColors>(sneakerColors)
   latestColorsRef.current = sneakerColors
-  const latestIsDarkRef = useRef<boolean>(isDark)
-  latestIsDarkRef.current = isDark
+  const latestIsDarkStageRef = useRef<boolean>(stageStyle.isDarkStage)
+  latestIsDarkStageRef.current = stageStyle.isDarkStage
   const latestModelIdRef = useRef<SneakerModelId>(modelId)
   latestModelIdRef.current = modelId
 
-  const hemiLightRef = useRef<THREE_TYPES.HemisphereLight | null>(null)
   const shadowCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const shadowTexRef = useRef<THREE_TYPES.CanvasTexture | null>(null)
 
@@ -158,6 +183,7 @@ function Sneaker3DCanvas({
   const lastActivityTime = useRef<number>(Date.now())
   const lastPointer = useRef({ x: 0, y: 0 })
 
+  // Прямое обновление цвета материалов без пересборки сцены (0 draw-call overhead)
   const applyColorsToRegistry = useCallback((colors: SneakerColors) => {
     const reg = zoneRegistryRef.current
     if (!reg) return
@@ -180,6 +206,12 @@ function Sneaker3DCanvas({
     let cleanupFn: (() => void) | undefined
 
     const isAndroid = isAndroidDevice()
+    const isLowRam = isLowMemoryDevice()
+    const useEcoProfile =
+      performanceMode === 'eco' || (performanceMode === 'auto' && isAndroid && isLowRam)
+    const useLowPowerLighting =
+      useEcoProfile || (performanceMode === 'auto' && isAndroid)
+
     const prefersReducedMotion =
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -198,15 +230,16 @@ function Sneaker3DCanvas({
         if (!container) return
 
         const width = container.clientWidth || 340
-        const height = container.clientHeight || 220
+        const height = container.clientHeight || 205
 
         let renderer: THREE_TYPES.WebGLRenderer
         try {
           renderer = new THREE.WebGLRenderer({
-            antialias: true,
+            antialias: !useEcoProfile,
             alpha: true,
-            powerPreference: isAndroid ? 'default' : 'high-performance',
-            precision: 'highp',
+            powerPreference: useEcoProfile || isAndroid ? 'low-power' : 'high-performance',
+            precision: useEcoProfile ? 'mediump' : 'highp',
+            stencil: false,
           })
         } catch (err) {
           if (import.meta.env.DEV) {
@@ -219,11 +252,21 @@ function Sneaker3DCanvas({
           return
         }
 
-        const maxDpr = isAndroid ? 1.35 : 2
+        // Адаптивный DPR для плавности на Android и слабых GPU
+        const maxDpr = useEcoProfile
+          ? 1.0
+          : performanceMode === 'high'
+            ? isAndroid
+              ? 1.5
+              : 2.0
+            : isAndroid
+              ? 1.25
+              : 2.0
+
         renderer.setSize(width, height)
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr))
         renderer.toneMapping = THREE.ACESFilmicToneMapping
-        renderer.toneMappingExposure = 1.12
+        renderer.toneMappingExposure = 1.1
         container.innerHTML = ''
         container.appendChild(renderer.domElement)
 
@@ -232,25 +275,31 @@ function Sneaker3DCanvas({
         camera.position.set(0, 0.44, 5.15)
         camera.lookAt(0, 0.04, 0)
 
-        const currentDark = latestIsDarkRef.current
         const currentColors = latestColorsRef.current
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd8d0c5, currentDark ? 1.1 : 1.3)
+        // Нейтральный студийный свет: НЕ зависит от темы интерфейса (белая подошва всегда белая)
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd8d3cc, 1.28)
         hemiLight.position.set(0, 6, 0)
         scene.add(hemiLight)
-        hemiLightRef.current = hemiLight
 
-        const keyLight = new THREE.DirectionalLight(0xfffdf8, 2.0)
-        keyLight.position.set(3.6, 5.2, 4.4)
+        const keyLight = new THREE.DirectionalLight(0xfffdf8, useLowPowerLighting ? 2.15 : 1.95)
+        keyLight.position.set(3.4, 5.2, 4.4)
         scene.add(keyLight)
 
-        const fillLight = new THREE.DirectionalLight(0xe2ecff, 1.0)
-        fillLight.position.set(-4.2, 2.2, 2.8)
-        scene.add(fillLight)
+        if (!useLowPowerLighting) {
+          const fillLight = new THREE.DirectionalLight(0xe4eeff, 0.95)
+          fillLight.position.set(-4.2, 2.2, 2.8)
+          scene.add(fillLight)
 
-        const rimLight = new THREE.DirectionalLight(0xffffff, 1.2)
-        rimLight.position.set(0, 3.8, -4.5)
-        scene.add(rimLight)
+          const rimLight = new THREE.DirectionalLight(0xffffff, 1.15)
+          rimLight.position.set(0, 3.8, -4.5)
+          scene.add(rimLight)
+        } else {
+          // Один мягкий контровой источник вместо двух — сохраняет читаемость белого на белом фоне при -35% нагрузки GPU
+          const rimLight = new THREE.DirectionalLight(0xedf2ff, 0.95)
+          rimLight.position.set(-2.4, 3.2, -3.6)
+          scene.add(rimLight)
+        }
 
         const { mats, registry } = createSneakerMaterials(THREE, currentColors)
         matsRef.current = mats
@@ -262,9 +311,9 @@ function Sneaker3DCanvas({
         shoeRootRef.current = pivotGroup
 
         const shadowCanvas = document.createElement('canvas')
-        shadowCanvas.width = 256
-        shadowCanvas.height = 128
-        drawShadowGradient(shadowCanvas, currentDark)
+        shadowCanvas.width = useEcoProfile ? 128 : 256
+        shadowCanvas.height = useEcoProfile ? 64 : 128
+        drawShadowGradient(shadowCanvas, latestIsDarkStageRef.current)
         shadowCanvasRef.current = shadowCanvas
 
         const shadowTex = new THREE.CanvasTexture(shadowCanvas)
@@ -303,13 +352,14 @@ function Sneaker3DCanvas({
           const idleMs = Date.now() - lastActivityTime.current
           const dYaw = rotTarget.current.yaw - rotCurrent.current.yaw
           const dPitch = rotTarget.current.pitch - rotCurrent.current.pitch
-          const isSettled = Math.abs(dYaw) < 0.0012 && Math.abs(dPitch) < 0.0012
+          const isSettled = Math.abs(dYaw) < 0.0015 && Math.abs(dPitch) < 0.0015
 
+          // На Android останавливаем цикл сразу после затухания инерции, чтобы не нагружать GPU в простое
           const shouldStop =
             !isInteracting.current &&
             (prefersReducedMotion ||
-              (isAndroid && (isSettled || idleMs >= 1600)) ||
-              idleMs >= 6000)
+              ((isAndroid || useEcoProfile) && (isSettled || idleMs >= 1200)) ||
+              idleMs >= 4500)
 
           if (shouldStop) {
             rotCurrent.current.yaw = rotTarget.current.yaw
@@ -328,15 +378,16 @@ function Sneaker3DCanvas({
           frameId = requestAnimationFrame(animate)
           const elapsed = clock.getElapsedTime()
 
-          const swayDamping = isAndroid
-            ? 0
-            : Math.max(0, Math.min(1, (5400 - idleMs) / 1200))
+          const swayDamping =
+            isAndroid || useEcoProfile
+              ? 0
+              : Math.max(0, Math.min(1, (4000 - idleMs) / 1200))
 
           if (!isInteracting.current && !prefersReducedMotion && swayDamping > 0) {
             rotTarget.current.yaw += Math.sin(elapsed * 0.65) * 0.0007 * swayDamping
           }
 
-          const lerpFactor = isAndroid ? 0.24 : 0.14
+          const lerpFactor = isAndroid || useEcoProfile ? 0.28 : 0.15
           rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * lerpFactor
           rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * lerpFactor
 
@@ -344,9 +395,9 @@ function Sneaker3DCanvas({
             shoeRootRef.current.rotation.y = rotCurrent.current.yaw
             shoeRootRef.current.rotation.x = rotCurrent.current.pitch
             shoeRootRef.current.position.y =
-              prefersReducedMotion || isAndroid
+              prefersReducedMotion || isAndroid || useEcoProfile
                 ? 0
-                : Math.sin(elapsed * 1.5) * 0.015 * swayDamping
+                : Math.sin(elapsed * 1.5) * 0.014 * swayDamping
           }
 
           renderer.render(scene, camera)
@@ -469,7 +520,7 @@ function Sneaker3DCanvas({
         const updateViewportSize = () => {
           if (!container || disposed) return
           const w = container.clientWidth || 340
-          const h = container.clientHeight || 220
+          const h = container.clientHeight || 205
           camera.aspect = w / h
           camera.updateProjectionMatrix()
           renderer.setSize(w, h)
@@ -490,7 +541,12 @@ function Sneaker3DCanvas({
               const entry = entries[0]
               if (!entry) return
               isVisibleInViewport = entry.isIntersecting
-              if (isVisibleInViewport) renderSingleFrame()
+              if (!isVisibleInViewport && isLoopRunning) {
+                cancelAnimationFrame(frameId)
+                isLoopRunning = false
+              } else if (isVisibleInViewport) {
+                renderSingleFrame()
+              }
             },
             { threshold: 0.05 }
           )
@@ -499,7 +555,12 @@ function Sneaker3DCanvas({
 
         const onVisibilityChange = () => {
           isDocumentVisible = !document.hidden
-          if (isDocumentVisible) renderSingleFrame()
+          if (!isDocumentVisible && isLoopRunning) {
+            cancelAnimationFrame(frameId)
+            isLoopRunning = false
+          } else if (isDocumentVisible) {
+            renderSingleFrame()
+          }
         }
         document.addEventListener('visibilitychange', onVisibilityChange)
 
@@ -535,7 +596,6 @@ function Sneaker3DCanvas({
           matsRef.current = null
           zoneRegistryRef.current = null
           shoeRootRef.current = null
-          hemiLightRef.current = null
           shadowCanvasRef.current = null
           shadowTexRef.current = null
           requestSingleRenderRef.current = null
@@ -558,7 +618,7 @@ function Sneaker3DCanvas({
       cancelAnimationFrame(frameId)
       if (cleanupFn) cleanupFn()
     }
-  }, [contextLostCount, applyColorsToRegistry])
+  }, [contextLostCount, performanceMode, applyColorsToRegistry])
 
   useEffect(() => {
     loadModelRef.current?.(modelId)
@@ -568,16 +628,14 @@ function Sneaker3DCanvas({
     applyColorsToRegistry(sneakerColors)
   }, [sneakerColors, applyColorsToRegistry])
 
+  // Тень под обувью адаптируется только к яркости фона студии (не к цветам материалов)
   useEffect(() => {
-    if (hemiLightRef.current) {
-      hemiLightRef.current.intensity = isDark ? 1.1 : 1.3
-    }
     if (shadowCanvasRef.current && shadowTexRef.current) {
-      drawShadowGradient(shadowCanvasRef.current, isDark)
+      drawShadowGradient(shadowCanvasRef.current, stageStyle.isDarkStage)
       shadowTexRef.current.needsUpdate = true
     }
     requestSingleRenderRef.current?.()
-  }, [isDark])
+  }, [stageStyle.isDarkStage])
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isInteracting.current = true
@@ -615,22 +673,27 @@ function Sneaker3DCanvas({
   }
 
   const activeModel = getSneakerModelConfig(modelId)
-  const tokens = getThemeTokens(isDark)
 
   return (
-    <div className="w-full select-none">
+    <div
+      className="w-full select-none rounded-[22px] px-3 pt-1 pb-2.5 border transition-colors duration-200"
+      style={{
+        backgroundColor: stageStyle.bgHex,
+        borderColor: uiTokens.border,
+      }}
+    >
       <div
         className={
-          'relative w-full transition-[height] duration-300 ' +
+          'relative w-full transition-[height] duration-200 ' +
           (compact
-            ? 'h-[175px] sm:h-[210px]'
-            : 'h-[208px] sm:h-[246px] md:h-[280px]')
+            ? 'h-[168px] sm:h-[202px]'
+            : 'h-[196px] sm:h-[234px] md:h-[268px]')
         }
       >
         {webglError ? (
           <SneakerFallbackCard
             sneakerColors={sneakerColors}
-            isDark={isDark}
+            isDarkStage={stageStyle.isDarkStage}
             label={webglFallbackLabel}
           />
         ) : (
@@ -649,24 +712,24 @@ function Sneaker3DCanvas({
 
         {isLoading3D && !webglError && (
           <RainbowTilesLoader
-            isDark={isDark}
+            isDark={stageStyle.isDarkStage}
             label={loading3DLabel || '3D • ' + activeModel.name + '...'}
           />
         )}
       </div>
 
-      {/* Редакционная нижняя строка модели + iOS-кнопка 360° */}
-      <div className="flex items-center gap-3 mt-1 px-0.5">
+      {/* Редакционная строка модели + кнопка 360° с авто-контрастом под фон студии */}
+      <div className="flex items-center gap-3 mt-0.5 px-0.5">
         <span
-          className="text-[11px] font-sans font-medium uppercase tracking-[0.2em] shrink-0"
-          style={{ color: tokens.inkSecondary }}
+          className="text-[11px] font-sans font-medium uppercase tracking-[0.2em] shrink-0 transition-colors"
+          style={{ color: stageStyle.labelColor }}
         >
           {activeModel.shortLabel}
         </span>
 
         <span
-          className="h-px flex-1"
-          style={{ backgroundColor: tokens.divider }}
+          className="h-px flex-1 transition-colors"
+          style={{ backgroundColor: stageStyle.dividerColor }}
           aria-hidden="true"
         />
 
@@ -674,12 +737,11 @@ function Sneaker3DCanvas({
           type="button"
           onClick={handleResetClick}
           title={resetLabel || '360°'}
-          className="flex items-center gap-1.5 px-3.5 h-8 rounded-full border text-[12px] font-sans font-medium tracking-[0.04em] transition-all duration-150 active:scale-[0.95] cursor-pointer shrink-0"
+          className="flex items-center gap-1.5 px-3.5 h-8 rounded-full border text-[12px] font-sans font-medium tracking-[0.04em] transition-transform duration-150 active:scale-[0.95] cursor-pointer shrink-0"
           style={{
-            backgroundColor: tokens.surface,
-            borderColor: tokens.borderStrong,
-            color: tokens.ink,
-            boxShadow: tokens.buttonShadow,
+            backgroundColor: stageStyle.btnBg,
+            borderColor: stageStyle.btnBorder,
+            color: stageStyle.btnText,
           }}
         >
           <span>360°</span>
@@ -703,14 +765,20 @@ function Sneaker3DCanvas({
   )
 }
 
-export function Sneaker3D(props: Sneaker3DProps) {
+export const Sneaker3D = memo(function Sneaker3D(props: Sneaker3DProps) {
+  const uiTokens = getThemeTokens(props.isDark)
+  const stageStyle = resolveStudioStageStyle(
+    props.studioBgHex || uiTokens.pageBg,
+    props.autoContrast ?? true,
+    uiTokens
+  )
   return (
     <SneakerErrorBoundary
       sneakerColors={props.sneakerColors}
-      isDark={props.isDark}
+      isDarkStage={stageStyle.isDarkStage}
       fallbackLabel={props.webglFallbackLabel}
     >
       <Sneaker3DCanvas {...props} />
     </SneakerErrorBoundary>
   )
-}
+})
