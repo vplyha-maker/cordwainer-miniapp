@@ -1340,43 +1340,82 @@ export function ensureCleanGlbSegmentation(THREE: ThreeLib, root: THREE_TYPES.Ob
     }
   })
 
-  // Авто-разделение подошвы и нижних берцев для NEXUS X1 (sockbottom) и MONOLITH V (sole_mat)
-  const nexusBottomKey = Object.keys(meshesByName).find((k) =>
-    k.toLowerCase().includes('sockbottom')
-  )
-  if (nexusBottomKey) {
-    const nbMesh = meshesByName[nexusBottomKey]
+  // Авто-разделение цельного меша подошвы+берцев на NEXUS X1 (sockbottom) в мировых координатах Y
+  root.updateMatrixWorld(true)
+  const nexusBottomMeshes: THREE_TYPES.Mesh[] = []
+  root.traverse((obj) => {
+    const m = obj as THREE_TYPES.Mesh
+    if (!m.isMesh || !m.geometry) return
+    const rawMat = Array.isArray(m.material) ? m.material[0] : m.material
+    const combined = (
+      (m.name || '') +
+      '_' +
+      (m.parent?.name || '') +
+      '_' +
+      (rawMat?.name || '')
+    ).toLowerCase()
+    if (combined.includes('sockbottom')) {
+      nexusBottomMeshes.push(m)
+    }
+  })
+
+  nexusBottomMeshes.forEach((nbMesh) => {
     const pos = nbMesh.geometry.attributes.position
     const idxAttr = nbMesh.geometry.index
-    if (pos && idxAttr && !nbMesh.geometry.userData?.soleSplitDone) {
-      nbMesh.geometry.computeBoundingBox()
-      const bb = nbMesh.geometry.boundingBox
-      if (bb && bb.max.y - bb.min.y > 0.05) {
-        const yCut = bb.min.y + (bb.max.y - bb.min.y) * 0.44
-        const indices = idxAttr.array
-        const soleIdx: number[] = []
-        const sideIdx: number[] = []
-        for (let i = 0; i < indices.length; i += 3) {
-          const i0 = indices[i], i1 = indices[i + 1], i2 = indices[i + 2]
-          const cy = (pos.getY(i0) + pos.getY(i1) + pos.getY(i2)) / 3
-          if (cy <= yCut) soleIdx.push(i0, i1, i2)
-          else sideIdx.push(i0, i1, i2)
-        }
-        if (soleIdx.length > 0 && sideIdx.length > 0) {
-          nbMesh.geometry.setIndex(soleIdx)
-          nbMesh.geometry.computeBoundingSphere()
-          nbMesh.geometry.userData = { ...nbMesh.geometry.userData, soleSplitDone: true }
-          const sideGeom = nbMesh.geometry.clone()
-          sideGeom.setIndex(sideIdx)
-          sideGeom.computeBoundingSphere()
-          sideGeom.userData = { ...sideGeom.userData, soleSplitDone: true }
-          const sideMesh = new THREE.Mesh(sideGeom, nbMesh.material)
-          sideMesh.name = 'quarters'
-          nbMesh.parent?.add(sideMesh)
-        }
+    if (!pos || nbMesh.geometry.userData?.soleSplitDone) return
+
+    // Вычисляем реальный вертикальный диапазон в world-пространстве (учитывая Z-up повороты GLTF)
+    const vTmp = new THREE.Vector3()
+    let minY = Infinity
+    let maxY = -Infinity
+    for (let i = 0; i < pos.count; i++) {
+      vTmp.fromBufferAttribute(pos, i).applyMatrix4(nbMesh.matrixWorld)
+      if (vTmp.y < minY) minY = vTmp.y
+      if (vTmp.y > maxY) maxY = vTmp.y
+    }
+
+    const heightY = maxY - minY
+    if (!Number.isFinite(heightY) || heightY <= 0.02) return
+
+    // Нижние 30% по высоте — чистая подошва (midsole), всё выше окантовки — боковые берцы (quarters)
+    const yCut = minY + heightY * 0.30
+    const soleIdx: number[] = []
+    const sideIdx: number[] = []
+
+    const triCount = idxAttr ? idxAttr.count : pos.count
+    for (let i = 0; i < triCount; i += 3) {
+      const i0 = idxAttr ? idxAttr.getX(i) : i
+      const i1 = idxAttr ? idxAttr.getX(i + 1) : i + 1
+      const i2 = idxAttr ? idxAttr.getX(i + 2) : i + 2
+
+      const y0 = vTmp.fromBufferAttribute(pos, i0).applyMatrix4(nbMesh.matrixWorld).y
+      const y1 = vTmp.fromBufferAttribute(pos, i1).applyMatrix4(nbMesh.matrixWorld).y
+      const y2 = vTmp.fromBufferAttribute(pos, i2).applyMatrix4(nbMesh.matrixWorld).y
+      const cy = (y0 + y1 + y2) / 3
+
+      if (cy <= yCut) {
+        soleIdx.push(i0, i1, i2)
+      } else {
+        sideIdx.push(i0, i1, i2)
       }
     }
-  }
+
+    if (soleIdx.length > 0 && sideIdx.length > 0) {
+      nbMesh.geometry.setIndex(soleIdx)
+      nbMesh.geometry.computeBoundingSphere()
+      nbMesh.geometry.userData = { ...nbMesh.geometry.userData, soleSplitDone: true }
+      nbMesh.name = 'midsole'
+
+      const sideGeom = nbMesh.geometry.clone()
+      sideGeom.setIndex(sideIdx)
+      sideGeom.computeBoundingSphere()
+      sideGeom.userData = { ...sideGeom.userData, soleSplitDone: true }
+
+      const sideMesh = new THREE.Mesh(sideGeom, nbMesh.material)
+      sideMesh.name = 'quarters'
+      nbMesh.parent?.add(sideMesh)
+    }
+  })
 
   if (toeBoxVerts === 0 || toeBoxVerts > 600) return
 
