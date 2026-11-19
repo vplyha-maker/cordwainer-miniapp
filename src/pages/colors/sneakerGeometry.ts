@@ -138,21 +138,21 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   sockbottom: 'midsole',
   traces: 'outsole',
 
-  // 3. CORDWAINE MONOLITH V (V.glb)
-  leather_mat: 'vamp',
+  // 3. CORDWAINE MONOLITH V (V.glb) — уточнённая раскладка
+  plastic_mat: 'vamp',
   pattern_dior_mat: 'quarters',
   pattern_dior_top1: 'toeBox',
-  strap_mat: 'eyestays',
   new_mat: 'heel',
-  phong7: 'collar',
+  leather_mat: 'collar',
   stingraypbs1: 'lining',
-  plastic_mat: 'encap',
+  phong7: 'laces',
+  hole_mat: 'laces',
+  ring_white: 'laces',
+  strap_mat: 'swoosh',
   decaltop_mat: 'swoosh',
   decal_sole_mat: 'swoosh',
   stitches_mat: 'swoosh',
   sole_mat: 'outsole',
-  hole_mat: 'laces',
-  ring_white: 'laces',
 
   // Универсальные ключи
   upper_vamp: 'vamp',
@@ -260,16 +260,18 @@ export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   if (normalized.includes('traces')) return 'outsole'
   if (normalized.includes('curve')) return 'toeBox'
   if (normalized.includes('tail')) return 'heel'
+  if (normalized.includes('plastic_mat')) return 'vamp'
   if (normalized.includes('pattern_dior_top')) return 'toeBox'
   if (normalized.includes('pattern_dior')) return 'quarters'
-  if (normalized.includes('leather_mat')) return 'vamp'
-  if (normalized.includes('strap_mat')) return 'eyestays'
-  if (normalized.includes('stitches_mat') || normalized.includes('decal')) return 'swoosh'
-  if (normalized.includes('plastic_mat')) return 'encap'
+  if (normalized.includes('leather_mat')) return 'collar'
+  if (normalized.includes('strap_mat') || normalized.includes('stitches_mat') || normalized.includes('decal')) {
+    return 'swoosh'
+  }
   if (normalized.includes('stingray')) return 'lining'
-  if (normalized.includes('phong7')) return 'collar'
+  if (normalized.includes('phong7') || normalized.includes('ring_white') || normalized.includes('hole_mat')) {
+    return 'laces'
+  }
   if (normalized.includes('new_mat')) return 'heel'
-  if (normalized.includes('ring_white') || normalized.includes('hole_mat')) return 'laces'
 
   // Общие правила
   if (
@@ -1484,13 +1486,20 @@ export function bindGlbMaterialsPreservingTextures(
 
     if (hasReliefTextures && srcStd) {
       const clonedMat = srcStd.clone()
-      // Очищаем запечённую цветную карту (map), сохраняя normal/roughness/ao-рельеф,
-      // чтобы круг Иттена точно передавал выбранные HEX-цвета без затемнения
       if (clonedMat.map) {
         clonedMat.map.dispose()
         clonedMat.map = null
       }
       clonedMat.color = new THREE.Color(currentColors[zone])
+      // Благородная матовая фактура кожи/замши вместо глянцевого пластика
+      clonedMat.roughness = Math.max(
+        typeof clonedMat.roughness === 'number' ? clonedMat.roughness : 0.65,
+        0.62
+      )
+      clonedMat.metalness = Math.min(
+        typeof clonedMat.metalness === 'number' ? clonedMat.metalness : 0.04,
+        0.08
+      )
       clonedMat.vertexColors = hasMeshVertexColor
       clonedMat.needsUpdate = true
       mesh.material = clonedMat
@@ -1515,8 +1524,8 @@ export function bindGlbMaterialsPreservingTextures(
       vcMat.vertexColors = true
       if (srcStd) {
         vcMat.side = srcStd.side ?? THREE.DoubleSide
-        if (typeof srcStd.roughness === 'number') vcMat.roughness = srcStd.roughness
-        if (typeof srcStd.metalness === 'number') vcMat.metalness = srcStd.metalness
+        if (typeof srcStd.roughness === 'number') vcMat.roughness = Math.max(srcStd.roughness, 0.58)
+        if (typeof srcStd.metalness === 'number') vcMat.metalness = Math.min(srcStd.metalness, 0.08)
       } else {
         vcMat.side = THREE.DoubleSide
       }
