@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 
 const HAPTICS_STORAGE_KEY = 'cordwainer_haptics_enabled_v1'
 const HAPTICS_EVENT = 'cordwaine:haptics-changed'
-const SWATCH_COOLDOWN_MS = 50
+const SWATCH_COOLDOWN_MS = 55
 
 let lastSwatchHapticAt = 0
 let sharedAudioCtx: AudioContext | null = null
+let audioUnlockAttached = false
 
 type TgHapticApi = {
   impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
@@ -29,6 +30,36 @@ function getExtendedWindow(): ExtendedHapticWindow | undefined {
   if (typeof window === 'undefined') return undefined
   return window as unknown as ExtendedHapticWindow
 }
+
+function ensureAudioUnlocked(): AudioContext | null {
+  try {
+    const w = getExtendedWindow()
+    const AudioCtx =
+      typeof AudioContext !== 'undefined' ? AudioContext : w?.webkitAudioContext
+    if (!AudioCtx) return null
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new AudioCtx()
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      void sharedAudioCtx.resume().catch(() => {})
+    }
+    return sharedAudioCtx
+  } catch {
+    return null
+  }
+}
+
+function attachGlobalAudioUnlock(): void {
+  if (audioUnlockAttached || typeof window === 'undefined') return
+  audioUnlockAttached = true
+  const unlock = () => {
+    ensureAudioUnlocked()
+  }
+  window.addEventListener('pointerdown', unlock, { passive: true, capture: true })
+  window.addEventListener('touchstart', unlock, { passive: true, capture: true })
+}
+
+attachGlobalAudioUnlock()
 
 export function isHapticsEnabled(): boolean {
   try {
@@ -75,7 +106,7 @@ export function useHapticsSetting(): [boolean, (next: boolean) => void] {
   return [enabled, update]
 }
 
-// Канал 1: navigator.vibrate() для Android WebView и Chrome
+// Канал 1: navigator.vibrate() — длительности >= 14–18ms выше порога раскрутки мотора Android
 function fireNavigatorVibrate(pattern: number | number[]): void {
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -99,61 +130,68 @@ function fireTelegramProxy(
   } catch {}
 }
 
-// Канал 3: Резервный Web Audio API микро-импульс (ощутимый тактильный щелчок даже без вибромотора)
+// Канал 3: Резервный Web Audio API микро-импульс (суббас 175 -> 46 Гц + короткий клик)
 function fireAudioMicroImpulse(strength: 'soft' | 'tap' | 'confirm'): void {
   try {
-    const w = getExtendedWindow()
-    const AudioCtx =
-      typeof AudioContext !== 'undefined' ? AudioContext : w?.webkitAudioContext
-    if (!AudioCtx) return
+    const ctx = ensureAudioUnlocked()
+    if (!ctx) return
 
-    if (!sharedAudioCtx) {
-      sharedAudioCtx = new AudioCtx()
+    const play = () => {
+      try {
+        const now = ctx.currentTime
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        const peakGain = strength === 'confirm' ? 0.09 : strength === 'tap' ? 0.065 : 0.042
+        const startFreq = strength === 'confirm' ? 210 : 175
+        const endFreq = 46
+        const duration = strength === 'confirm' ? 0.036 : 0.022
+
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(startFreq, now)
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration)
+
+        gain.gain.setValueAtTime(0.0001, now)
+        gain.gain.linearRampToValueAtTime(peakGain, now + 0.0025)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+
+        osc.start(now)
+        osc.stop(now + duration + 0.006)
+      } catch {}
     }
-    if (sharedAudioCtx.state === 'suspended') {
-      void sharedAudioCtx.resume().catch(() => {})
+
+    if (ctx.state === 'running') {
+      play()
+    } else if (ctx.state === 'suspended') {
+      void ctx.resume().then(play).catch(() => {})
     }
-    if (sharedAudioCtx.state !== 'running') return
-
-    const now = sharedAudioCtx.currentTime
-    const osc = sharedAudioCtx.createOscillator()
-    const gain = sharedAudioCtx.createGain()
-
-    const peakGain = strength === 'confirm' ? 0.045 : strength === 'tap' ? 0.028 : 0.018
-    const startFreq = strength === 'confirm' ? 190 : 168
-    const endFreq = 46
-    const duration = strength === 'confirm' ? 0.032 : 0.018
-
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(startFreq, now)
-    osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration)
-
-    gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.002)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
-
-    osc.connect(gain)
-    gain.connect(sharedAudioCtx.destination)
-
-    osc.start(now)
-    osc.stop(now + duration + 0.005)
   } catch {}
 }
 
-// 3-канальный тактильный отклик (все каналы без раннего return — работает на One UI / HyperOS / iOS)
-export function triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
+export function triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'medium'): void {
   if (!isHapticsEnabled()) return
+  const tgStyle = style === 'light' ? 'medium' : style
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
-    tgHaptic?.impactOccurred?.(style)
+    tgHaptic?.impactOccurred?.(tgStyle)
   } catch {}
-  fireTelegramProxy({ type: 'impact', impact_style: style })
-  fireNavigatorVibrate(style === 'heavy' ? 18 : style === 'medium' ? 12 : 9)
+  fireTelegramProxy({ type: 'impact', impact_style: tgStyle })
+  fireNavigatorVibrate(style === 'heavy' ? 26 : style === 'medium' ? 18 : 15)
   fireAudioMicroImpulse(style === 'heavy' ? 'confirm' : 'tap')
 }
 
 export function hapticTap(): void {
-  triggerHaptic('light')
+  if (!isHapticsEnabled()) return
+  try {
+    const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
+    tgHaptic?.impactOccurred?.('medium')
+  } catch {}
+  fireTelegramProxy({ type: 'impact', impact_style: 'medium' })
+  fireNavigatorVibrate(18)
+  fireAudioMicroImpulse('tap')
 }
 
 export function hapticSwatch(): void {
@@ -164,10 +202,11 @@ export function hapticSwatch(): void {
 
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
+    tgHaptic?.impactOccurred?.('light')
     tgHaptic?.selectionChanged?.()
   } catch {}
-  fireTelegramProxy({ type: 'selection_change' })
-  fireNavigatorVibrate(8)
+  fireTelegramProxy({ type: 'impact', impact_style: 'light' })
+  fireNavigatorVibrate(14)
   fireAudioMicroImpulse('soft')
 }
 
@@ -175,22 +214,22 @@ export function hapticHarmony(): void {
   if (!isHapticsEnabled()) return
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
-    tgHaptic?.impactOccurred?.('medium')
+    tgHaptic?.impactOccurred?.('heavy')
   } catch {}
-  fireTelegramProxy({ type: 'impact', impact_style: 'medium' })
-  fireNavigatorVibrate([10, 20, 12])
-  fireAudioMicroImpulse('tap')
+  fireTelegramProxy({ type: 'impact', impact_style: 'heavy' })
+  fireNavigatorVibrate([18, 22, 18])
+  fireAudioMicroImpulse('confirm')
 }
 
 export function hapticModel(): void {
   if (!isHapticsEnabled()) return
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
-    tgHaptic?.impactOccurred?.('medium')
+    tgHaptic?.impactOccurred?.('heavy')
   } catch {}
-  fireTelegramProxy({ type: 'impact', impact_style: 'medium' })
-  fireNavigatorVibrate(14)
-  fireAudioMicroImpulse('tap')
+  fireTelegramProxy({ type: 'impact', impact_style: 'heavy' })
+  fireNavigatorVibrate([20, 20, 16])
+  fireAudioMicroImpulse('confirm')
 }
 
 export function hapticSave(): void {
@@ -200,7 +239,7 @@ export function hapticSave(): void {
     tgHaptic?.notificationOccurred?.('success')
   } catch {}
   fireTelegramProxy({ type: 'notification', notification_type: 'success' })
-  fireNavigatorVibrate([14, 28, 22])
+  fireNavigatorVibrate([22, 28, 32])
   fireAudioMicroImpulse('confirm')
 }
 
@@ -211,6 +250,6 @@ export function hapticReset(): void {
     tgHaptic?.notificationOccurred?.('warning')
   } catch {}
   fireTelegramProxy({ type: 'notification', notification_type: 'warning' })
-  fireNavigatorVibrate([16, 22, 12])
+  fireNavigatorVibrate([24, 24, 16])
   fireAudioMicroImpulse('tap')
 }
