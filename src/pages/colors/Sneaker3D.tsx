@@ -23,6 +23,14 @@ export type Sneaker3DProps = {
   webglFallbackLabel?: string
 }
 
+function isAndroidDevice(): boolean {
+  try {
+    return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+  } catch {
+    return false
+  }
+}
+
 function triggerLightHaptic() {
   try {
     const w = window as unknown as {
@@ -167,6 +175,7 @@ function Sneaker3DCanvas({
     let isDocumentVisible = typeof document !== 'undefined' ? !document.hidden : true
     let cleanupFn: (() => void) | undefined
 
+    const isAndroid = isAndroidDevice()
     const prefersReducedMotion =
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -187,12 +196,15 @@ function Sneaker3DCanvas({
         const width = container.clientWidth || 340
         const height = container.clientHeight || 205
 
+        const precision: 'mediump' | 'highp' = isAndroid ? 'mediump' : 'highp'
+
         let renderer: THREE_TYPES.WebGLRenderer
         try {
           renderer = new THREE.WebGLRenderer({
             antialias: true,
             alpha: true,
-            powerPreference: 'high-performance',
+            powerPreference: isAndroid ? 'default' : 'high-performance',
+            precision,
           })
         } catch (err) {
           if (import.meta.env.DEV) {
@@ -205,8 +217,9 @@ function Sneaker3DCanvas({
           return
         }
 
+        const maxDpr = isAndroid ? 1.35 : 2
         renderer.setSize(width, height)
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr))
         renderer.toneMapping = THREE.ACESFilmicToneMapping
         renderer.toneMappingExposure = 1.12
         container.innerHTML = ''
@@ -270,6 +283,10 @@ function Sneaker3DCanvas({
         const renderSingleFrame = () => {
           if (disposed || !isVisibleInViewport || !isDocumentVisible) return
           if (!isLoopRunning) {
+            if (shoeRootRef.current) {
+              shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+              shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+            }
             renderer.render(scene, camera)
           }
         }
@@ -282,7 +299,18 @@ function Sneaker3DCanvas({
           }
 
           const idleMs = Date.now() - lastActivityTime.current
-          if (!isInteracting.current && (prefersReducedMotion || idleMs >= 6000)) {
+          const dYaw = rotTarget.current.yaw - rotCurrent.current.yaw
+          const dPitch = rotTarget.current.pitch - rotCurrent.current.pitch
+          const isSettled = Math.abs(dYaw) < 0.0012 && Math.abs(dPitch) < 0.0012
+
+          // На Android останавливаем рендер-цикл сразу после остановки инерции (0% нагрузки на GPU в простое)
+          const shouldStop =
+            !isInteracting.current &&
+            (prefersReducedMotion ||
+              (isAndroid && (isSettled || idleMs >= 1600)) ||
+              idleMs >= 6000)
+
+          if (shouldStop) {
             rotCurrent.current.yaw = rotTarget.current.yaw
             rotCurrent.current.pitch = rotTarget.current.pitch
             if (shoeRootRef.current) {
@@ -299,21 +327,25 @@ function Sneaker3DCanvas({
           frameId = requestAnimationFrame(animate)
           const elapsed = clock.getElapsedTime()
 
-          const swayDamping = Math.max(0, Math.min(1, (5400 - idleMs) / 1200))
+          const swayDamping = isAndroid
+            ? 0
+            : Math.max(0, Math.min(1, (5400 - idleMs) / 1200))
 
           if (!isInteracting.current && !prefersReducedMotion && swayDamping > 0) {
             rotTarget.current.yaw += Math.sin(elapsed * 0.65) * 0.0007 * swayDamping
           }
 
-          rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * 0.14
-          rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * 0.14
+          const lerpFactor = isAndroid ? 0.24 : 0.14
+          rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * lerpFactor
+          rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * lerpFactor
 
           if (shoeRootRef.current) {
             shoeRootRef.current.rotation.y = rotCurrent.current.yaw
             shoeRootRef.current.rotation.x = rotCurrent.current.pitch
-            shoeRootRef.current.position.y = prefersReducedMotion
-              ? 0
-              : Math.sin(elapsed * 1.5) * 0.015 * swayDamping
+            shoeRootRef.current.position.y =
+              prefersReducedMotion || isAndroid
+                ? 0
+                : Math.sin(elapsed * 1.5) * 0.015 * swayDamping
           }
 
           renderer.render(scene, camera)
@@ -585,8 +617,10 @@ function Sneaker3DCanvas({
         type="button"
         onClick={handleResetClick}
         className={
-          'absolute bottom-1 right-2 px-3 py-1.5 min-h-[28px] text-[8.5px] font-sans uppercase tracking-[0.2em] border rounded-full backdrop-blur-sm transition-opacity opacity-80 hover:opacity-100 cursor-pointer bg-transparent ' +
-          (isDark ? 'border-white/25 text-[#F4F0E8]' : 'border-black/25 text-[#1C1816]')
+          'absolute bottom-1 right-2 px-3 py-1.5 min-h-[28px] text-[8.5px] font-sans uppercase tracking-[0.2em] border rounded-full transition-opacity opacity-85 hover:opacity-100 cursor-pointer ' +
+          (isDark
+            ? 'border-white/25 bg-[#0A0A0A]/80 text-[#F4F0E8]'
+            : 'border-black/25 bg-[#F2EFE9]/85 text-[#1C1816]')
         }
       >
         {resetLabel || '360° • Сброс'}
