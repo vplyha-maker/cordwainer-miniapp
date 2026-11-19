@@ -303,7 +303,6 @@ function Sneaker3DCanvas({
           const dPitch = rotTarget.current.pitch - rotCurrent.current.pitch
           const isSettled = Math.abs(dYaw) < 0.0012 && Math.abs(dPitch) < 0.0012
 
-          // На Android останавливаем рендер-цикл сразу после остановки инерции (0% нагрузки на GPU в простое)
           const shouldStop =
             !isInteracting.current &&
             (prefersReducedMotion ||
