@@ -22,6 +22,11 @@ import {
 } from './colors/colorEngine'
 import { Sneaker3D } from './colors/Sneaker3D'
 import {
+  SNEAKER_MODELS,
+  getSneakerModelConfig,
+  type SneakerModelId,
+} from './colors/sneakerGeometry'
+import {
   TRANSLATIONS,
   getPresetSwatchLabels,
   isAppNativeLang,
@@ -35,7 +40,6 @@ import {
   useTelegramProPayment,
 } from './colors/useTelegramProPayment'
 
-// Реэкспорты для полной обратной совместимости с остальными модулями проекта
 export {
   PRO_COLORS_PRICE_STARS,
   normalizeSupportedLang,
@@ -78,6 +82,7 @@ type PersistedColorsState = {
   scheme: Scheme
   modelMode: ColorModelMode
   mappingPreset: FootwearMappingPreset
+  modelId: SneakerModelId
 }
 
 const STORAGE_KEY = 'cordwainer_colors_state_v1'
@@ -101,6 +106,8 @@ const ALL_PRESETS: readonly FootwearMappingPreset[] = [
   'neutral-sole',
 ]
 
+const VALID_MODEL_IDS: readonly SneakerModelId[] = ['aerostrap', 'nexus', 'monolith']
+
 const DEFAULT_STATE: PersistedColorsState = {
   baseHue: 194,
   whiteAmount: 0.05,
@@ -109,6 +116,7 @@ const DEFAULT_STATE: PersistedColorsState = {
   scheme: 'complementary',
   modelMode: 'ryb',
   mappingPreset: 'classic',
+  modelId: 'aerostrap',
 }
 
 function loadSavedColorsState(): PersistedColorsState {
@@ -137,6 +145,12 @@ function loadSavedColorsState(): PersistedColorsState {
         ? (parsed.mappingPreset as FootwearMappingPreset)
         : DEFAULT_STATE.mappingPreset
 
+    const modelId: SneakerModelId =
+      typeof parsed.modelId === 'string' &&
+      VALID_MODEL_IDS.includes(parsed.modelId as SneakerModelId)
+        ? (parsed.modelId as SneakerModelId)
+        : DEFAULT_STATE.modelId
+
     return {
       baseHue: Math.round(clamp(parsed.baseHue, 0, 359, DEFAULT_STATE.baseHue)),
       whiteAmount: clamp(parsed.whiteAmount, 0, 1, DEFAULT_STATE.whiteAmount),
@@ -145,6 +159,7 @@ function loadSavedColorsState(): PersistedColorsState {
       scheme,
       modelMode,
       mappingPreset,
+      modelId,
     }
   } catch {
     return DEFAULT_STATE
@@ -182,6 +197,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [mappingPreset, setMappingPreset] = useState<FootwearMappingPreset>(
     initialSaved.mappingPreset
   )
+  const [modelId, setModelId] = useState<SneakerModelId>(initialSaved.modelId)
 
   const [baseHue, setBaseHue] = useState(initialSaved.baseHue)
   const [whiteAmount, setWhiteAmount] = useState(initialSaved.whiteAmount)
@@ -206,6 +222,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const lastHapticHue = useRef(initialSaved.baseHue)
 
   const t: TranslationDict = TRANSLATIONS[normalizeSupportedLang(localLang)] ?? TRANSLATIONS.ru
+  const activeModel = getSneakerModelConfig(modelId)
 
   const {
     paymentState,
@@ -238,10 +255,21 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         scheme: isProPurchased || FREE_SCHEMES.includes(scheme) ? scheme : 'complementary',
         modelMode,
         mappingPreset,
+        modelId,
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
     } catch {}
-  }, [baseHue, whiteAmount, blackAmount, chromaAmount, scheme, modelMode, mappingPreset, isProPurchased])
+  }, [
+    baseHue,
+    whiteAmount,
+    blackAmount,
+    chromaAmount,
+    scheme,
+    modelMode,
+    mappingPreset,
+    modelId,
+    isProPurchased,
+  ])
 
   useEffect(() => {
     if (!showProModal && !showGuide) return
@@ -287,6 +315,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     }
     triggerHaptic('light')
     setScheme(s)
+  }
+
+  const handleModelSwitch = (nextId: SneakerModelId) => {
+    if (nextId === modelId) return
+    triggerHaptic('light')
+    setModelId(nextId)
   }
 
   const handleResetAll = useCallback(() => {
@@ -385,7 +419,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const handleExportFullSpec = useCallback(() => {
     const header =
-      'CORDWAINE AEROSTRAP — ' +
+      activeModel.name +
+      ' — ' +
       t[scheme] +
       ' (' +
       modelMode.toUpperCase() +
@@ -397,7 +432,16 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     const lines = allZonesSpec.map((z) => z.label + ': ' + z.hex)
     const fullText = header + '\n' + lines.join('\n')
     copyToClipboard('__full_spec__', fullText, t.exportCopied)
-  }, [allZonesSpec, baseHue, copyToClipboard, harmonyEvaluation.ratioText, modelMode, scheme, t])
+  }, [
+    activeModel.name,
+    allZonesSpec,
+    baseHue,
+    copyToClipboard,
+    harmonyEvaluation.ratioText,
+    modelMode,
+    scheme,
+    t,
+  ])
 
   const wheelBackground = useMemo(() => {
     const stops: string[] = []
@@ -532,7 +576,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }
       `}</style>
 
-      {/* Невидимый live-регион для screen readers (WCAG 2.2 AA) */}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {liveStatusText}
       </div>
@@ -646,8 +689,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           })}
         </div>
 
-        {/* 1.5. ПРЕСЕТЫ НА ВСЮ ШИРИНУ + ОТДЕЛЬНАЯ МИКРО-СТРОКА КОНТРАСТА */}
-        <div className="pt-1.5 flex flex-col gap-1">
+        {/* 1.5. ПРЕСЕТЫ РАСПРЕДЕЛЕНИЯ + ПЕРЕКЛЮЧАТЕЛЬ 3D-МОДЕЛЕЙ И КОНТРАСТ */}
+        <div className="pt-1.5 flex flex-col gap-1.5">
           <div className="flex overflow-x-auto gap-1.5 pr-6 scrollbar-hide" style={fadeMaskStyle}>
             {PRESETS.map((p) => (
               <button
@@ -669,23 +712,46 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             ))}
           </div>
 
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+              {SNEAKER_MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => handleModelSwitch(m.id)}
+                  className={
+                    'px-2 py-0.5 text-[7.5px] font-sans uppercase tracking-[0.16em] rounded-full border transition-colors cursor-pointer shrink-0 ' +
+                    (modelId === m.id
+                      ? isDark
+                        ? 'border-[#F4F0E8]/40 bg-[#F4F0E8]/10 text-[#F4F0E8] font-semibold'
+                        : 'border-[#1C1816]/40 bg-[#1C1816]/10 text-[#1C1816] font-semibold'
+                      : 'border-transparent bg-transparent ' + cTextMuted + ' ' + cHover)
+                  }
+                >
+                  {m.shortLabel}
+                </button>
+              ))}
+            </div>
+
             <span
-              className={'text-[7.5px] font-sans uppercase tracking-[0.14em] ' + cTextMuted}
+              className={
+                'text-[7.5px] font-sans uppercase tracking-[0.12em] whitespace-nowrap ' + cTextMuted
+              }
             >
-              ΔE {harmonyEvaluation.ratioText} • {harmonyEvaluation.statusLabel}
+              ΔE {harmonyEvaluation.ratioText}
             </span>
           </div>
         </div>
 
-        {/* 2. 3D-МОДЕЛЬ CORDWAINE AEROSTRAP */}
+        {/* 2. 3D-МОДЕЛЬ (AEROSTRAP / NEXUS X1 / MONOLITH V) */}
         <div className="my-0.5">
           <Sneaker3D
             sneakerColors={sneakerColors}
             isDark={isDark}
+            modelId={modelId}
             onResetAll={handleResetAll}
             resetLabel={t.resetBtn}
-            loading3DLabel={t.loading3D}
+            loading3DLabel={'3D • ' + activeModel.name + '...'}
             webglFallbackLabel={t.webglFallback}
           />
         </div>
@@ -853,7 +919,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ (2 СТРОКИ ПОД СВОТЧЕМ ДЛЯ ЧИТАЕМОСТИ В ТЕТРАДАХ) */}
+        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ */}
         <div className={'grid gap-2.5 pt-1.5 ' + (isTetrad ? 'grid-cols-4' : 'grid-cols-3')}>
           {colors.map((c, i) => {
             const isCopied = copiedKey === 'swatch:' + i + ':' + c
@@ -893,11 +959,11 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           })}
         </div>
 
-        {/* 4.5. ПРОИЗВОДСТВЕННАЯ ТЕХКАРТА 13 ЗОН CORDWAINE AEROSTRAP */}
+        {/* 4.5. ПРОИЗВОДСТВЕННАЯ ТЕХКАРТА 13 ЗОН */}
         <div className={'mt-2 pt-1.5 border-t ' + cLine}>
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <span className={'text-[8px] font-sans uppercase tracking-[0.16em] ' + cTextMuted}>
-              CORDWAINE AEROSTRAP • 13
+              {activeModel.name} • 13
             </span>
             <button
               type="button"
