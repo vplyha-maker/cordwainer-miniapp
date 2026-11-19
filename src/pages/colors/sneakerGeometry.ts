@@ -152,7 +152,7 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   decaltop_mat: 'swoosh',
   decal_sole_mat: 'swoosh',
   stitches_mat: 'swoosh',
-  sole_mat: 'outsole',
+  sole_mat: 'midsole',
 
   // Универсальные ключи
   upper_vamp: 'vamp',
@@ -1340,6 +1340,44 @@ export function ensureCleanGlbSegmentation(THREE: ThreeLib, root: THREE_TYPES.Ob
     }
   })
 
+  // Авто-разделение подошвы и нижних берцев для NEXUS X1 (sockbottom) и MONOLITH V (sole_mat)
+  const nexusBottomKey = Object.keys(meshesByName).find((k) =>
+    k.toLowerCase().includes('sockbottom')
+  )
+  if (nexusBottomKey) {
+    const nbMesh = meshesByName[nexusBottomKey]
+    const pos = nbMesh.geometry.attributes.position
+    const idxAttr = nbMesh.geometry.index
+    if (pos && idxAttr && !nbMesh.geometry.userData?.soleSplitDone) {
+      nbMesh.geometry.computeBoundingBox()
+      const bb = nbMesh.geometry.boundingBox
+      if (bb && bb.max.y - bb.min.y > 0.05) {
+        const yCut = bb.min.y + (bb.max.y - bb.min.y) * 0.44
+        const indices = idxAttr.array
+        const soleIdx: number[] = []
+        const sideIdx: number[] = []
+        for (let i = 0; i < indices.length; i += 3) {
+          const i0 = indices[i], i1 = indices[i + 1], i2 = indices[i + 2]
+          const cy = (pos.getY(i0) + pos.getY(i1) + pos.getY(i2)) / 3
+          if (cy <= yCut) soleIdx.push(i0, i1, i2)
+          else sideIdx.push(i0, i1, i2)
+        }
+        if (soleIdx.length > 0 && sideIdx.length > 0) {
+          nbMesh.geometry.setIndex(soleIdx)
+          nbMesh.geometry.computeBoundingSphere()
+          nbMesh.geometry.userData = { ...nbMesh.geometry.userData, soleSplitDone: true }
+          const sideGeom = nbMesh.geometry.clone()
+          sideGeom.setIndex(sideIdx)
+          sideGeom.computeBoundingSphere()
+          sideGeom.userData = { ...sideGeom.userData, soleSplitDone: true }
+          const sideMesh = new THREE.Mesh(sideGeom, nbMesh.material)
+          sideMesh.name = 'quarters'
+          nbMesh.parent?.add(sideMesh)
+        }
+      }
+    }
+  }
+
   if (toeBoxVerts === 0 || toeBoxVerts > 600) return
 
   const splitMeshByPredicate = (
@@ -1459,8 +1497,8 @@ export function bindGlbMaterialsPreservingTextures(
     const parentName = mesh.parent && mesh.parent.name !== 'RootNode' ? mesh.parent.name : ''
     const candidateName = mesh.name || parentName || rawMat?.name || ''
     const zone =
-      resolveGlbZone(rawMat?.name || '') ??
       resolveGlbZone(mesh.name || '') ??
+      resolveGlbZone(rawMat?.name || '') ??
       resolveGlbZone(parentName + '_' + mesh.name + '_' + (rawMat?.name || ''))
 
     if (!zone) {
