@@ -1,6 +1,7 @@
 import React, { Component, useCallback, useEffect, useRef, useState } from 'react'
 import type * as THREE_TYPES from 'three'
 import type { SneakerColors, SneakerZoneKey } from './colorEngine'
+import { hapticReset } from './haptics'
 import { RainbowTilesLoader } from './RainbowTilesLoader'
 import {
   SNEAKER_LAST_PARAMS,
@@ -16,6 +17,7 @@ import {
   type SneakerModelId,
   type ZoneMaterialRegistry,
 } from './sneakerGeometry'
+import { getThemeTokens } from './themeSystem'
 
 export type Sneaker3DProps = {
   sneakerColors: SneakerColors
@@ -25,6 +27,7 @@ export type Sneaker3DProps = {
   resetLabel?: string
   loading3DLabel?: string
   webglFallbackLabel?: string
+  compact?: boolean
 }
 
 function isAndroidDevice(): boolean {
@@ -33,15 +36,6 @@ function isAndroidDevice(): boolean {
   } catch {
     return false
   }
-}
-
-function triggerLightHaptic() {
-  try {
-    const w = window as unknown as {
-      Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred: (style: string) => void } } }
-    }
-    w.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light')
-  } catch {}
 }
 
 function SneakerFallbackCard({
@@ -64,7 +58,7 @@ function SneakerFallbackCard({
   return (
     <div
       className={
-        'w-full h-full flex flex-col items-center justify-center border border-dashed rounded-sm px-4 text-center ' +
+        'w-full h-full flex flex-col items-center justify-center border border-dashed rounded-2xl px-4 text-center ' +
         (isDark ? 'border-white/15 text-[#F4F0E8]/70' : 'border-black/15 text-[#1C1816]/70')
       }
     >
@@ -111,7 +105,7 @@ class SneakerErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render() {
     if (this.state.hasError) {
       return (
-        <div className="relative w-full h-[178px] sm:h-[218px] md:h-[270px] select-none">
+        <div className="relative w-full h-[200px] sm:h-[240px] md:h-[280px] select-none">
           <SneakerFallbackCard
             sneakerColors={this.props.sneakerColors}
             isDark={this.props.isDark}
@@ -132,6 +126,7 @@ function Sneaker3DCanvas({
   resetLabel,
   loading3DLabel,
   webglFallbackLabel,
+  compact = false,
 }: Sneaker3DProps) {
   const mountRef = useRef<HTMLDivElement>(null)
   const matsRef = useRef<SneakerMaterials | null>(null)
@@ -203,7 +198,7 @@ function Sneaker3DCanvas({
         if (!container) return
 
         const width = container.clientWidth || 340
-        const height = container.clientHeight || 205
+        const height = container.clientHeight || 220
 
         let renderer: THREE_TYPES.WebGLRenderer
         try {
@@ -474,7 +469,7 @@ function Sneaker3DCanvas({
         const updateViewportSize = () => {
           if (!container || disposed) return
           const w = container.clientWidth || 340
-          const h = container.clientHeight || 205
+          const h = container.clientHeight || 220
           camera.aspect = w / h
           camera.updateProjectionMatrix()
           renderer.setSize(w, h)
@@ -565,7 +560,6 @@ function Sneaker3DCanvas({
     }
   }, [contextLostCount, applyColorsToRegistry])
 
-  // Переключение модели с мгновенным показом радужного лоадера
   useEffect(() => {
     loadModelRef.current?.(modelId)
   }, [modelId])
@@ -614,57 +608,97 @@ function Sneaker3DCanvas({
   }
 
   const handleResetClick = () => {
-    triggerLightHaptic()
+    hapticReset()
     rotTarget.current = { yaw: -0.26, pitch: 0.16 }
     wakeCameraAnimationRef.current?.()
     onResetAll?.()
   }
 
   const activeModel = getSneakerModelConfig(modelId)
+  const tokens = getThemeTokens(isDark)
 
   return (
-    <div className="relative w-full h-[178px] sm:h-[218px] md:h-[270px] select-none">
-      {webglError ? (
-        <SneakerFallbackCard
-          sneakerColors={sneakerColors}
-          isDark={isDark}
-          label={webglFallbackLabel}
-        />
-      ) : (
-        <div
-          ref={mountRef}
-          role="img"
-          aria-label={'3D ' + activeModel.name}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
-          style={{ touchAction: 'none' }}
-        />
-      )}
+    <div className="w-full select-none">
+      <div
+        className={
+          'relative w-full transition-[height] duration-300 ' +
+          (compact
+            ? 'h-[175px] sm:h-[210px]'
+            : 'h-[208px] sm:h-[246px] md:h-[280px]')
+        }
+      >
+        {webglError ? (
+          <SneakerFallbackCard
+            sneakerColors={sneakerColors}
+            isDark={isDark}
+            label={webglFallbackLabel}
+          />
+        ) : (
+          <div
+            ref={mountRef}
+            role="img"
+            aria-label={'3D ' + activeModel.name}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
+            style={{ touchAction: 'none' }}
+          />
+        )}
 
-      {isLoading3D && !webglError && (
-        <RainbowTilesLoader
-          isDark={isDark}
-          label={loading3DLabel || '3D • ' + activeModel.name + '...'}
-        />
-      )}
+        {isLoading3D && !webglError && (
+          <RainbowTilesLoader
+            isDark={isDark}
+            label={loading3DLabel || '3D • ' + activeModel.name + '...'}
+          />
+        )}
+      </div>
 
-      {!isLoading3D && (
+      {/* Редакционная нижняя строка модели + iOS-кнопка 360° */}
+      <div className="flex items-center gap-3 mt-1 px-0.5">
+        <span
+          className="text-[11px] font-sans font-medium uppercase tracking-[0.2em] shrink-0"
+          style={{ color: tokens.inkSecondary }}
+        >
+          {activeModel.shortLabel}
+        </span>
+
+        <span
+          className="h-px flex-1"
+          style={{ backgroundColor: tokens.divider }}
+          aria-hidden="true"
+        />
+
         <button
           type="button"
           onClick={handleResetClick}
-          className={
-            'absolute bottom-1 right-2 px-3 py-1.5 min-h-[28px] text-[8.5px] font-sans uppercase tracking-[0.2em] border rounded-full transition-opacity opacity-85 hover:opacity-100 cursor-pointer ' +
-            (isDark
-              ? 'border-white/25 bg-[#0A0A0A]/80 text-[#F4F0E8]'
-              : 'border-black/25 bg-[#F2EFE9]/85 text-[#1C1816]')
-          }
+          title={resetLabel || '360°'}
+          className="flex items-center gap-1.5 px-3.5 h-8 rounded-full border text-[12px] font-sans font-medium tracking-[0.04em] transition-all duration-150 active:scale-[0.95] cursor-pointer shrink-0"
+          style={{
+            backgroundColor: tokens.surface,
+            borderColor: tokens.borderStrong,
+            color: tokens.ink,
+            boxShadow: tokens.buttonShadow,
+          }}
         >
-          {resetLabel || '360° • Сброс'}
+          <span>360°</span>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 11-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
         </button>
-      )}
+      </div>
     </div>
   )
 }
