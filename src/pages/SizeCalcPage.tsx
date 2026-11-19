@@ -46,13 +46,48 @@ type SavedPrefs = {
 const RULER_TICKS = 31
 const PREFS_STORAGE_KEY = 'cordwainer_size_calc_prefs_v1'
 const THEME_STORAGE_KEY = 'cordwainer_theme'
-const SLIDER_HAPTIC_THROTTLE_MS = 32
+const SLIDER_HAPTIC_THROTTLE_MS = 36
 
 const VALID_GENDERS: Gender[] = ['men', 'women', 'kids']
 const VALID_MODES: MeasureMode[] = ['foot', 'insole']
 const VALID_UNITS: UnitMode[] = ['cm', 'mm']
 const VALID_STYLES: ShoeStyle[] = ['sneakers', 'classic', 'winter', 'running', 'sandals']
 const VALID_WIDTHS: WidthFit[] = ['narrow', 'standard', 'wide', 'extraWide']
+
+const UI_LABELS: Record<
+  SupportedLang,
+  {
+    styleSection: string
+    widthSection: string
+    groupSport: string
+    groupClassic: string
+  }
+> = {
+  uk: {
+    styleSection: 'Тип взуття та запас',
+    widthSection: 'Повнота стопи',
+    groupSport: 'Спорт і кросівки',
+    groupClassic: 'Класика і шкіра',
+  },
+  ru: {
+    styleSection: 'Тип обуви и запас',
+    widthSection: 'Полнота стопы',
+    groupSport: 'Спорт и кроссовки',
+    groupClassic: 'Классика и кожа',
+  },
+  en: {
+    styleSection: 'Footwear Type & Allowance',
+    widthSection: 'Foot Width',
+    groupSport: 'Sport & Sneakers',
+    groupClassic: 'Classic & Leather',
+  },
+  de: {
+    styleSection: 'Schuhtyp & Zugabe',
+    widthSection: 'Fußweite',
+    groupSport: 'Sport & Sneaker',
+    groupClassic: 'Klassik & Leder',
+  },
+}
 
 function safeHapticSelection() {
   try {
@@ -120,10 +155,16 @@ function resolveInitialDarkTheme(): boolean {
   return true
 }
 
+function isClassicBrandEntry(row: BrandFitEntry): boolean {
+  const cat = row.category.toUpperCase()
+  return cat.includes('LEATHER') || cat.includes('CLASSIC') || cat.includes('DRESS')
+}
+
 export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const safeLang: SupportedLang =
     lang && (lang === 'ru' || lang === 'uk' || lang === 'de' || lang === 'en') ? lang : 'uk'
   const t = I18N[safeLang]
+  const ui = UI_LABELS[safeLang]
 
   const initialPrefs = useMemo(() => loadSavedPrefs(), [])
 
@@ -261,6 +302,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     measureMode === 'foot' ? range.min : range.min + STYLE_ALLOWANCES[shoeStyle].insoleAddMm
   const sliderMax =
     measureMode === 'foot' ? range.max : range.max + STYLE_ALLOWANCES[shoeStyle].insoleAddMm
+  const sliderMid = Math.round((sliderMin + sliderMax) / 2)
 
   const displayValue =
     unit === 'cm'
@@ -486,11 +528,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const usLabel = gender === 'kids' ? 'US K' : gender === 'men' ? 'US M' : 'US W'
 
-  // Палитра Premium Fashion Tech (Dark & Light)
   const bgPage = isDark ? 'bg-[#0B0B0C]' : 'bg-[#F7F4EE]'
-  const bgHeader = isDark ? 'bg-[#0B0B0C]/85' : 'bg-[#F7F4EE]/85'
+  const bgHeader = isDark ? 'bg-[#0B0B0C]/90' : 'bg-[#F7F4EE]/90'
   const bgSurface = isDark ? 'bg-[#141416]' : 'bg-[#EFEAE1]'
-  const bgSurfaceSoft = isDark ? 'bg-[#1B1B1F]' : 'bg-[#E6E0D5]'
+  const bgSurfaceSoft = isDark ? 'bg-[#1C1C20]' : 'bg-[#E5DFD3]'
   const textPrimary = isDark ? 'text-[#F4F0E8]' : 'text-[#181715]'
   const textSecondary = isDark ? 'text-[#A29D95]' : 'text-[#6D6860]'
   const textTertiary = isDark ? 'text-[#736F68]' : 'text-[#8C867D]'
@@ -501,6 +542,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const activeInvert = isDark
     ? 'bg-[#F4F0E8] text-[#0B0B0C]'
     : 'bg-[#181715] text-[#F7F4EE]'
+
+  const styleItems: Array<{ id: ShoeStyle; label: string; addMm: number }> = [
+    { id: 'sneakers', label: t.styleSneakers, addMm: STYLE_ALLOWANCES.sneakers.insoleAddMm },
+    { id: 'classic', label: t.styleClassic, addMm: STYLE_ALLOWANCES.classic.insoleAddMm },
+    { id: 'winter', label: t.styleWinter, addMm: STYLE_ALLOWANCES.winter.insoleAddMm },
+    { id: 'running', label: t.styleRunning, addMm: STYLE_ALLOWANCES.running.insoleAddMm },
+    { id: 'sandals', label: t.styleSandals, addMm: STYLE_ALLOWANCES.sandals.insoleAddMm },
+  ]
 
   const styleLabels: Record<ShoeStyle, string> = {
     sneakers: t.styleSneakers,
@@ -555,6 +604,15 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     },
   ]
 
+  const brandGroups = useMemo(() => {
+    const sport = proFit.brandMatrix.filter((row) => !isClassicBrandEntry(row))
+    const classic = proFit.brandMatrix.filter((row) => isClassicBrandEntry(row))
+    const groups: Array<{ id: string; title: string; rows: BrandFitEntry[] }> = []
+    if (sport.length > 0) groups.push({ id: 'sport', title: ui.groupSport, rows: sport })
+    if (classic.length > 0) groups.push({ id: 'classic', title: ui.groupClassic, rows: classic })
+    return groups
+  }, [proFit.brandMatrix, ui.groupSport, ui.groupClassic])
+
   const dynamicAnnotationText =
     measureMode === 'foot'
       ? t.annotationFootMode(
@@ -572,6 +630,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           formatSize(activeResult.ua)
         )
 
+  const formatScaleMark = (mm: number) =>
+    unit === 'cm' ? (mm / 10).toFixed(1).replace('.', ',') : String(mm)
+
   return (
     <div
       className={`min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden transition-colors duration-300 ${bgPage} ${textPrimary} select-none`}
@@ -582,81 +643,83 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* 1. ВЕРХНЯЯ НАВИГАЦИЯ */}
+      {/* 1. КОМПАКТНАЯ ЛИПКАЯ ШАПКА */}
       <header
         className={`sticky top-0 z-30 backdrop-blur-xl transition-colors duration-300 ${bgHeader} border-b ${hairline}`}
       >
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-3 pb-3 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={triggerBackNavigation}
-              className={`inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-full text-xs font-sans font-medium tracking-wide cursor-pointer active:scale-95 transition-all ${bgSurface} ${textPrimary}`}
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={triggerBackNavigation}
+            className={`inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-full text-xs font-sans font-medium tracking-wide cursor-pointer active:scale-95 transition-all ${bgSurface} ${textPrimary}`}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            <span>{t.back}</span>
+          </button>
+
+          <span className="font-serif text-[13px] sm:text-sm uppercase tracking-[0.26em] font-medium">
+            Cordwainer
+          </span>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-all ${bgSurface} ${textSecondary}`}
+          >
+            {isDark ? (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2" />
+                <path d="M12 20v2" />
+                <path d="M4.93 4.93l1.41 1.41" />
+                <path d="M17.66 17.66l1.41 1.41" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="M6.34 17.66l-1.41 1.41" />
+                <path d="M19.07 4.93l-1.41 1.41" />
+              </svg>
+            ) : (
               <svg
                 width="15"
                 height="15"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="1.7"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M15 18l-6-6 6-6" />
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
-              <span>{t.back}</span>
-            </button>
+            )}
+          </button>
+        </div>
+      </header>
 
-            <span className="font-serif text-[13px] sm:text-sm uppercase tracking-[0.26em] font-medium">
-              Cordwainer
-            </span>
-
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-all ${bgSurface} ${textSecondary}`}
-            >
-              {isDark ? (
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2" />
-                  <path d="M12 20v2" />
-                  <path d="M4.93 4.93l1.41 1.41" />
-                  <path d="M17.66 17.66l1.41 1.41" />
-                  <path d="M2 12h2" />
-                  <path d="M20 12h2" />
-                  <path d="M6.34 17.66l-1.41 1.41" />
-                  <path d="M19.07 4.93l-1.41 1.41" />
-                </svg>
-              ) : (
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
-            </button>
-          </div>
-
-          {/* Сегментированный контрол: Мужской / Женский / Детский */}
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-3.5 pb-8 flex flex-col gap-5">
+        {/* 2. ПОЛ ПОЛЬЗОВАТЕЛЯ */}
+        <section>
           <div className={`grid grid-cols-3 p-1 rounded-full ${bgSurface}`}>
             {(['men', 'women', 'kids'] as Gender[]).map((g) => {
               const active = gender === g
@@ -681,126 +744,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               )
             })}
           </div>
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 pb-10 flex flex-col gap-7">
-        {/* 2. ГЛАВНЫЙ РЕЗУЛЬТАТ — ЦЕНТРАЛЬНЫЙ ЭЛЕМЕНТ КОМПОЗИЦИИ */}
-        <section className="flex flex-col items-center text-center pt-1">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <FlagUA />
-            <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.2em] ${textSecondary}`}>
-              {t.yourSizeLabel}
-            </span>
-            <FlagEU />
-          </div>
-
-          <div className="flex items-end justify-center gap-6 sm:gap-10">
-            <div className="flex flex-col items-center">
-              <motion.span
-                key={`ua-${activeResult.ua}`}
-                initial={{ opacity: 0.45, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.18 }}
-                className="font-serif text-[72px] sm:text-[88px] leading-[0.92] tracking-tight tabular-nums"
-                style={{ color: accentHex }}
-              >
-                {formatSize(activeResult.ua)}
-              </motion.span>
-              <span className={`mt-2 text-[11px] font-sans font-semibold uppercase tracking-[0.22em] ${textSecondary}`}>
-                UA
-              </span>
-            </div>
-
-            <div className={`h-14 sm:h-16 w-px mb-6 ${isDark ? 'bg-[#F4F0E8]/12' : 'bg-[#181715]/12'}`} />
-
-            <div className="flex flex-col items-center">
-              <motion.span
-                key={`eu-${activeResult.eu}`}
-                initial={{ opacity: 0.45, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.18 }}
-                className="font-serif text-[52px] sm:text-[64px] leading-[0.95] tracking-tight tabular-nums"
-              >
-                {formatSize(activeResult.eu)}
-              </motion.span>
-              <span className={`mt-2 text-[11px] font-sans font-semibold uppercase tracking-[0.22em] ${textSecondary}`}>
-                EU
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 inline-flex items-center gap-2 text-xs font-sans">
-            <span
-              className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ backgroundColor: accentHex }}
-            />
-            <span
-              className="font-medium tracking-wide"
-              style={{ color: proFit.hasReserveShift ? accentHex : undefined }}
-            >
-              {proFit.hasReserveShift
-                ? t.reserveActiveBadge
-                : `${t.baseFitBadge} · JP ${formatSize(activeResult.jp)}`}
-            </span>
-          </div>
         </section>
 
-        {/* 3. ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ (ОТКРЫТАЯ ТИПОГРАФИЧЕСКАЯ ПОЛОСА) */}
-        <section className={`grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-4 py-4 border-y ${hairline}`}>
-          <div className="flex flex-col">
-            <span className={`text-[10px] font-sans uppercase tracking-[0.16em] ${textTertiary}`}>
-              {t.footTag}
-            </span>
-            <span className="mt-1 text-base sm:text-lg font-sans font-medium tabular-nums">
-              {proFit.footMm} {t.mmLabel}
-            </span>
-            <span className={`text-[11px] font-sans tabular-nums ${textSecondary}`}>
-              {proFit.footCm.toFixed(1)} {t.cmLabel}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className={`text-[10px] font-sans uppercase tracking-[0.16em] ${textTertiary}`}>
-              {t.ballTag}
-            </span>
-            <span className="mt-1 text-base sm:text-lg font-sans font-medium tabular-nums">
-              {proFit.ballGirthMm} {t.mmLabel}
-            </span>
-            <span className={`text-[11px] font-sans ${textSecondary}`}>
-              EU {proFit.widthMarks.eu}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className={`text-[10px] font-sans uppercase tracking-[0.16em] ${textTertiary}`}>
-              {t.insoleLabel}
-            </span>
-            <span className="mt-1 text-base sm:text-lg font-sans font-medium tabular-nums" style={{ color: accentHex }}>
-              {proFit.insoleMm} {t.mmLabel}
-            </span>
-            <span className={`text-[11px] font-sans tabular-nums ${textSecondary}`}>
-              {proFit.insoleCm.toFixed(1)} {t.cmLabel}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className={`text-[10px] font-sans uppercase tracking-[0.16em] ${textTertiary}`}>
-              {t.allowanceLabel}
-            </span>
-            <span className="mt-1 text-base sm:text-lg font-sans font-medium tabular-nums">
-              +{proFit.allowanceMm} {t.mmLabel}
-            </span>
-            <span className={`text-[11px] font-sans truncate ${textSecondary}`}>
-              {styleLabels[shoeStyle]}
-            </span>
-          </div>
-        </section>
-
-        {/* 4. БЛОК ИЗМЕРЕНИЯ И ИНТЕРАКТИВНЫЙ МИКРОМЕТР */}
-        <section className={`rounded-3xl p-5 sm:p-6 transition-colors duration-300 ${bgSurface}`}>
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-            <div className={`inline-flex items-center p-1 rounded-full ${bgSurfaceSoft}`}>
+        {/* 3. БЛОК ИЗМЕРЕНИЯ (ВСЕГДА В ОДНУ СТРОКУ + УДОБНЫЙ ВВОД ОДНОЙ РУКОЙ) */}
+        <section className={`rounded-3xl p-4 sm:p-5 transition-colors duration-300 ${bgSurface}`}>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className={`inline-flex items-center p-0.5 rounded-full ${bgSurfaceSoft} min-w-0`}>
               {(['foot', 'insole'] as const).map((m) => {
                 const active = measureMode === m
                 return (
@@ -811,7 +760,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       safeHapticImpact('medium')
                       setMeasureMode(m)
                     }}
-                    className={`px-3.5 py-1.5 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.08em] transition-all cursor-pointer ${
+                    className={`px-2.5 sm:px-3.5 py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-sans font-semibold uppercase tracking-[0.05em] whitespace-nowrap transition-all cursor-pointer ${
                       active ? activeInvert : textSecondary
                     }`}
                   >
@@ -821,7 +770,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               })}
             </div>
 
-            <div className={`inline-flex items-center p-1 rounded-full ${bgSurfaceSoft}`}>
+            <div className={`inline-flex items-center p-0.5 rounded-full ${bgSurfaceSoft} shrink-0`}>
               {(['cm', 'mm'] as const).map((u) => {
                 const active = unit === u
                 return (
@@ -832,7 +781,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       safeHapticImpact('light')
                       setUnit(u)
                     }}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.08em] transition-all cursor-pointer ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-sans font-semibold uppercase tracking-[0.06em] whitespace-nowrap transition-all cursor-pointer ${
                       active ? activeInvert : textSecondary
                     }`}
                   >
@@ -843,8 +792,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           </div>
 
-          {/* Крупный ввод значения + кнопки уменьшения / увеличения */}
-          <div className="flex items-center justify-between gap-3 mb-6">
+          {/* Кнопки − / + и крупное значение */}
+          <div className="flex items-center justify-between gap-3 mb-4">
             <button
               type="button"
               onPointerDown={(e) => startHold(-1, e)}
@@ -853,18 +802,18 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               onPointerCancel={stopHold}
               disabled={footMm <= range.min}
               aria-label="Decrease"
-              className={`w-12 h-12 rounded-full ${bgSurfaceSoft} ${textPrimary} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-90 transition-transform`}
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full ${bgSurfaceSoft} ${textPrimary} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-90 transition-transform`}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </button>
 
             <div onClick={startEdit} className="flex flex-col items-center cursor-pointer min-w-0">
-              <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.18em] ${textSecondary}`}>
+              <span className={`text-[10px] font-sans font-medium uppercase tracking-[0.18em] ${textSecondary}`}>
                 {measureMode === 'foot' ? t.footLengthLabel : t.insoleInputLabel}
               </span>
-              <div className="flex items-baseline gap-1.5 mt-1">
+              <div className="flex items-baseline gap-1.5 mt-0.5">
                 {isEditing ? (
                   <input
                     ref={inputRef}
@@ -873,15 +822,15 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     onChange={(e) => setEditValue(e.target.value.replace(/[^0-9.,]/g, ''))}
                     onBlur={commitEdit}
                     onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                    className={`w-[120px] text-center text-[44px] sm:text-[52px] font-serif leading-none bg-transparent outline-none border-b ${hairline} ${textPrimary}`}
+                    className={`w-[116px] text-center text-[40px] sm:text-[46px] font-serif leading-none bg-transparent outline-none border-b ${hairline} ${textPrimary}`}
                     inputMode="decimal"
                   />
                 ) : (
-                  <span className="text-[46px] sm:text-[54px] font-serif leading-none tracking-tight tabular-nums">
+                  <span className="text-[42px] sm:text-[48px] font-serif leading-none tracking-tight tabular-nums">
                     {displayValue}
                   </span>
                 )}
-                <span className={`text-sm font-sans font-medium uppercase ${textSecondary}`}>
+                <span className={`text-xs sm:text-sm font-sans font-medium uppercase ${textSecondary}`}>
                   {unit === 'cm' ? t.cmLabel : t.mmLabel}
                 </span>
               </div>
@@ -895,17 +844,17 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               onPointerCancel={stopHold}
               disabled={footMm >= range.max}
               aria-label="Increase"
-              className={`w-12 h-12 rounded-full ${bgSurfaceSoft} ${textPrimary} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-90 transition-transform`}
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full ${bgSurfaceSoft} ${textPrimary} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-90 transition-transform`}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </button>
           </div>
 
-          {/* Прецизионный измеритель */}
-          <div className="relative w-full pt-2 pb-1">
+          {/* Прецизионный измеритель без вылета бегунка на краях */}
+          <div className="relative w-full pt-1 pb-0.5">
             <input
               type="range"
               min={sliderMin}
@@ -922,19 +871,19 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 safeHapticImpact('light')
               }}
               onPointerCancel={() => setIsDraggingSlider(false)}
-              className="w-full h-12 absolute inset-x-0 top-0 z-30 opacity-0 cursor-pointer"
+              className="w-full h-14 absolute inset-x-0 -top-1 z-30 opacity-0 cursor-pointer touch-pan-y"
             />
 
-            <div className="relative h-10 flex items-center justify-between px-1 pointer-events-none">
+            <div className="relative mx-3 h-11 flex items-center justify-between pointer-events-none">
               <div
-                className="absolute left-1 right-1 top-1/2 -translate-y-1/2 h-[2px] rounded-full"
+                className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] rounded-full"
                 style={{ backgroundColor: trackIdleHex }}
               />
 
               <div
-                className="absolute left-1 top-1/2 -translate-y-1/2 h-[2px] rounded-full transition-all duration-75"
+                className="absolute left-0 top-1/2 -translate-y-1/2 h-[2.5px] rounded-full transition-all duration-75"
                 style={{
-                  width: `calc(${pct}% - 2px)`,
+                  width: `${pct}%`,
                   backgroundColor: accentHex,
                 }}
               />
@@ -944,7 +893,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 const dist = Math.abs(tickPct - pct)
                 const proximity = Math.max(0, 1 - dist / 14)
                 const isMajor = idx % 5 === 0
-                const baseHeight = isMajor ? 12 : 5
+                const baseHeight = isMajor ? 14 : 6
                 const dynamicHeight = baseHeight + proximity * 12
 
                 return (
@@ -953,8 +902,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     className="relative z-10 w-[1.5px] rounded-full transition-all duration-75"
                     style={{
                       height: `${dynamicHeight}px`,
-                      backgroundColor: proximity > 0.3 ? accentHex : trackIdleHex,
-                      opacity: proximity > 0.2 ? 1 : isMajor ? 0.65 : 0.35,
+                      backgroundColor: proximity > 0.28 ? accentHex : trackIdleHex,
+                      opacity: proximity > 0.2 ? 1 : isMajor ? 0.72 : 0.36,
                     }}
                   />
                 )
@@ -963,42 +912,157 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               <div
                 className="absolute top-1/2 z-20 pointer-events-none transition-transform duration-100"
                 style={{
-                  left: `calc(${pct}% - 12px)`,
-                  transform: `translateY(-50%) scale(${isDraggingSlider ? 1.15 : 1})`,
+                  left: `${pct}%`,
+                  transform: `translate(-50%, -50%) scale(${isDraggingSlider ? 1.16 : 1})`,
                 }}
               >
                 <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center shadow-sm"
+                  className="w-7 h-7 rounded-full flex items-center justify-center shadow-sm"
                   style={{
                     backgroundColor: isDark ? '#0B0B0C' : '#F7F4EE',
                     border: `2px solid ${accentHex}`,
                   }}
                 >
                   <div
-                    className="w-2 h-2 rounded-full"
+                    className="w-2.5 h-2.5 rounded-full"
                     style={{ backgroundColor: accentHex }}
                   />
                 </div>
               </div>
             </div>
 
-            <div className={`flex justify-between items-center text-[11px] font-sans tabular-nums mt-1 ${textTertiary}`}>
-              <span>
-                {unit === 'cm' ? (sliderMin / 10).toFixed(1) : sliderMin} {unit === 'cm' ? t.cmLabel : t.mmLabel}
+            <div className={`grid grid-cols-3 items-center text-[10.5px] font-sans tabular-nums mt-0.5 px-1 ${textTertiary}`}>
+              <span className="text-left">
+                {formatScaleMark(sliderMin)} {unit === 'cm' ? t.cmLabel : t.mmLabel}
               </span>
-              <span>
-                {unit === 'cm' ? (sliderMax / 10).toFixed(1) : sliderMax} {unit === 'cm' ? t.cmLabel : t.mmLabel}
+              <span className="text-center opacity-70">
+                {formatScaleMark(sliderMid)}
+              </span>
+              <span className="text-right">
+                {formatScaleMark(sliderMax)} {unit === 'cm' ? t.cmLabel : t.mmLabel}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. ГЛАВНЫЙ РЕЗУЛЬТАТ UA / EU — ВСЕГДА ВИДЕН РЯДОМ С ИЗМЕРИТЕЛЕМ */}
+        <section className="flex flex-col items-center text-center pt-1">
+          <div className="inline-flex items-center gap-2 mb-2">
+            <FlagUA />
+            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.2em] ${textSecondary}`}>
+              {t.yourSizeLabel}
+            </span>
+            <FlagEU />
+          </div>
+
+          <div className="flex items-end justify-center gap-6 sm:gap-10">
+            <div className="flex flex-col items-center">
+              <motion.span
+                key={`ua-${activeResult.ua}`}
+                initial={{ opacity: 0.45, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.16 }}
+                className="font-serif text-[62px] sm:text-[76px] leading-[0.92] tracking-tight tabular-nums"
+                style={{ color: accentHex }}
+              >
+                {formatSize(activeResult.ua)}
+              </motion.span>
+              <span className={`mt-1.5 text-[10.5px] font-sans font-semibold uppercase tracking-[0.22em] ${textSecondary}`}>
+                UA
+              </span>
+            </div>
+
+            <div className={`h-12 sm:h-14 w-px mb-5 ${isDark ? 'bg-[#F4F0E8]/12' : 'bg-[#181715]/12'}`} />
+
+            <div className="flex flex-col items-center">
+              <motion.span
+                key={`eu-${activeResult.eu}`}
+                initial={{ opacity: 0.45, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.16 }}
+                className="font-serif text-[46px] sm:text-[58px] leading-[0.95] tracking-tight tabular-nums"
+              >
+                {formatSize(activeResult.eu)}
+              </motion.span>
+              <span className={`mt-1.5 text-[10.5px] font-sans font-semibold uppercase tracking-[0.22em] ${textSecondary}`}>
+                EU
               </span>
             </div>
           </div>
 
-          <p className={`mt-4 pt-3.5 border-t ${hairline} text-xs font-sans leading-relaxed ${textSecondary}`}>
+          <div className="mt-2.5 inline-flex items-center gap-2 text-xs font-sans">
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: accentHex }}
+            />
+            <span
+              className="font-medium tracking-wide"
+              style={{ color: proFit.hasReserveShift ? accentHex : undefined }}
+            >
+              {proFit.hasReserveShift
+                ? t.reserveActiveBadge
+                : `${t.baseFitBadge} · JP ${formatSize(activeResult.jp)}`}
+            </span>
+          </div>
+
+          <p className={`mt-2 max-w-md text-[11.5px] font-sans leading-relaxed ${textSecondary}`}>
             {dynamicAnnotationText}
           </p>
         </section>
 
-        {/* 5. НАВИГАЦИЯ ПО ВКЛАДКАМ (РЕДАКЦИОННОЕ ПОДЧЁРКИВАНИЕ) */}
-        <section className="flex flex-col gap-5">
+        {/* 5. ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ (КОМПАКТНАЯ ПОЛОСА БЕЗ ДУБЛИРОВАНИЯ) */}
+        <section className={`grid grid-cols-4 gap-2 py-3.5 border-y ${hairline}`}>
+          <div className="flex flex-col min-w-0">
+            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+              {t.footTag}
+            </span>
+            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate">
+              {proFit.footMm} {t.mmLabel}
+            </span>
+            <span className={`text-[10.5px] font-sans tabular-nums ${textSecondary}`}>
+              {proFit.footCm.toFixed(1)} {t.cmLabel}
+            </span>
+          </div>
+
+          <div className="flex flex-col min-w-0">
+            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+              {t.ballTag}
+            </span>
+            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate">
+              {proFit.ballGirthMm} {t.mmLabel}
+            </span>
+            <span className={`text-[10.5px] font-sans truncate ${textSecondary}`}>
+              EU {proFit.widthMarks.eu}
+            </span>
+          </div>
+
+          <div className="flex flex-col min-w-0">
+            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+              {t.insoleLabel}
+            </span>
+            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate" style={{ color: accentHex }}>
+              {proFit.insoleMm} {t.mmLabel}
+            </span>
+            <span className={`text-[10.5px] font-sans tabular-nums ${textSecondary}`}>
+              {proFit.insoleCm.toFixed(1)} {t.cmLabel}
+            </span>
+          </div>
+
+          <div className="flex flex-col min-w-0">
+            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+              {t.allowanceLabel}
+            </span>
+            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate">
+              +{proFit.allowanceMm} {t.mmLabel}
+            </span>
+            <span className={`text-[10.5px] font-sans truncate ${textSecondary}`}>
+              {styleLabels[shoeStyle]}
+            </span>
+          </div>
+        </section>
+
+        {/* 6. ВКЛАДКИ: МИРОВЫЕ · КОЛОДКА · БРЕНДЫ · ЗАМЕР */}
+        <section className="flex flex-col gap-4">
           <nav className={`grid grid-cols-4 border-b ${hairline}`}>
             {(
               [
@@ -1017,7 +1081,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     safeHapticImpact('medium')
                     setActiveTab(tab.id)
                   }}
-                  className={`relative pb-3 pt-1 text-xs sm:text-[13px] font-sans font-semibold uppercase tracking-[0.1em] transition-colors cursor-pointer truncate ${
+                  className={`relative pb-2.5 pt-1 text-[11.5px] sm:text-[12.5px] font-sans font-semibold uppercase tracking-[0.09em] transition-colors cursor-pointer truncate ${
                     active ? textPrimary : textSecondary
                   }`}
                 >
@@ -1040,11 +1104,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             {activeTab === 'world' && (
               <motion.div
                 key="world"
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.16 }}
-                className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+                transition={{ duration: 0.15 }}
+                className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3"
               >
                 {worldSystems.map((item) => {
                   const unlocked = item.free || isProPurchased
@@ -1055,14 +1119,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                         if (!unlocked) handleProClick()
                         else safeHapticSelection()
                       }}
-                      className={`rounded-2xl p-4 flex flex-col justify-between min-h-[104px] transition-colors ${bgSurface} ${
+                      className={`rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between min-h-[96px] transition-colors ${bgSurface} ${
                         !unlocked ? 'cursor-pointer active:scale-[0.98]' : ''
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           {item.flag}
-                          <span className="text-xs font-sans font-semibold uppercase tracking-[0.12em] whitespace-nowrap">
+                          <span className="text-xs font-sans font-semibold uppercase tracking-[0.1em] whitespace-nowrap">
                             {item.code}
                           </span>
                         </div>
@@ -1073,13 +1137,13 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                         )}
                       </div>
 
-                      <div className="mt-3">
+                      <div className="mt-2.5">
                         {unlocked ? (
-                          <span className="font-serif text-[26px] leading-none tracking-tight tabular-nums block">
+                          <span className="font-serif text-[24px] sm:text-[26px] leading-none tracking-tight tabular-nums block">
                             {item.val}
                           </span>
                         ) : (
-                          <span className="font-serif text-[24px] leading-none blur-[5px] opacity-35 select-none block">
+                          <span className="font-serif text-[22px] leading-none blur-[5px] opacity-35 select-none block">
                             42.5
                           </span>
                         )}
@@ -1093,28 +1157,24 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </motion.div>
             )}
 
-            {/* ВКЛАДКА 2: КОЛОДКА, СЕЗОН И ПОЛНОТА */}
+            {/* ВКЛАДКА 2: КОЛОДКА, СЕЗОН И ПОЛНОТА (СБАЛАНСИРОВАННАЯ СЕТКА БЕЗ ПУСТЫХ ЗОН) */}
             {activeTab === 'fit' && (
               <motion.div
                 key="fit"
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.16 }}
-                className="flex flex-col gap-5"
+                transition={{ duration: 0.15 }}
+                className="flex flex-col gap-4"
               >
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        { id: 'sneakers', label: t.styleSneakers },
-                        { id: 'classic', label: t.styleClassic },
-                        { id: 'winter', label: t.styleWinter },
-                        { id: 'running', label: t.styleRunning },
-                        { id: 'sandals', label: t.styleSandals },
-                      ] as Array<{ id: ShoeStyle; label: string }>
-                    ).map((st) => {
+                <div>
+                  <span className={`block text-[10px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
+                    {ui.styleSection}
+                  </span>
+                  <div className="grid grid-cols-6 gap-2">
+                    {styleItems.map((st, idx) => {
                       const active = shoeStyle === st.id
+                      const spanClass = idx < 3 ? 'col-span-2' : 'col-span-3'
                       return (
                         <button
                           key={st.id}
@@ -1123,71 +1183,85 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                             safeHapticImpact('medium')
                             setShoeStyle(st.id)
                           }}
-                          className={`px-3.5 py-2 rounded-full text-xs font-sans font-medium tracking-wide cursor-pointer transition-all ${
-                            active ? activeInvert : `${bgSurface} ${textSecondary}`
+                          className={`${spanClass} py-2.5 px-2.5 rounded-2xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all ${
+                            active ? activeInvert : `${bgSurface} ${textPrimary}`
                           }`}
                         >
-                          {st.label}
+                          <span className="text-xs font-sans font-medium truncate max-w-full">
+                            {st.label}
+                          </span>
+                          <span
+                            className={`text-[10px] font-sans tabular-nums ${
+                              active ? 'opacity-75' : textSecondary
+                            }`}
+                          >
+                            +{st.addMm} {t.mmLabel}
+                          </span>
                         </button>
                       )
                     })}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {(
-                    [
-                      { id: 'narrow', label: t.widthNarrow },
-                      { id: 'standard', label: t.widthStandard },
-                      { id: 'wide', label: t.widthWide },
-                      { id: 'extraWide', label: t.widthExtraWide },
-                    ] as Array<{ id: WidthFit; label: string }>
-                  ).map((wf) => {
-                    const active = widthFit === wf.id
-                    return (
-                      <button
-                        key={wf.id}
-                        type="button"
-                        onClick={() => {
-                          safeHapticImpact('medium')
-                          setWidthFit(wf.id)
-                        }}
-                        className={`py-2.5 px-3 rounded-2xl text-xs font-sans font-medium tracking-wide cursor-pointer truncate transition-all ${
-                          active ? textPrimary : `${bgSurface} ${textSecondary}`
-                        }`}
-                        style={
-                          active
-                            ? {
-                                backgroundColor: isDark
-                                  ? 'rgba(201, 168, 106, 0.16)'
-                                  : 'rgba(154, 107, 47, 0.14)',
-                                color: accentHex,
-                              }
-                            : undefined
-                        }
-                      >
-                        {wf.label}
-                      </button>
-                    )
-                  })}
+                <div>
+                  <span className={`block text-[10px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
+                    {ui.widthSection}
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(
+                      [
+                        { id: 'narrow', label: t.widthNarrow },
+                        { id: 'standard', label: t.widthStandard },
+                        { id: 'wide', label: t.widthWide },
+                        { id: 'extraWide', label: t.widthExtraWide },
+                      ] as Array<{ id: WidthFit; label: string }>
+                    ).map((wf) => {
+                      const active = widthFit === wf.id
+                      return (
+                        <button
+                          key={wf.id}
+                          type="button"
+                          onClick={() => {
+                            safeHapticImpact('medium')
+                            setWidthFit(wf.id)
+                          }}
+                          className={`py-2.5 px-3 rounded-2xl text-xs font-sans font-medium tracking-wide cursor-pointer truncate transition-all ${
+                            active ? textPrimary : `${bgSurface} ${textSecondary}`
+                          }`}
+                          style={
+                            active
+                              ? {
+                                  backgroundColor: isDark
+                                    ? 'rgba(201, 168, 106, 0.16)'
+                                    : 'rgba(154, 107, 47, 0.14)',
+                                  color: accentHex,
+                                }
+                              : undefined
+                          }
+                        >
+                          {wf.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 <div
                   onClick={() => {
                     if (!isProPurchased) handleProClick()
                   }}
-                  className={`rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-5 ${bgSurface} ${
+                  className={`rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 ${bgSurface} ${
                     !isProPurchased ? 'cursor-pointer' : ''
                   }`}
                 >
                   <div>
-                    <span className={`text-[10.5px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
+                    <span className={`text-[10px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
                       {t.insoleLabel} · {t.allowanceLabel}
                     </span>
-                    <span className={`font-serif text-[26px] leading-tight block mt-1.5 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
+                    <span className={`font-serif text-[24px] sm:text-[26px] leading-tight block mt-1 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
                       {proFit.insoleMm} {t.mmLabel} ({proFit.insoleCm.toFixed(1)} {t.cmLabel})
                     </span>
-                    <span className={`block text-xs mt-1.5 ${textSecondary}`}>
+                    <span className={`block text-xs mt-1 ${textSecondary}`}>
                       {t.footTag} {proFit.footMm} + {proFit.allowanceMm} →{' '}
                       <strong className="font-semibold" style={{ color: accentHex }}>
                         {formatSize(activeResult.ua)} UA / {formatSize(activeResult.eu)} EU
@@ -1195,14 +1269,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     </span>
                   </div>
 
-                  <div className={`sm:pl-5 sm:border-l ${hairline}`}>
-                    <span className={`text-[10.5px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
+                  <div className={`pt-4 border-t ${hairline} sm:pt-0 sm:border-t-0 sm:pl-5 sm:border-l`}>
+                    <span className={`text-[10px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
                       {t.widthLabel} · {t.girthLabel}
                     </span>
-                    <span className={`font-serif text-[26px] leading-tight block mt-1.5 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
+                    <span className={`font-serif text-[24px] sm:text-[26px] leading-tight block mt-1 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
                       {proFit.ballWidthMm} / {proFit.ballGirthMm} {t.mmLabel}
                     </span>
-                    <span className={`block text-xs mt-1.5 ${textSecondary} ${!isProPurchased ? 'blur-[4px]' : ''}`}>
+                    <span className={`block text-xs mt-1 ${textSecondary} ${!isProPurchased ? 'blur-[4px]' : ''}`}>
                       EU {proFit.widthMarks.eu} · US {proFit.widthMarks.us} · JP {proFit.widthMarks.jp}
                     </span>
                   </div>
@@ -1210,60 +1284,75 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </motion.div>
             )}
 
-            {/* ВКЛАДКА 3: МАТРИЦА ПОСАДКИ БРЕНДОВ */}
+            {/* ВКЛАДКА 3: СГРУППИРОВАННЫЕ БРЕНДЫ */}
             {activeTab === 'brands' && (
               <motion.div
                 key="brands"
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.16 }}
-                className={`rounded-2xl px-4 sm:px-5 divide-y ${bgSurface} ${dividerClass}`}
+                transition={{ duration: 0.15 }}
+                className="flex flex-col gap-4"
               >
-                {proFit.brandMatrix.map((row: BrandFitEntry) => (
-                  <div
-                    key={row.brand}
-                    onClick={() => {
-                      if (!isProPurchased) handleProClick()
-                      else safeHapticSelection()
-                    }}
-                    className={`py-4 flex items-center justify-between gap-4 ${
-                      !isProPurchased ? 'cursor-pointer' : ''
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-sans font-semibold uppercase tracking-[0.08em]">
-                          {row.brand}
-                        </span>
-                        <span className={`text-[10px] font-sans uppercase tracking-[0.14em] ${textTertiary}`}>
-                          {row.category}
-                        </span>
-                      </div>
-                      <p className={`text-xs font-sans leading-relaxed mt-1 ${textSecondary}`}>
-                        {row.offsetNote[safeLang]}
-                      </p>
-                    </div>
+                {brandGroups.map((group) => (
+                  <div key={group.id} className="flex flex-col gap-2">
+                    <span className={`text-[10px] font-sans font-semibold uppercase tracking-[0.16em] px-1 ${textTertiary}`}>
+                      {group.title}
+                    </span>
 
-                    {isProPurchased ? (
-                      <div className="text-right shrink-0">
-                        <span className="font-serif text-xl block leading-tight tabular-nums">
-                          EU {row.eu} · US {row.us}
-                        </span>
-                        <span className={`text-[11px] font-sans tabular-nums ${textSecondary}`}>
-                          UK {row.uk} · JP {row.jp}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-serif text-lg blur-[5px] opacity-35 select-none">
-                          EU 42.5
-                        </span>
-                        <span className={textTertiary}>
-                          <LockIcon />
-                        </span>
-                      </div>
-                    )}
+                    <div className={`rounded-2xl px-4 sm:px-5 divide-y ${bgSurface} ${dividerClass}`}>
+                      {group.rows.map((row) => (
+                        <div
+                          key={row.brand}
+                          onClick={() => {
+                            if (!isProPurchased) handleProClick()
+                            else safeHapticSelection()
+                          }}
+                          className={`py-3.5 flex items-start justify-between gap-3 ${
+                            !isProPurchased ? 'cursor-pointer' : ''
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[13px] font-sans font-semibold uppercase tracking-[0.07em]">
+                                {row.brand}
+                              </span>
+                              <span
+                                className={`text-[9.5px] font-sans font-medium uppercase tracking-[0.1em] px-2 py-0.5 rounded-full ${bgSurfaceSoft} ${textSecondary}`}
+                              >
+                                {row.category}
+                              </span>
+                            </div>
+                            <p className={`text-[11.5px] font-sans leading-relaxed mt-1.5 ${textSecondary}`}>
+                              {row.offsetNote[safeLang]}
+                            </p>
+                          </div>
+
+                          {isProPurchased ? (
+                            <div className="text-right shrink-0 pt-0.5">
+                              <span className="font-serif text-[19px] sm:text-xl block leading-tight tabular-nums">
+                                EU {row.eu}
+                              </span>
+                              <span className="text-[11px] font-sans font-medium tabular-nums block mt-0.5" style={{ color: accentHex }}>
+                                US {row.us} · UK {row.uk}
+                              </span>
+                              <span className={`text-[10.5px] font-sans tabular-nums block ${textTertiary}`}>
+                                JP {row.jp}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 shrink-0 pt-1">
+                              <span className="font-serif text-base blur-[5px] opacity-35 select-none">
+                                EU 42.5
+                              </span>
+                              <span className={textTertiary}>
+                                <LockIcon />
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </motion.div>
@@ -1273,40 +1362,40 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             {activeTab === 'guide' && (
               <motion.div
                 key="guide"
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.16 }}
-                className={`rounded-2xl p-5 sm:p-6 flex flex-col gap-5 ${bgSurface}`}
+                transition={{ duration: 0.15 }}
+                className={`rounded-2xl p-4 sm:p-5 flex flex-col gap-4 ${bgSurface}`}
               >
-                <div className="flex gap-3.5">
+                <div className="flex gap-3">
                   <span className="font-serif text-lg leading-none pt-0.5 shrink-0" style={{ color: accentHex }}>
                     01
                   </span>
                   <div>
-                    <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.14em]">
+                    <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
                       {t.guideFootTitle}
                     </h4>
-                    <p className="text-sm font-sans leading-relaxed mt-1.5">{t.measureGuide1}</p>
+                    <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide1}</p>
                     <p className={`text-xs font-sans leading-relaxed mt-1.5 ${textSecondary}`}>
                       {t.measureGuide2}
                     </p>
                   </div>
                 </div>
 
-                <div className={`pt-5 border-t ${hairline} flex gap-3.5`}>
+                <div className={`pt-4 border-t ${hairline} flex gap-3`}>
                   <span className="font-serif text-lg leading-none pt-0.5 shrink-0" style={{ color: accentHex }}>
                     02
                   </span>
                   <div>
-                    <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.14em]">
+                    <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
                       {t.guideInsoleTitle}
                     </h4>
-                    <p className="text-sm font-sans leading-relaxed mt-1.5">{t.measureGuide3}</p>
+                    <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide3}</p>
                   </div>
                 </div>
 
-                <p className={`text-xs font-sans italic leading-relaxed pt-4 border-t ${hairline} ${textSecondary}`}>
+                <p className={`text-xs font-sans italic leading-relaxed pt-3.5 border-t ${hairline} ${textSecondary}`}>
                   {t.measureTip}
                 </p>
               </motion.div>
@@ -1314,8 +1403,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </AnimatePresence>
         </section>
 
-        {/* 6. СТАТУС PRO ИЛИ ПОКУПКА */}
-        <footer className="pt-1">
+        {/* 7. СТАТУС PRO ИЛИ ПОКУПКА */}
+        <footer>
           {statusError && (
             <div className="mb-3 px-4 py-2.5 rounded-2xl bg-red-500/10 text-red-400 text-xs text-center">
               {statusError}
@@ -1323,7 +1412,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           )}
 
           {!isProPurchased ? (
-            <div className={`rounded-3xl p-5 sm:p-6 flex flex-col gap-4 ${bgSurface}`}>
+            <div className={`rounded-3xl p-4 sm:p-5 flex flex-col gap-3.5 ${bgSurface}`}>
               <div>
                 <h3 className="font-serif text-lg tracking-tight leading-snug">{t.proTitle}</h3>
                 <p className={`text-xs font-sans leading-relaxed mt-1 ${textSecondary}`}>
@@ -1335,7 +1424,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 type="button"
                 onClick={handleProClick}
                 disabled={isPurchasing}
-                className={`w-full min-h-[48px] py-3 px-5 rounded-2xl flex items-center justify-center gap-2 text-xs font-sans font-semibold uppercase tracking-[0.14em] cursor-pointer active:scale-[0.99] transition-transform ${activeInvert}`}
+                className={`w-full min-h-[46px] py-3 px-5 rounded-2xl flex items-center justify-center gap-2 text-xs font-sans font-semibold uppercase tracking-[0.14em] cursor-pointer active:scale-[0.99] transition-transform ${activeInvert}`}
               >
                 {isPurchasing ? (
                   <span className="animate-pulse">{t.loading}</span>
