@@ -33,6 +33,10 @@ export type SneakerColors = {
 
 export type SneakerZoneKey = keyof SneakerColors
 
+export type MaterialZoneKey = 'upper' | 'outsole' | 'midsole' | 'tread' | 'accent'
+
+export type MaterialOverrides = Partial<Record<MaterialZoneKey, string>>
+
 export type ContrastLevel = 'soft' | 'optimal' | 'high'
 
 export type HarmonyContrastResult = {
@@ -434,6 +438,57 @@ export function mapPaletteToFootwear(
         outsole: neutralOutsole,
         laces: neutralLaces,
       }
+  }
+}
+
+/**
+ * Слой C: независимые переопределения материалов обуви.
+ * Не зависит от темы интерфейса (UI Theme) и фона студии (Studio Background).
+ * - upper   -> vamp, heel (основной верх)
+ * - outsole -> midsole (основная видимая подошва EVA)
+ * - midsole -> encap (промежуточная вставка / Air-блок подошвы)
+ * - tread   -> outsole (нижний резиновый протектор)
+ * - accent  -> swoosh (логотип, штрихи, акцентные детали)
+ */
+export function applyMaterialOverrides(
+  base: SneakerColors,
+  overrides: MaterialOverrides
+): SneakerColors {
+  const result: SneakerColors = { ...base }
+  if (overrides.upper) {
+    result.vamp = overrides.upper
+    result.heel = overrides.upper
+  }
+  if (overrides.outsole) {
+    result.midsole = overrides.outsole
+  }
+  if (overrides.midsole) {
+    result.encap = overrides.midsole
+  }
+  if (overrides.tread) {
+    result.outsole = overrides.tread
+  }
+  if (overrides.accent) {
+    result.swoosh = overrides.accent
+  }
+  return result
+}
+
+export function getMaterialZoneHex(
+  sneakerColors: SneakerColors,
+  zone: MaterialZoneKey
+): string {
+  switch (zone) {
+    case 'upper':
+      return sneakerColors.vamp
+    case 'outsole':
+      return sneakerColors.midsole
+    case 'midsole':
+      return sneakerColors.encap
+    case 'tread':
+      return sneakerColors.outsole
+    case 'accent':
+      return sneakerColors.swoosh
   }
 }
 
