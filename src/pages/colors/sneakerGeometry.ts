@@ -135,6 +135,7 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
 
 /**
  * Распознаёт конструктивную зону меша GLB по имени узла, родительского узла и материала.
+ * Учитывает удаление точек в Three.js GLTFLoader (sole.005 -> sole005, sock.001 -> sock001).
  */
 export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   const normalized = rawName
@@ -143,7 +144,8 @@ export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
     .replace(/[\s.-]+/g, '_')
     .replace(/(sock|sole|material|cube|plane)(\d+)/g, '$1_$2')
   if (!normalized) return null
-
+  if (GLB_EXPLICIT_ZONE_MAP[normalized]) {
+    return GLB_EXPLICIT_ZONE_MAP[normalized]
   }
 
   if (normalized.includes('sock_upper')) return 'vamp'
@@ -1454,4 +1456,3 @@ export function drawShadowGradient(canvas: HTMLCanvasElement, dark: boolean) {
   sCtx.fillStyle = grad
   sCtx.fillRect(0, 0, canvas.width, canvas.height)
 }
-
