@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
-import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 import {
   calculateProFit,
@@ -47,8 +46,7 @@ const RULER_TICKS = 31
 const PREFS_STORAGE_KEY = 'cordwaine_size_calc_prefs_v1'
 const LEGACY_PREFS_STORAGE_KEY = 'cordwainer_size_calc_prefs_v1'
 const THEME_STORAGE_KEY = 'cordwaine_theme'
-const LEGACY_THEME_STORAGE_KEY = 'cordwainer_theme'
-const SLIDER_HAPTIC_THROTTLE_MS = 36
+const APP_THEME_STORAGE_KEY = 'cordwainer_theme'
 
 const VALID_GENDERS: Gender[] = ['men', 'women', 'kids']
 const VALID_MODES: MeasureMode[] = ['foot', 'insole']
@@ -129,6 +127,21 @@ function FlagCN() {
   )
 }
 
+function isIOSDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  const tgPlatform = (window as unknown as {
+    Telegram?: { WebApp?: { platform?: string } }
+  }).Telegram?.WebApp?.platform
+  if (tgPlatform === 'ios') return true
+  if (typeof navigator !== 'undefined') {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  }
+  return false
+}
+
+const IS_IOS = isIOSDevice()
+const SLIDER_HAPTIC_THROTTLE_MS = IS_IOS ? 55 : 36
+
 function safeHapticSelection() {
   try {
     hapticSelection()
@@ -137,6 +150,14 @@ function safeHapticSelection() {
 
 function safeHapticImpact(style: 'light' | 'medium' | 'heavy') {
   try {
+    if (IS_IOS) {
+      if (style === 'heavy') {
+        hapticImpact('light')
+      } else {
+        hapticSelection()
+      }
+      return
+    }
     hapticImpact(style)
   } catch {}
 }
@@ -186,8 +207,8 @@ function resolveInitialDarkTheme(): boolean {
   if (typeof document === 'undefined') return true
   try {
     const stored =
-      window.localStorage.getItem(THEME_STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY)
+      window.localStorage.getItem(APP_THEME_STORAGE_KEY) ??
+      window.localStorage.getItem(THEME_STORAGE_KEY)
     if (stored === 'dark') {
       document.documentElement.classList.add('dark')
       document.documentElement.classList.remove('light')
@@ -229,29 +250,21 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [isTelegramMiniApp] = useState<boolean>(() => detectTelegramMiniApp())
 
   const onBackRef = useRef(onBack)
-  const lastBackTsRef = useRef<number>(0)
-
   useEffect(() => {
     onBackRef.current = onBack
   }, [onBack])
 
   const triggerBackNavigation = useCallback(() => {
-    const now = Date.now()
-    if (now - lastBackTsRef.current < 300) return
-    lastBackTsRef.current = now
-    safeHapticImpact('medium')
     if (typeof onBackRef.current === 'function') {
       onBackRef.current()
     }
+    safeHapticImpact('medium')
   }, [])
 
   useEffect(() => {
     const tg = (window as unknown as {
       Telegram?: {
         WebApp?: {
-          ready?: () => void
-          onEvent?: (eventType: string, cb: () => void) => void
-          offEvent?: (eventType: string, cb: () => void) => void
           BackButton?: {
             show?: () => void
             hide?: () => void
@@ -263,26 +276,26 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     }).Telegram?.WebApp
 
     const tgBack = tg?.BackButton
-    if (!tgBack && !tg?.onEvent) return
+    if (!tgBack?.onClick) return
 
     const listener = () => {
-      triggerBackNavigation()
+      if (typeof onBackRef.current === 'function') {
+        onBackRef.current()
+      }
+      safeHapticImpact('medium')
     }
     try {
-      tg?.ready?.()
-      tgBack?.show?.()
-      tgBack?.onClick?.(listener)
-      tg?.onEvent?.('backButtonClicked', listener)
+      tgBack.show?.()
+      tgBack.onClick(listener)
     } catch {}
 
     return () => {
       try {
-        tgBack?.offClick?.(listener)
-        tg?.offEvent?.('backButtonClicked', listener)
-        tgBack?.hide?.()
+        tgBack.offClick?.(listener)
+        tgBack.hide?.()
       } catch {}
     }
-  }, [triggerBackNavigation])
+  }, [])
 
   const [isDark, setIsDark] = useState<boolean>(() => resolveInitialDarkTheme())
 
@@ -299,12 +312,29 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     safeHapticImpact('light')
     setIsDark((prev) => {
       const next = !prev
+      const bgHex = next ? '#0B0B0C' : '#F7F4EE'
       if (typeof document !== 'undefined') {
         document.documentElement.classList.toggle('dark', next)
         document.documentElement.classList.toggle('light', !next)
+        document.documentElement.style.backgroundColor = bgHex
+        if (document.body) {
+          document.body.style.backgroundColor = bgHex
+        }
       }
       try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, next ? 'dark' : 'light')
+        const themeVal = next ? 'dark' : 'light'
+        window.localStorage.setItem(APP_THEME_STORAGE_KEY, themeVal)
+        window.localStorage.setItem(THEME_STORAGE_KEY, themeVal)
+        const tg = (window as unknown as {
+          Telegram?: {
+            WebApp?: {
+              setHeaderColor?: (color: string) => void
+              setBackgroundColor?: (color: string) => void
+            }
+          }
+        }).Telegram?.WebApp
+        tg?.setHeaderColor?.(bgHex)
+        tg?.setBackgroundColor?.(bgHex)
       } catch {}
       return next
     })
@@ -801,6 +831,13 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes cwTabFade {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .cw-tab-fade {
+          animation: cwTabFade 0.14s ease-out;
+        }
       `}</style>
 
       {/* 1. ВЕРХНЯЯ НАВИГАЦИЯ (ДЛЯ БРАУЗЕРА; В TELEGRAM MINI APP БЕЗ ДУБЛЯ ЗАГОЛОВКА) */}
@@ -875,18 +912,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   key={g}
                   type="button"
                   onClick={() => handleGenderChange(g)}
-                  className={`relative py-2 px-1 sm:px-2 rounded-full text-[10.5px] sm:text-xs font-sans font-semibold uppercase tracking-[0.03em] sm:tracking-[0.08em] transition-colors cursor-pointer text-center whitespace-nowrap ${
-                    active ? (isDark ? 'text-[#0B0B0C]' : 'text-[#F7F4EE]') : textSecondary
+                  className={`py-2 px-1 sm:px-2 rounded-full text-[10.5px] sm:text-xs font-sans font-semibold uppercase tracking-[0.03em] sm:tracking-[0.08em] transition-all duration-200 cursor-pointer text-center whitespace-nowrap ${
+                    active ? activeInvert : textSecondary
                   }`}
                 >
-                  {active && (
-                    <motion.span
-                      layoutId="genderSegmentIndicator"
-                      transition={{ type: 'spring', stiffness: 460, damping: 36 }}
-                      className={`absolute inset-0 rounded-full ${activeInvert}`}
-                    />
-                  )}
-                  <span className="relative z-10">{t[g]}</span>
+                  {t[g]}
                 </button>
               )
             })}
@@ -1230,14 +1260,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   }`}
                 >
                   {tab.label}
-                  {active && (
-                    <motion.span
-                      layoutId="activeTabUnderline"
-                      transition={{ type: 'spring', stiffness: 460, damping: 36 }}
-                      className="absolute inset-x-2 bottom-0 h-[2px] rounded-full"
-                      style={{ backgroundColor: accentHex }}
-                    />
-                  )}
+                  <span
+                    className={`absolute inset-x-2 bottom-0 h-[2px] rounded-full transition-opacity duration-150 ${
+                      active ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    style={{ backgroundColor: accentHex }}
+                  />
                 </button>
               )
             })}
@@ -1245,13 +1273,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
           {/* ВКЛАДКА 1: МИРОВЫЕ СИСТЕМЫ */}
           {activeTab === 'world' && (
-            <motion.div
-              key="world"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.14, ease: 'easeOut' }}
-              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
-            >
+            <div key="world" className="cw-tab-fade grid grid-cols-2 sm:grid-cols-3 gap-3">
               {worldSystems.map((item) => {
                 const unlocked = item.free || isProPurchased
                 const isWideVal = item.val.length > 6
@@ -1301,18 +1323,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   </div>
                 )
               })}
-            </motion.div>
+            </div>
           )}
 
           {/* ВКЛАДКА 2: КОЛОДКА, СЕЗОН И ПОЛНОТА */}
           {activeTab === 'fit' && (
-            <motion.div
-              key="fit"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.14, ease: 'easeOut' }}
-              className="flex flex-col gap-4"
-            >
+            <div key="fit" className="cw-tab-fade flex flex-col gap-4">
               <div>
                 <span className={`block text-[11px] font-sans font-semibold uppercase tracking-[0.14em] mb-2 ${textTertiary}`}>
                   {ui.styleSection}
@@ -1427,18 +1443,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   </span>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* ВКЛАДКА 3: СТРУКТУРИРОВАННЫЕ КАРТОЧКИ БРЕНДОВ */}
           {activeTab === 'brands' && (
-            <motion.div
-              key="brands"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.14, ease: 'easeOut' }}
-              className="flex flex-col gap-4"
-            >
+            <div key="brands" className="cw-tab-fade flex flex-col gap-4">
               {brandGroups.map((group) => (
                 <div key={group.id} className="flex flex-col gap-2">
                   <span className={`text-[11px] font-sans font-semibold uppercase tracking-[0.14em] px-1 ${textTertiary}`}>
@@ -1507,18 +1517,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   </div>
                 </div>
               ))}
-            </motion.div>
+            </div>
           )}
 
           {/* ВКЛАДКА 4: ИНСТРУКЦИЯ ЗАМЕРА */}
           {activeTab === 'guide' && (
-            <motion.div
-              key="guide"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.14, ease: 'easeOut' }}
-              className={`rounded-2xl p-4 sm:p-5 flex flex-col gap-4 ${bgSurface}`}
-            >
+            <div key="guide" className={`cw-tab-fade rounded-2xl p-4 sm:p-5 flex flex-col gap-4 ${bgSurface}`}>
               <div className="flex gap-3">
                 <span className="font-serif text-lg leading-none pt-0.5 shrink-0" style={{ color: accentHex }}>
                   01
@@ -1549,7 +1553,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               <p className={`text-xs font-sans italic leading-relaxed pt-3.5 border-t ${hairline} ${textSecondary}`}>
                 {t.measureTip}
               </p>
-            </motion.div>
+            </div>
           )}
         </section>
 
