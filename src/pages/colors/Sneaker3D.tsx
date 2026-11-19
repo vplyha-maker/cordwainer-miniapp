@@ -1,6 +1,7 @@
 import React, { Component, useCallback, useEffect, useRef, useState } from 'react'
 import type * as THREE_TYPES from 'three'
 import type { SneakerColors, SneakerZoneKey } from './colorEngine'
+import { RainbowTilesLoader } from './RainbowTilesLoader'
 import {
   SNEAKER_LAST_PARAMS,
   bindGlbMaterialsPreservingTextures,
@@ -331,7 +332,6 @@ function Sneaker3DCanvas({
         }
         wakeCameraAnimationRef.current = wakeCameraLoop
 
-        // Прогрессивная загрузка: сначала пробуем студийный GLB, процедурный меш — только как fallback
         const mountProceduralFallback = () => {
           if (disposed || pivotGroup.children.length > 0) return
           const proceduralMesh = buildSneakerMeshGroup(THREE, mats)
@@ -578,18 +578,7 @@ function Sneaker3DCanvas({
       )}
 
       {isLoading3D && !webglError && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span
-            className={
-              'px-3 py-1 text-[9px] font-sans uppercase tracking-[0.22em] border rounded-full backdrop-blur-sm animate-pulse ' +
-              (isDark
-                ? 'border-white/15 bg-black/40 text-[#F4F0E8]/80'
-                : 'border-black/15 bg-white/50 text-[#1C1816]/80')
-            }
-          >
-            {loading3DLabel || 'Загрузка 3D • CORDWAINE AEROSTRAP...'}
-          </span>
-        </div>
+        <RainbowTilesLoader isDark={isDark} label={loading3DLabel} />
       )}
 
       <button
@@ -617,4 +606,3 @@ export function Sneaker3D(props: Sneaker3DProps) {
     </SneakerErrorBoundary>
   )
 }
-
