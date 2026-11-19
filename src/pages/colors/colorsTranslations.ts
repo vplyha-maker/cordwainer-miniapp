@@ -69,7 +69,7 @@ export const TRANSLATIONS = {
     chroma: 'Насыщенность',
     pure: 'Пигмент',
     ittenLabel: 'Круг Иттена (RYB)',
-    hslLabel: 'Цифровой (HSL)',
+    hslLabel: 'Перцептивный (OKLCH)',
     presetClassic: '60/30/10 База',
     presetToe: 'Акцент мыска',
     presetSplit: 'Сплит-берцы',
@@ -103,7 +103,7 @@ export const TRANSLATIONS = {
     guideBalanceTitle: '1. Цветовая формула 60 / 30 / 10',
     guideBalance:
       '• 60% (Верх) — основной доминирующий материал (союзка, пятка).\n• 30% (Обводка) — поддерживающие панели (берцы, ремень, обвод мыска).\n• 10% (Детали) — чистый визуальный акцент (логотип, штрихи, петля, Air-блок).\nНажмите на любой сегмент полосы 60/30/10 или карточку под ней — откроется Bottom Sheet «Редактор цвета», где каждое движение ползунка сразу обновляет 3D-модель в реальном времени.',
-    guideSchemesTitle: '2. Схемы гармонии Иттена (RYB / HSL)',
+    guideSchemesTitle: '2. Схемы гармонии Иттена (RYB / OKLCH)',
     guideComplementary:
       'Комплементарная — два противоположных цвета на круге. Даёт сильный, энергичный контраст для спортивной и fashion-обуви.',
     guideAnalogous:
@@ -252,7 +252,7 @@ export const TRANSLATIONS = {
     chroma: 'Насиченість',
     pure: 'Пігмент',
     ittenLabel: 'Коло Іттена (RYB)',
-    hslLabel: 'Цифровий (HSL)',
+    hslLabel: 'Перцептивний (OKLCH)',
     presetClassic: '60/30/10 База',
     presetToe: 'Акцент миска',
     presetSplit: 'Спліт-берці',
@@ -285,7 +285,7 @@ export const TRANSLATIONS = {
     guideBalanceTitle: '1. Колірна формула 60 / 30 / 10',
     guideBalance:
       '• 60% (Верх) — основний домінуючий матеріал (союзка, п’ята).\n• 30% (Обвідка) — підтримуючі панелі (берці, ремінь, обвід миска).\n• 10% (Деталі) — чистий акцент (логотип, штрихи, петля, Air-блок).\nНатисніть на будь-який сегмент смуги 60/30/10 або картку під нею — відкриється Bottom Sheet «Редактор кольору», що оновлює 3D-модель у реальному часі.',
-    guideSchemesTitle: '2. Схеми гармонії Іттена (RYB / HSL)',
+    guideSchemesTitle: '2. Схеми гармонії Іттена (RYB / OKLCH)',
     guideComplementary:
       'Комплементарна — два протилежні кольори на колі. Сильний контраст для спортивного та fashion-взуття.',
     guideAnalogous:
@@ -433,7 +433,7 @@ export const TRANSLATIONS = {
     chroma: 'Sättigung',
     pure: 'Pigment',
     ittenLabel: 'Itten-Kreis (RYB)',
-    hslLabel: 'Digital (HSL)',
+    hslLabel: 'Perzeptiv (OKLCH)',
     presetClassic: '60/30/10 Klassik',
     presetToe: 'Kappen-Fokus',
     presetSplit: 'Split-Quartier',
@@ -466,7 +466,7 @@ export const TRANSLATIONS = {
     guideBalanceTitle: '1. Farbformel 60 / 30 / 10',
     guideBalance:
       '• 60 % (Obermaterial) — dominierender Hauptton.\n• 30 % (Einfassung) — stützende Seiten- und Riemenpartien.\n• 10 % (Details) — präziser Akzent (Logo, Air-Unit, Fersenlasche).\nTippen Sie auf ein beliebiges Feld der 60/30/10-Leiste, um den Farbeditor (Bottom Sheet) mit sofortiger 3D-Live-Vorschau zu öffnen.',
-    guideSchemesTitle: '2. Itten-Harmonien (RYB / HSL)',
+    guideSchemesTitle: '2. Itten-Harmonien (RYB / OKLCH)',
     guideComplementary:
       'Komplementär — zwei gegenüberliegende Farben für starken, energetischen Kontrast.',
     guideAnalogous:
