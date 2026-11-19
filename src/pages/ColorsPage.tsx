@@ -16,6 +16,7 @@ import {
   getMaterialZoneHex,
   getSchemeWheelAngles,
   mapPaletteToFootwear,
+  oklchToHex,
   rybHueToRgbHue,
   type ColorModelMode,
   type FootwearMappingPreset,
@@ -75,6 +76,8 @@ export {
 export {
   getCircularAngleDiff,
   rybHueToRgbHue,
+  hexToOklch,
+  oklchToHex,
   synthesizePigmentHex,
   getRelativeLuminance,
   getContrastRatio,
@@ -203,9 +206,11 @@ function loadSavedColorsState(): PersistedColorsState {
         : DEFAULT_STATE.scheme
 
     const modelMode: ColorModelMode =
-      parsed.modelMode === 'ryb' || parsed.modelMode === 'hsl'
+      parsed.modelMode === 'ryb' || parsed.modelMode === 'oklch'
         ? parsed.modelMode
-        : DEFAULT_STATE.modelMode
+        : parsed.modelMode === 'hsl'
+          ? 'oklch'
+          : DEFAULT_STATE.modelMode
 
     const mappingPreset: FootwearMappingPreset =
       typeof parsed.mappingPreset === 'string' &&
@@ -886,8 +891,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const wheelBackground = useMemo(() => {
     const stops: string[] = []
     for (let deg = 0; deg <= 360; deg += 30) {
-      const displayHue = modelMode === 'ryb' ? rybHueToRgbHue(deg) : deg
-      stops.push('hsl(' + displayHue.toFixed(1) + ', 90%, 50%)')
+      if (modelMode === 'oklch') {
+        stops.push(oklchToHex(0.68, 0.22, deg))
+      } else {
+        const displayHue = modelMode === 'ryb' ? rybHueToRgbHue(deg) : deg
+        stops.push('hsl(' + displayHue.toFixed(1) + ', 90%, 50%)')
+      }
     }
     return 'conic-gradient(from 0deg, ' + stops.join(', ') + ')'
   }, [modelMode])
