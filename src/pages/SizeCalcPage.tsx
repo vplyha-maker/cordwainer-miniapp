@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 import {
   calculateProFit,
@@ -44,8 +44,10 @@ type SavedPrefs = {
 }
 
 const RULER_TICKS = 31
-const PREFS_STORAGE_KEY = 'cordwainer_size_calc_prefs_v1'
-const THEME_STORAGE_KEY = 'cordwainer_theme'
+const PREFS_STORAGE_KEY = 'cordwaine_size_calc_prefs_v1'
+const LEGACY_PREFS_STORAGE_KEY = 'cordwainer_size_calc_prefs_v1'
+const THEME_STORAGE_KEY = 'cordwaine_theme'
+const LEGACY_THEME_STORAGE_KEY = 'cordwainer_theme'
 const SLIDER_HAPTIC_THROTTLE_MS = 36
 
 const VALID_GENDERS: Gender[] = ['men', 'women', 'kids']
@@ -89,6 +91,37 @@ const UI_LABELS: Record<
   },
 }
 
+function FlagCN() {
+  return (
+    <svg
+      width="18"
+      height="13"
+      viewBox="0 0 18 13"
+      fill="none"
+      aria-hidden="true"
+      className="rounded-[2px] shrink-0"
+    >
+      <rect width="18" height="13" fill="#DE2910" />
+      <polygon
+        points="3.6,1.8 4.15,3.5 5.95,3.5 4.5,4.55 5.05,6.25 3.6,5.2 2.15,6.25 2.7,4.55 1.25,3.5 3.05,3.5"
+        fill="#FFDE00"
+      />
+      <circle cx="7.2" cy="1.8" r="0.55" fill="#FFDE00" />
+      <circle cx="8.3" cy="3.1" r="0.55" fill="#FFDE00" />
+      <circle cx="8.3" cy="4.8" r="0.55" fill="#FFDE00" />
+      <circle cx="7.2" cy="6.1" r="0.55" fill="#FFDE00" />
+    </svg>
+  )
+}
+
+function normalizeBrandName(text: string): string {
+  return text.replace(/cordwainer/gi, (match) => {
+    if (match === match.toUpperCase()) return 'CORDWAINE'
+    if (match[0] === match[0].toUpperCase()) return 'Cordwaine'
+    return 'cordwaine'
+  })
+}
+
 function safeHapticSelection() {
   try {
     hapticSelection()
@@ -101,10 +134,25 @@ function safeHapticImpact(style: 'light' | 'medium' | 'heavy') {
   } catch {}
 }
 
+function detectTelegramMiniApp(): boolean {
+  if (typeof window === 'undefined') return false
+  const tg = (window as unknown as {
+    Telegram?: {
+      WebApp?: {
+        initData?: string
+        platform?: string
+      }
+    }
+  }).Telegram?.WebApp
+  return Boolean(tg && (tg.initData || (tg.platform && tg.platform !== 'unknown')))
+}
+
 function loadSavedPrefs(): SavedPrefs {
   if (typeof window === 'undefined') return {}
   try {
-    const raw = window.localStorage.getItem(PREFS_STORAGE_KEY)
+    const raw =
+      window.localStorage.getItem(PREFS_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_PREFS_STORAGE_KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw) as Partial<SavedPrefs>
     const gender = parsed.gender && VALID_GENDERS.includes(parsed.gender) ? parsed.gender : undefined
@@ -130,13 +178,17 @@ function loadSavedPrefs(): SavedPrefs {
 function resolveInitialDarkTheme(): boolean {
   if (typeof document === 'undefined') return true
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    const stored =
+      window.localStorage.getItem(THEME_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY)
     if (stored === 'dark') {
       document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
       return true
     }
     if (stored === 'light') {
       document.documentElement.classList.remove('dark')
+      document.documentElement.classList.add('light')
       return false
     }
   } catch {}
@@ -167,6 +219,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const ui = UI_LABELS[safeLang]
 
   const initialPrefs = useMemo(() => loadSavedPrefs(), [])
+  const [isTelegramMiniApp] = useState<boolean>(() => detectTelegramMiniApp())
 
   const onBackRef = useRef(onBack)
   useEffect(() => {
@@ -326,8 +379,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       setIsProPurchased(purchased)
       try {
         if (purchased) {
-          localStorage.setItem(`cordwainer_pro_sizes_${uid}`, '1')
+          localStorage.setItem(`cordwaine_pro_sizes_${uid}`, '1')
         } else {
+          localStorage.removeItem(`cordwaine_pro_sizes_${uid}`)
           localStorage.removeItem(`cordwainer_pro_sizes_${uid}`)
         }
       } catch {}
@@ -352,7 +406,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     if (!userId) return
 
     try {
-      if (localStorage.getItem(`cordwainer_pro_sizes_${userId}`) === '1') {
+      if (
+        localStorage.getItem(`cordwaine_pro_sizes_${userId}`) === '1' ||
+        localStorage.getItem(`cordwainer_pro_sizes_${userId}`) === '1'
+      ) {
         setIsProPurchased(true)
       }
     } catch {}
@@ -403,7 +460,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         safeHapticImpact('heavy')
         setIsProPurchased(true)
         try {
-          localStorage.setItem(`cordwainer_pro_sizes_${userId}`, '1')
+          localStorage.setItem(`cordwaine_pro_sizes_${userId}`, '1')
         } catch {}
         setIsPurchasing(false)
         return
@@ -418,7 +475,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           safeHapticImpact('heavy')
           setIsProPurchased(true)
           try {
-            localStorage.setItem(`cordwainer_pro_sizes_${userId}`, '1')
+            localStorage.setItem(`cordwaine_pro_sizes_${userId}`, '1')
           } catch {}
           setTimeout(() => {
             verifyPurchaseOnServer(userId, rawInitData)
@@ -599,7 +656,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       code: 'BR / CN',
       sub: t.subBrCn,
       val: `${formatSize(activeResult.br)} / ${formatSize(activeResult.cn)}`,
-      flag: <FlagBR />,
+      flag: (
+        <span className="inline-flex items-center gap-1 shrink-0">
+          <FlagBR />
+          <FlagCN />
+        </span>
+      ),
       free: false,
     },
   ]
@@ -633,6 +695,51 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const formatScaleMark = (mm: number) =>
     unit === 'cm' ? (mm / 10).toFixed(1).replace('.', ',') : String(mm)
 
+  const themeToggleBtn = (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-all ${bgSurface} ${textSecondary}`}
+    >
+      {isDark ? (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="M4.93 4.93l1.41 1.41" />
+          <path d="M17.66 17.66l1.41 1.41" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="M6.34 17.66l-1.41 1.41" />
+          <path d="M19.07 4.93l-1.41 1.41" />
+        </svg>
+      ) : (
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      )}
+    </button>
+  )
+
   return (
     <div
       className={`min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden transition-colors duration-300 ${bgPage} ${textPrimary} select-none`}
@@ -643,84 +750,49 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* 1. КОМПАКТНАЯ ЛИПКАЯ ШАПКА */}
-      <header
-        className={`sticky top-0 z-30 backdrop-blur-xl transition-colors duration-300 ${bgHeader} border-b ${hairline}`}
-      >
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={triggerBackNavigation}
-            className={`inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-full text-xs font-sans font-medium tracking-wide cursor-pointer active:scale-95 transition-all ${bgSurface} ${textPrimary}`}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+      {/* 1. ВЕРХНЯЯ НАВИГАЦИЯ (БЕЗ ДУБЛИРОВАНИЯ ШАПКИ TELEGRAM MINI APP + SAFE-AREA) */}
+      {!isTelegramMiniApp && (
+        <header
+          className={`sticky top-0 z-30 backdrop-blur-xl transition-colors duration-300 ${bgHeader} border-b ${hairline} pt-[env(safe-area-inset-top)]`}
+        >
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={triggerBackNavigation}
+              className={`inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-full text-xs font-sans font-medium tracking-wide cursor-pointer active:scale-95 transition-all ${bgSurface} ${textPrimary}`}
             >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-            <span>{t.back}</span>
-          </button>
-
-          <span className="font-serif text-[13px] sm:text-sm uppercase tracking-[0.26em] font-medium">
-            Cordwainer
-          </span>
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-all ${bgSurface} ${textSecondary}`}
-          >
-            {isDark ? (
               <svg
-                width="16"
-                height="16"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.7"
+                strokeWidth="1.9"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2" />
-                <path d="M12 20v2" />
-                <path d="M4.93 4.93l1.41 1.41" />
-                <path d="M17.66 17.66l1.41 1.41" />
-                <path d="M2 12h2" />
-                <path d="M20 12h2" />
-                <path d="M6.34 17.66l-1.41 1.41" />
-                <path d="M19.07 4.93l-1.41 1.41" />
+                <path d="M15 18l-6-6 6-6" />
               </svg>
-            ) : (
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
-        </div>
-      </header>
+              <span>{t.back}</span>
+            </button>
 
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-3.5 pb-8 flex flex-col gap-5">
-        {/* 2. ПОЛ ПОЛЬЗОВАТЕЛЯ */}
-        <section>
-          <div className={`grid grid-cols-3 p-1 rounded-full ${bgSurface}`}>
+            <span className="font-serif text-[13px] sm:text-sm uppercase tracking-[0.26em] font-medium">
+              Cordwaine
+            </span>
+
+            {themeToggleBtn}
+          </div>
+        </header>
+      )}
+
+      <main
+        className={`max-w-2xl mx-auto px-4 sm:px-6 pb-[max(2rem,env(safe-area-inset-bottom))] flex flex-col gap-5 ${
+          isTelegramMiniApp ? 'pt-[calc(0.75rem+env(safe-area-inset-top))]' : 'pt-3.5'
+        }`}
+      >
+        {/* 2. ПОЛ ПОЛЬЗОВАТЕЛЯ (+ ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ В TELEGRAM MINI APP) */}
+        <section className="flex items-center gap-2.5">
+          <div className={`flex-1 grid grid-cols-3 p-1 rounded-full ${bgSurface}`}>
             {(['men', 'women', 'kids'] as Gender[]).map((g) => {
               const active = gender === g
               return (
@@ -735,7 +807,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   {active && (
                     <motion.span
                       layoutId="genderSegmentIndicator"
-                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      transition={{ type: 'spring', stiffness: 460, damping: 36 }}
                       className={`absolute inset-0 rounded-full ${activeInvert}`}
                     />
                   )}
@@ -744,9 +816,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               )
             })}
           </div>
+
+          {isTelegramMiniApp && themeToggleBtn}
         </section>
 
-        {/* 3. БЛОК ИЗМЕРЕНИЯ (ВСЕГДА В ОДНУ СТРОКУ + УДОБНЫЙ ВВОД ОДНОЙ РУКОЙ) */}
+        {/* 3. БЛОК ИЗМЕРЕНИЯ И ПРЕЦИЗИОННЫЙ ПОЛЗУНОК */}
         <section className={`rounded-3xl p-4 sm:p-5 transition-colors duration-300 ${bgSurface}`}>
           <div className="flex items-center justify-between gap-2 mb-4">
             <div className={`inline-flex items-center p-0.5 rounded-full ${bgSurfaceSoft} min-w-0`}>
@@ -792,7 +866,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           </div>
 
-          {/* Кнопки − / + и крупное значение */}
           <div className="flex items-center justify-between gap-3 mb-4">
             <button
               type="button"
@@ -853,7 +926,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </button>
           </div>
 
-          {/* Прецизионный измеритель без вылета бегунка на краях */}
           <div className="relative w-full pt-1 pb-0.5">
             <input
               type="range"
@@ -935,9 +1007,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               <span className="text-left">
                 {formatScaleMark(sliderMin)} {unit === 'cm' ? t.cmLabel : t.mmLabel}
               </span>
-              <span className="text-center opacity-70">
-                {formatScaleMark(sliderMid)}
-              </span>
+              <span className="text-center opacity-70">{formatScaleMark(sliderMid)}</span>
               <span className="text-right">
                 {formatScaleMark(sliderMax)} {unit === 'cm' ? t.cmLabel : t.mmLabel}
               </span>
@@ -945,52 +1015,44 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
         </section>
 
-        {/* 4. ГЛАВНЫЙ РЕЗУЛЬТАТ UA / EU — ВСЕГДА ВИДЕН РЯДОМ С ИЗМЕРИТЕЛЕМ */}
+        {/* 4. ГЛАВНЫЙ РЕЗУЛЬТАТ UA / EU */}
         <section className="flex flex-col items-center text-center pt-1">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <FlagUA />
-            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.2em] ${textSecondary}`}>
-              {t.yourSizeLabel}
-            </span>
-            <FlagEU />
-          </div>
+          <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.22em] mb-2.5 ${textSecondary}`}>
+            {t.yourSizeLabel}
+          </span>
 
-          <div className="flex items-end justify-center gap-6 sm:gap-10">
-            <div className="flex flex-col items-center">
-              <motion.span
-                key={`ua-${activeResult.ua}`}
-                initial={{ opacity: 0.45, y: 3 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.16 }}
-                className="font-serif text-[62px] sm:text-[76px] leading-[0.92] tracking-tight tabular-nums"
+          <div className="w-full max-w-sm grid grid-cols-[1fr_1px_1fr] items-center">
+            <div className="flex flex-col items-center pr-3">
+              <span
+                className="font-serif text-[64px] sm:text-[74px] leading-[0.92] tracking-tight tabular-nums transition-colors duration-200"
                 style={{ color: accentHex }}
               >
                 {formatSize(activeResult.ua)}
-              </motion.span>
-              <span className={`mt-1.5 text-[10.5px] font-sans font-semibold uppercase tracking-[0.22em] ${textSecondary}`}>
-                UA
               </span>
+              <div className="mt-2.5 inline-flex items-center gap-1.5">
+                <FlagUA />
+                <span className={`text-[11px] font-sans font-semibold uppercase tracking-[0.2em] ${textSecondary}`}>
+                  UA
+                </span>
+              </div>
             </div>
 
-            <div className={`h-12 sm:h-14 w-px mb-5 ${isDark ? 'bg-[#F4F0E8]/12' : 'bg-[#181715]/12'}`} />
+            <div className={`h-14 w-px ${isDark ? 'bg-[#F4F0E8]/12' : 'bg-[#181715]/12'}`} />
 
-            <div className="flex flex-col items-center">
-              <motion.span
-                key={`eu-${activeResult.eu}`}
-                initial={{ opacity: 0.45, y: 3 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.16 }}
-                className="font-serif text-[46px] sm:text-[58px] leading-[0.95] tracking-tight tabular-nums"
-              >
+            <div className="flex flex-col items-center pl-3">
+              <span className="font-serif text-[56px] sm:text-[66px] leading-[0.92] tracking-tight tabular-nums transition-colors duration-200">
                 {formatSize(activeResult.eu)}
-              </motion.span>
-              <span className={`mt-1.5 text-[10.5px] font-sans font-semibold uppercase tracking-[0.22em] ${textSecondary}`}>
-                EU
               </span>
+              <div className="mt-2.5 inline-flex items-center gap-1.5">
+                <FlagEU />
+                <span className={`text-[11px] font-sans font-semibold uppercase tracking-[0.2em] ${textSecondary}`}>
+                  EU
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="mt-2.5 inline-flex items-center gap-2 text-xs font-sans">
+          <div className="mt-3.5 inline-flex items-center gap-2 text-xs font-sans">
             <span
               className="w-1.5 h-1.5 rounded-full shrink-0"
               style={{ backgroundColor: accentHex }}
@@ -1005,57 +1067,57 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </span>
           </div>
 
-          <p className={`mt-2 max-w-md text-[11.5px] font-sans leading-relaxed ${textSecondary}`}>
+          <p className={`mt-2 max-w-md text-xs font-sans leading-relaxed ${textSecondary}`}>
             {dynamicAnnotationText}
           </p>
         </section>
 
-        {/* 5. ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ (КОМПАКТНАЯ ПОЛОСА БЕЗ ДУБЛИРОВАНИЯ) */}
-        <section className={`grid grid-cols-4 gap-2 py-3.5 border-y ${hairline}`}>
-          <div className="flex flex-col min-w-0">
-            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+        {/* 5. ПОКАЗАТЕЛИ ИЗМЕРЕНИЯ (АДАПТИВНАЯ СЕТКА 2×2 НА УЗКИХ ЭКРАНАХ, 4 В РЯД НА ШИРОКИХ) */}
+        <section className={`grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-4 py-4 border-y ${hairline}`}>
+          <div className="flex flex-col">
+            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
               {t.footTag}
             </span>
-            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate">
+            <span className="mt-1 text-base font-sans font-medium tabular-nums">
               {proFit.footMm} {t.mmLabel}
             </span>
-            <span className={`text-[10.5px] font-sans tabular-nums ${textSecondary}`}>
+            <span className={`text-xs font-sans tabular-nums ${textSecondary}`}>
               {proFit.footCm.toFixed(1)} {t.cmLabel}
             </span>
           </div>
 
-          <div className="flex flex-col min-w-0">
-            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+          <div className="flex flex-col">
+            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
               {t.ballTag}
             </span>
-            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate">
+            <span className="mt-1 text-base font-sans font-medium tabular-nums">
               {proFit.ballGirthMm} {t.mmLabel}
             </span>
-            <span className={`text-[10.5px] font-sans truncate ${textSecondary}`}>
+            <span className={`text-xs font-sans ${textSecondary}`}>
               EU {proFit.widthMarks.eu}
             </span>
           </div>
 
-          <div className="flex flex-col min-w-0">
-            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+          <div className="flex flex-col">
+            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
               {t.insoleLabel}
             </span>
-            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate" style={{ color: accentHex }}>
+            <span className="mt-1 text-base font-sans font-medium tabular-nums" style={{ color: accentHex }}>
               {proFit.insoleMm} {t.mmLabel}
             </span>
-            <span className={`text-[10.5px] font-sans tabular-nums ${textSecondary}`}>
+            <span className={`text-xs font-sans tabular-nums ${textSecondary}`}>
               {proFit.insoleCm.toFixed(1)} {t.cmLabel}
             </span>
           </div>
 
-          <div className="flex flex-col min-w-0">
-            <span className={`text-[9.5px] font-sans uppercase tracking-[0.12em] truncate ${textTertiary}`}>
+          <div className="flex flex-col">
+            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
               {t.allowanceLabel}
             </span>
-            <span className="mt-0.5 text-sm sm:text-base font-sans font-medium tabular-nums truncate">
+            <span className="mt-1 text-base font-sans font-medium tabular-nums">
               +{proFit.allowanceMm} {t.mmLabel}
             </span>
-            <span className={`text-[10.5px] font-sans truncate ${textSecondary}`}>
+            <span className={`text-xs font-sans ${textSecondary}`}>
               {styleLabels[shoeStyle]}
             </span>
           </div>
@@ -1089,7 +1151,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   {active && (
                     <motion.span
                       layoutId="activeTabUnderline"
-                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      transition={{ type: 'spring', stiffness: 460, damping: 36 }}
                       className="absolute inset-x-2 bottom-0 h-[2px] rounded-full"
                       style={{ backgroundColor: accentHex }}
                     />
@@ -1099,308 +1161,308 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             })}
           </nav>
 
-          <AnimatePresence mode="wait">
-            {/* ВКЛАДКА 1: МИРОВЫЕ СИСТЕМЫ */}
-            {activeTab === 'world' && (
-              <motion.div
-                key="world"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3"
-              >
-                {worldSystems.map((item) => {
-                  const unlocked = item.free || isProPurchased
-                  return (
-                    <div
-                      key={item.code}
-                      onClick={() => {
-                        if (!unlocked) handleProClick()
-                        else safeHapticSelection()
-                      }}
-                      className={`rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between min-h-[96px] transition-colors ${bgSurface} ${
-                        !unlocked ? 'cursor-pointer active:scale-[0.98]' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {item.flag}
-                          <span className="text-xs font-sans font-semibold uppercase tracking-[0.1em] whitespace-nowrap">
-                            {item.code}
-                          </span>
-                        </div>
-                        {!unlocked && (
-                          <span className={textTertiary}>
-                            <LockIcon />
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-2.5">
-                        {unlocked ? (
-                          <span className="font-serif text-[24px] sm:text-[26px] leading-none tracking-tight tabular-nums block">
-                            {item.val}
-                          </span>
-                        ) : (
-                          <span className="font-serif text-[22px] leading-none blur-[5px] opacity-35 select-none block">
-                            42.5
-                          </span>
-                        )}
-                        <span className={`text-[11px] font-sans block mt-1.5 truncate ${textSecondary}`}>
-                          {item.sub}
+          {/* ВКЛАДКА 1: МИРОВЫЕ СИСТЕМЫ */}
+          {activeTab === 'world' && (
+            <motion.div
+              key="world"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+            >
+              {worldSystems.map((item) => {
+                const unlocked = item.free || isProPurchased
+                const isWideVal = item.val.length > 6
+                return (
+                  <div
+                    key={item.code}
+                    onClick={() => {
+                      if (!unlocked) handleProClick()
+                      else safeHapticSelection()
+                    }}
+                    className={`rounded-2xl p-4 flex flex-col justify-between min-h-[112px] transition-colors ${bgSurface} ${
+                      !unlocked ? 'cursor-pointer active:scale-[0.98]' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {item.flag}
+                        <span className="text-xs font-sans font-semibold uppercase tracking-[0.1em] whitespace-nowrap">
+                          {item.code}
                         </span>
                       </div>
+                      {!unlocked && (
+                        <span className={textTertiary}>
+                          <LockIcon />
+                        </span>
+                      )}
                     </div>
-                  )
-                })}
-              </motion.div>
-            )}
 
-            {/* ВКЛАДКА 2: КОЛОДКА, СЕЗОН И ПОЛНОТА (СБАЛАНСИРОВАННАЯ СЕТКА БЕЗ ПУСТЫХ ЗОН) */}
-            {activeTab === 'fit' && (
-              <motion.div
-                key="fit"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                className="flex flex-col gap-4"
-              >
-                <div>
-                  <span className={`block text-[10px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
-                    {ui.styleSection}
-                  </span>
-                  <div className="grid grid-cols-6 gap-2">
-                    {styleItems.map((st, idx) => {
-                      const active = shoeStyle === st.id
-                      const spanClass = idx < 3 ? 'col-span-2' : 'col-span-3'
-                      return (
-                        <button
-                          key={st.id}
-                          type="button"
-                          onClick={() => {
-                            safeHapticImpact('medium')
-                            setShoeStyle(st.id)
-                          }}
-                          className={`${spanClass} py-2.5 px-2.5 rounded-2xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all ${
-                            active ? activeInvert : `${bgSurface} ${textPrimary}`
+                    <div className="mt-3">
+                      {unlocked ? (
+                        <span
+                          className={`font-serif leading-none tracking-tight tabular-nums block whitespace-nowrap ${
+                            isWideVal ? 'text-[23px] sm:text-[25px]' : 'text-[28px] sm:text-[30px]'
                           }`}
                         >
-                          <span className="text-xs font-sans font-medium truncate max-w-full">
-                            {st.label}
+                          {item.val}
+                        </span>
+                      ) : (
+                        <span className="font-serif text-[26px] leading-none blur-[5px] opacity-35 select-none block">
+                          42.5
+                        </span>
+                      )}
+                      <span className={`text-[11px] font-sans block mt-2 truncate ${textSecondary}`}>
+                        {item.sub}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </motion.div>
+          )}
+
+          {/* ВКЛАДКА 2: КОЛОДКА, СЕЗОН И ПОЛНОТА */}
+          {activeTab === 'fit' && (
+            <motion.div
+              key="fit"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              className="flex flex-col gap-4"
+            >
+              <div>
+                <span className={`block text-[10.5px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
+                  {ui.styleSection}
+                </span>
+                <div className="grid grid-cols-6 gap-2">
+                  {styleItems.map((st, idx) => {
+                    const active = shoeStyle === st.id
+                    const spanClass = idx < 3 ? 'col-span-2' : 'col-span-3'
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => {
+                          safeHapticImpact('medium')
+                          setShoeStyle(st.id)
+                        }}
+                        className={`${spanClass} py-2.5 px-2.5 rounded-2xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all ${
+                          active ? activeInvert : `${bgSurface} ${textPrimary}`
+                        }`}
+                      >
+                        <span className="text-xs font-sans font-medium truncate max-w-full">
+                          {st.label}
+                        </span>
+                        <span
+                          className={`text-[10.5px] font-sans tabular-nums ${
+                            active ? 'opacity-75' : textSecondary
+                          }`}
+                        >
+                          +{st.addMm} {t.mmLabel}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <span className={`block text-[10.5px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
+                  {ui.widthSection}
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(
+                    [
+                      { id: 'narrow', label: t.widthNarrow },
+                      { id: 'standard', label: t.widthStandard },
+                      { id: 'wide', label: t.widthWide },
+                      { id: 'extraWide', label: t.widthExtraWide },
+                    ] as Array<{ id: WidthFit; label: string }>
+                  ).map((wf) => {
+                    const active = widthFit === wf.id
+                    return (
+                      <button
+                        key={wf.id}
+                        type="button"
+                        onClick={() => {
+                          safeHapticImpact('medium')
+                          setWidthFit(wf.id)
+                        }}
+                        className={`py-2.5 px-3 rounded-2xl text-xs font-sans font-medium tracking-wide cursor-pointer truncate transition-all ${
+                          active ? textPrimary : `${bgSurface} ${textSecondary}`
+                        }`}
+                        style={
+                          active
+                            ? {
+                                backgroundColor: isDark
+                                  ? 'rgba(201, 168, 106, 0.16)'
+                                  : 'rgba(154, 107, 47, 0.14)',
+                                color: accentHex,
+                              }
+                            : undefined
+                        }
+                      >
+                        {wf.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div
+                onClick={() => {
+                  if (!isProPurchased) handleProClick()
+                }}
+                className={`rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 ${bgSurface} ${
+                  !isProPurchased ? 'cursor-pointer' : ''
+                }`}
+              >
+                <div>
+                  <span className={`text-[10.5px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
+                    {t.insoleLabel} · {t.allowanceLabel}
+                  </span>
+                  <span className={`font-serif text-[25px] sm:text-[26px] leading-tight block mt-1.5 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
+                    {proFit.insoleMm} {t.mmLabel} ({proFit.insoleCm.toFixed(1)} {t.cmLabel})
+                  </span>
+                  <span className={`block text-xs mt-1.5 ${textSecondary}`}>
+                    {t.footTag} {proFit.footMm} + {proFit.allowanceMm} →{' '}
+                    <strong className="font-semibold" style={{ color: accentHex }}>
+                      {formatSize(activeResult.ua)} UA / {formatSize(activeResult.eu)} EU
+                    </strong>
+                  </span>
+                </div>
+
+                <div className={`pt-4 border-t ${hairline} sm:pt-0 sm:border-t-0 sm:pl-5 sm:border-l`}>
+                  <span className={`text-[10.5px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
+                    {t.widthLabel} · {t.girthLabel}
+                  </span>
+                  <span className={`font-serif text-[25px] sm:text-[26px] leading-tight block mt-1.5 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
+                    {proFit.ballWidthMm} / {proFit.ballGirthMm} {t.mmLabel}
+                  </span>
+                  <span className={`block text-xs mt-1.5 ${textSecondary} ${!isProPurchased ? 'blur-[4px]' : ''}`}>
+                    EU {proFit.widthMarks.eu} · US {proFit.widthMarks.us} · JP {proFit.widthMarks.jp}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ВКЛАДКА 3: СГРУППИРОВАННЫЕ БРЕНДЫ С ЕДИНЫМ ВЫРАВНИВАНИЕМ */}
+          {activeTab === 'brands' && (
+            <motion.div
+              key="brands"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              className="flex flex-col gap-4"
+            >
+              {brandGroups.map((group) => (
+                <div key={group.id} className="flex flex-col gap-2">
+                  <span className={`text-[10.5px] font-sans font-semibold uppercase tracking-[0.16em] px-1 ${textTertiary}`}>
+                    {group.title}
+                  </span>
+
+                  <div className={`rounded-2xl px-4 sm:px-5 divide-y ${bgSurface} ${dividerClass}`}>
+                    {group.rows.map((row) => (
+                      <div
+                        key={row.brand}
+                        onClick={() => {
+                          if (!isProPurchased) handleProClick()
+                          else safeHapticSelection()
+                        }}
+                        className={`py-4 flex items-start justify-between gap-4 ${
+                          !isProPurchased ? 'cursor-pointer' : ''
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 flex flex-col items-start">
+                          <span className="text-[13.5px] font-sans font-semibold uppercase tracking-[0.06em] leading-snug">
+                            {row.brand}
                           </span>
                           <span
-                            className={`text-[10px] font-sans tabular-nums ${
-                              active ? 'opacity-75' : textSecondary
-                            }`}
+                            className={`mt-1 text-[9.5px] font-sans font-medium uppercase tracking-[0.12em] px-2 py-0.5 rounded-full ${bgSurfaceSoft} ${textSecondary}`}
                           >
-                            +{st.addMm} {t.mmLabel}
+                            {row.category}
                           </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <span className={`block text-[10px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
-                    {ui.widthSection}
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {(
-                      [
-                        { id: 'narrow', label: t.widthNarrow },
-                        { id: 'standard', label: t.widthStandard },
-                        { id: 'wide', label: t.widthWide },
-                        { id: 'extraWide', label: t.widthExtraWide },
-                      ] as Array<{ id: WidthFit; label: string }>
-                    ).map((wf) => {
-                      const active = widthFit === wf.id
-                      return (
-                        <button
-                          key={wf.id}
-                          type="button"
-                          onClick={() => {
-                            safeHapticImpact('medium')
-                            setWidthFit(wf.id)
-                          }}
-                          className={`py-2.5 px-3 rounded-2xl text-xs font-sans font-medium tracking-wide cursor-pointer truncate transition-all ${
-                            active ? textPrimary : `${bgSurface} ${textSecondary}`
-                          }`}
-                          style={
-                            active
-                              ? {
-                                  backgroundColor: isDark
-                                    ? 'rgba(201, 168, 106, 0.16)'
-                                    : 'rgba(154, 107, 47, 0.14)',
-                                  color: accentHex,
-                                }
-                              : undefined
-                          }
-                        >
-                          {wf.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => {
-                    if (!isProPurchased) handleProClick()
-                  }}
-                  className={`rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 ${bgSurface} ${
-                    !isProPurchased ? 'cursor-pointer' : ''
-                  }`}
-                >
-                  <div>
-                    <span className={`text-[10px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
-                      {t.insoleLabel} · {t.allowanceLabel}
-                    </span>
-                    <span className={`font-serif text-[24px] sm:text-[26px] leading-tight block mt-1 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
-                      {proFit.insoleMm} {t.mmLabel} ({proFit.insoleCm.toFixed(1)} {t.cmLabel})
-                    </span>
-                    <span className={`block text-xs mt-1 ${textSecondary}`}>
-                      {t.footTag} {proFit.footMm} + {proFit.allowanceMm} →{' '}
-                      <strong className="font-semibold" style={{ color: accentHex }}>
-                        {formatSize(activeResult.ua)} UA / {formatSize(activeResult.eu)} EU
-                      </strong>
-                    </span>
-                  </div>
-
-                  <div className={`pt-4 border-t ${hairline} sm:pt-0 sm:border-t-0 sm:pl-5 sm:border-l`}>
-                    <span className={`text-[10px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
-                      {t.widthLabel} · {t.girthLabel}
-                    </span>
-                    <span className={`font-serif text-[24px] sm:text-[26px] leading-tight block mt-1 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
-                      {proFit.ballWidthMm} / {proFit.ballGirthMm} {t.mmLabel}
-                    </span>
-                    <span className={`block text-xs mt-1 ${textSecondary} ${!isProPurchased ? 'blur-[4px]' : ''}`}>
-                      EU {proFit.widthMarks.eu} · US {proFit.widthMarks.us} · JP {proFit.widthMarks.jp}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* ВКЛАДКА 3: СГРУППИРОВАННЫЕ БРЕНДЫ */}
-            {activeTab === 'brands' && (
-              <motion.div
-                key="brands"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                className="flex flex-col gap-4"
-              >
-                {brandGroups.map((group) => (
-                  <div key={group.id} className="flex flex-col gap-2">
-                    <span className={`text-[10px] font-sans font-semibold uppercase tracking-[0.16em] px-1 ${textTertiary}`}>
-                      {group.title}
-                    </span>
-
-                    <div className={`rounded-2xl px-4 sm:px-5 divide-y ${bgSurface} ${dividerClass}`}>
-                      {group.rows.map((row) => (
-                        <div
-                          key={row.brand}
-                          onClick={() => {
-                            if (!isProPurchased) handleProClick()
-                            else safeHapticSelection()
-                          }}
-                          className={`py-3.5 flex items-start justify-between gap-3 ${
-                            !isProPurchased ? 'cursor-pointer' : ''
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[13px] font-sans font-semibold uppercase tracking-[0.07em]">
-                                {row.brand}
-                              </span>
-                              <span
-                                className={`text-[9.5px] font-sans font-medium uppercase tracking-[0.1em] px-2 py-0.5 rounded-full ${bgSurfaceSoft} ${textSecondary}`}
-                              >
-                                {row.category}
-                              </span>
-                            </div>
-                            <p className={`text-[11.5px] font-sans leading-relaxed mt-1.5 ${textSecondary}`}>
-                              {row.offsetNote[safeLang]}
-                            </p>
-                          </div>
-
-                          {isProPurchased ? (
-                            <div className="text-right shrink-0 pt-0.5">
-                              <span className="font-serif text-[19px] sm:text-xl block leading-tight tabular-nums">
-                                EU {row.eu}
-                              </span>
-                              <span className="text-[11px] font-sans font-medium tabular-nums block mt-0.5" style={{ color: accentHex }}>
-                                US {row.us} · UK {row.uk}
-                              </span>
-                              <span className={`text-[10.5px] font-sans tabular-nums block ${textTertiary}`}>
-                                JP {row.jp}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 shrink-0 pt-1">
-                              <span className="font-serif text-base blur-[5px] opacity-35 select-none">
-                                EU 42.5
-                              </span>
-                              <span className={textTertiary}>
-                                <LockIcon />
-                              </span>
-                            </div>
-                          )}
+                          <p className={`text-xs font-sans leading-relaxed mt-2 ${textSecondary}`}>
+                            {row.offsetNote[safeLang]}
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
-            )}
 
-            {/* ВКЛАДКА 4: ИНСТРУКЦИЯ ЗАМЕРА */}
-            {activeTab === 'guide' && (
-              <motion.div
-                key="guide"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                className={`rounded-2xl p-4 sm:p-5 flex flex-col gap-4 ${bgSurface}`}
-              >
-                <div className="flex gap-3">
-                  <span className="font-serif text-lg leading-none pt-0.5 shrink-0" style={{ color: accentHex }}>
-                    01
-                  </span>
-                  <div>
-                    <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
-                      {t.guideFootTitle}
-                    </h4>
-                    <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide1}</p>
-                    <p className={`text-xs font-sans leading-relaxed mt-1.5 ${textSecondary}`}>
-                      {t.measureGuide2}
-                    </p>
-                  </div>
-                </div>
-
-                <div className={`pt-4 border-t ${hairline} flex gap-3`}>
-                  <span className="font-serif text-lg leading-none pt-0.5 shrink-0" style={{ color: accentHex }}>
-                    02
-                  </span>
-                  <div>
-                    <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
-                      {t.guideInsoleTitle}
-                    </h4>
-                    <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide3}</p>
+                        {isProPurchased ? (
+                          <div className="text-right shrink-0 min-w-[104px] pt-0.5">
+                            <span className="font-serif text-[21px] block leading-none tabular-nums">
+                              EU {row.eu}
+                            </span>
+                            <span
+                              className="text-[11.5px] font-sans font-medium tabular-nums block mt-1.5"
+                              style={{ color: accentHex }}
+                            >
+                              US {row.us} · UK {row.uk}
+                            </span>
+                            <span className={`text-[11px] font-sans tabular-nums block mt-0.5 ${textTertiary}`}>
+                              JP {row.jp}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 shrink-0 pt-1">
+                            <span className="font-serif text-base blur-[5px] opacity-35 select-none">
+                              EU 42.5
+                            </span>
+                            <span className={textTertiary}>
+                              <LockIcon />
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
+              ))}
+            </motion.div>
+          )}
 
-                <p className={`text-xs font-sans italic leading-relaxed pt-3.5 border-t ${hairline} ${textSecondary}`}>
-                  {t.measureTip}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* ВКЛАДКА 4: ИНСТРУКЦИЯ ЗАМЕРА */}
+          {activeTab === 'guide' && (
+            <motion.div
+              key="guide"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              className={`rounded-2xl p-4 sm:p-5 flex flex-col gap-4 ${bgSurface}`}
+            >
+              <div className="flex gap-3">
+                <span className="font-serif text-lg leading-none pt-0.5 shrink-0" style={{ color: accentHex }}>
+                  01
+                </span>
+                <div>
+                  <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
+                    {t.guideFootTitle}
+                  </h4>
+                  <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide1}</p>
+                  <p className={`text-xs font-sans leading-relaxed mt-1.5 ${textSecondary}`}>
+                    {t.measureGuide2}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`pt-4 border-t ${hairline} flex gap-3`}>
+                <span className="font-serif text-lg leading-none pt-0.5 shrink-0" style={{ color: accentHex }}>
+                  02
+                </span>
+                <div>
+                  <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
+                    {t.guideInsoleTitle}
+                  </h4>
+                  <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide3}</p>
+                </div>
+              </div>
+
+              <p className={`text-xs font-sans italic leading-relaxed pt-3.5 border-t ${hairline} ${textSecondary}`}>
+                {t.measureTip}
+              </p>
+            </motion.div>
+          )}
         </section>
 
         {/* 7. СТАТУС PRO ИЛИ ПОКУПКА */}
@@ -1438,7 +1500,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           ) : (
             <div className={`py-3 border-t ${hairline} flex items-center justify-between gap-3 text-[11px] font-sans uppercase tracking-[0.14em] ${textSecondary}`}>
-              <span className="truncate">{t.subtitle}</span>
+              <span className="truncate">{normalizeBrandName(t.subtitle)}</span>
               <span className="shrink-0 font-semibold" style={{ color: accentHex }}>
                 ★ {t.proActiveBadge}
               </span>
