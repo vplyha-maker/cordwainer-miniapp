@@ -27,17 +27,24 @@ type TileMeta = {
   delaySec: number
 }
 
+const COLS = 12
+const ROWS = 6
+
 export function RainbowTilesLoader({ isDark, label }: RainbowTilesLoaderProps) {
   const tiles = useMemo<TileMeta[]>(() => {
     const items: TileMeta[] = []
-    for (let row = 0; row < 7; row++) {
-      for (let col = 0; col < 7; col++) {
-        const layer = Math.max(Math.abs(row - 3), Math.abs(col - 3))
-        const diag = row + col
-        const delaySec = -(layer * 0.28 + diag * 0.035)
+    const maxDiag = COLS - 1 + (ROWS - 1)
+    const centerCol = (COLS - 1) / 2
+    const centerRow = (ROWS - 1) / 2
+
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const dist = Math.hypot((col - centerCol) * 0.72, row - centerRow)
+        const paletteIdx = Math.round(((row + col) / maxDiag) * (DIAGONAL_PALETTE.length - 1))
+        const delaySec = -(dist * 0.24 + (row + col) * 0.03)
         items.push({
-          key: row * 7 + col,
-          color: DIAGONAL_PALETTE[diag] ?? DIAGONAL_PALETTE[0],
+          key: row * COLS + col,
+          color: DIAGONAL_PALETTE[paletteIdx] ?? DIAGONAL_PALETTE[0],
           delaySec,
         })
       }
@@ -48,8 +55,8 @@ export function RainbowTilesLoader({ isDark, label }: RainbowTilesLoaderProps) {
   return (
     <div
       className={
-        'fixed inset-0 z-[80] flex flex-col items-center justify-center gap-6 select-none ' +
-        (isDark ? 'bg-[#0A0A0A] text-[#F4F0E8]' : 'bg-[#F2EFE9] text-[#1C1816]')
+        'absolute inset-0 z-10 overflow-hidden rounded-sm select-none pointer-events-none ' +
+        (isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]')
       }
       role="status"
       aria-live="polite"
@@ -58,11 +65,11 @@ export function RainbowTilesLoader({ isDark, label }: RainbowTilesLoaderProps) {
         @keyframes cwRainbowTileWave {
           0%, 100% {
             transform: scale3d(0.28, 0.28, 1);
-            opacity: 0.3;
+            opacity: 0.28;
           }
           38%, 54% {
             transform: scale3d(1, 1, 1);
-            opacity: 1;
+            opacity: 0.96;
           }
         }
         .cw-rainbow-tile {
@@ -73,13 +80,13 @@ export function RainbowTilesLoader({ isDark, label }: RainbowTilesLoaderProps) {
           .cw-rainbow-tile {
             animation: none;
             transform: scale3d(0.85, 0.85, 1);
-            opacity: 0.9;
+            opacity: 0.85;
           }
         }
       `}</style>
 
       <div
-        className="grid grid-cols-7 gap-[6px] w-[184px] h-[184px] sm:w-[220px] sm:h-[220px]"
+        className="grid grid-cols-12 grid-rows-6 gap-[5px] w-full h-full p-2"
         aria-hidden="true"
       >
         {tiles.map((tile) => (
@@ -94,14 +101,13 @@ export function RainbowTilesLoader({ isDark, label }: RainbowTilesLoaderProps) {
         ))}
       </div>
 
-      <div className="flex flex-col items-center gap-1.5 text-center px-6">
-        <span className="font-serif text-lg tracking-[0.06em]">
-          CORDWAINE AEROSTRAP
-        </span>
+      <div className="absolute inset-0 flex items-center justify-center">
         <span
           className={
-            'text-[9px] font-sans uppercase tracking-[0.24em] ' +
-            (isDark ? 'text-[#F4F0E8]/55' : 'text-[#1C1816]/55')
+            'px-3.5 py-1.5 text-[8.5px] font-sans uppercase tracking-[0.22em] border rounded-full ' +
+            (isDark
+              ? 'border-white/20 bg-[#0A0A0A]/85 text-[#F4F0E8]'
+              : 'border-black/20 bg-[#F2EFE9]/90 text-[#1C1816]')
           }
         >
           {label || 'Загрузка 3D • CORDWAINE AEROSTRAP...'}
