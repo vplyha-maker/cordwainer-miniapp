@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-
 import { hexToHsl, hslToHex, normalizeHex } from './colorEngine'
 import type { TranslationDict } from './colorsTranslations'
 import { hapticReset, hapticSwatch, hapticTap } from './haptics'
-import type { CordwainerThemeTokens } from './themeSystem'
+import type { CordwaineThemeTokens } from './themeSystem'
 
 type EditorMode = 'hue' | 'tone' | 'saturation'
 
@@ -18,7 +18,7 @@ type WindowWithEyeDropper = Window & {
 export type ColorEditorSheetProps = {
   isOpen: boolean
   isDark: boolean
-  tokens: CordwainerThemeTokens
+  tokens: CordwaineThemeTokens
   t: TranslationDict
   slotLabel: string
   slotRatio: string
@@ -60,13 +60,23 @@ export function ColorEditorSheet({
 
   const trackRef = useRef<HTMLDivElement>(null)
   const isDraggingTrack = useRef(false)
-  const lastHapticStep = useRef<number>(-1)
+  const pendingClientX = useRef<number | null>(null)
+  const rafIdRef = useRef<number | null>(null)
 
   const hsl = useMemo(() => hexToHsl(currentHex), [currentHex])
 
   useEffect(() => {
     setHexInput(currentHex.toUpperCase())
   }, [currentHex])
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!isOpen) {
@@ -107,11 +117,7 @@ export function ColorEditorSheet({
       if (!el) return
       const rect = el.getBoundingClientRect()
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(rect.width, 1)))
-      const stepBucket = Math.floor(ratio * 18)
-      if (stepBucket !== lastHapticStep.current) {
-        hapticSwatch()
-        lastHapticStep.current = stepBucket
-      }
+      hapticSwatch()
 
       if (mode === 'hue') {
         const nextHue = Math.round(ratio * 359)
@@ -129,6 +135,22 @@ export function ColorEditorSheet({
     [mode, hsl, onLiveChangeHex]
   )
 
+  // rAF-троттлинг: не более 1 обновления цвета за кадр для плавной работы на Android
+  const scheduleTrackUpdate = useCallback(
+    (clientX: number) => {
+      pendingClientX.current = clientX
+      if (rafIdRef.current !== null) return
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null
+        if (pendingClientX.current !== null) {
+          applyTrackClientX(pendingClientX.current)
+          pendingClientX.current = null
+        }
+      })
+    },
+    [applyTrackClientX]
+  )
+
   const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isDraggingTrack.current = true
     try {
@@ -139,7 +161,7 @@ export function ColorEditorSheet({
 
   const handleTrackPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingTrack.current) return
-    applyTrackClientX(e.clientX)
+    scheduleTrackUpdate(e.clientX)
   }
 
   const handleTrackPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -226,14 +248,13 @@ export function ColorEditorSheet({
           aria-modal="true"
           aria-label={t.editorTitle}
         >
-          {/* Полупрозрачный фон — оставляет 3D-модель сверху видимой в реальном времени */}
           <motion.button
             type="button"
             aria-label={t.guideClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: prefersReduced ? 0.05 : 0.22 }}
+            transition={{ duration: prefersReduced ? 0.05 : 0.18 }}
             onClick={() => {
               hapticTap()
               onClose()
@@ -247,19 +268,18 @@ export function ColorEditorSheet({
             }}
           />
 
-          {/* Bottom Sheet в стиле iOS с поддержкой свайпа вниз */}
           <motion.div
             initial={prefersReduced ? { opacity: 0 } : { y: '100%' }}
             animate={prefersReduced ? { opacity: 1 } : { y: 0 }}
             exit={prefersReduced ? { opacity: 0 } : { y: '100%' }}
             transition={
               prefersReduced
-                ? { duration: 0.1 }
-                : { type: 'spring', stiffness: 360, damping: 34, mass: 0.9 }
+                ? { duration: 0.08 }
+                : { type: 'spring', stiffness: 380, damping: 36, mass: 0.85 }
             }
             drag={prefersReduced ? false : 'y'}
             dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0.04, bottom: 0.45 }}
+            dragElastic={{ top: 0.04, bottom: 0.4 }}
             onDragEnd={handleDragEnd}
             className="pointer-events-auto w-full max-w-xl mx-auto rounded-t-[28px] px-5 pt-2.5 pb-5 border-t"
             style={{
@@ -269,7 +289,6 @@ export function ColorEditorSheet({
               paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
             }}
           >
-            {/* iOS Grabber Handle */}
             <div className="flex justify-center pb-2.5 cursor-grab active:cursor-grabbing">
               <div
                 className="w-10 h-1 rounded-full"
@@ -277,7 +296,6 @@ export function ColorEditorSheet({
               />
             </div>
 
-            {/* Заголовок */}
             <div className="flex items-center justify-between mb-3.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span
@@ -300,7 +318,7 @@ export function ColorEditorSheet({
                     className="text-[10px] font-sans uppercase tracking-[0.14em]"
                     style={{ color: tokens.inkMuted }}
                   >
-                    {slotRatio} • {slotLabel}
+                    {slotRatio ? slotRatio + ' • ' + slotLabel : slotLabel}
                   </span>
                 </div>
               </div>
@@ -333,7 +351,6 @@ export function ColorEditorSheet({
               </button>
             </div>
 
-            {/* Переключатели «Оттенок / Тон / Насыщенность» + Пипетка */}
             <div className="flex items-center justify-between gap-2 mb-3.5">
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
                 {(
@@ -352,12 +369,11 @@ export function ColorEditorSheet({
                         hapticTap()
                         setMode(item.id)
                       }}
-                      className="px-3 py-1.5 rounded-full text-[12px] font-sans font-medium whitespace-nowrap border transition-all duration-150 active:scale-[0.96] cursor-pointer"
+                      className="px-3 py-1.5 rounded-full text-[12px] font-sans font-medium whitespace-nowrap border transition-transform duration-150 active:scale-[0.96] cursor-pointer"
                       style={{
                         backgroundColor: active ? tokens.pillActiveBg : tokens.pillIdleBg,
                         color: active ? tokens.pillActiveText : tokens.pillIdleText,
                         borderColor: active ? tokens.pillActiveBg : tokens.border,
-                        boxShadow: active ? tokens.buttonShadow : 'none',
                       }}
                     >
                       {item.label}
@@ -407,7 +423,6 @@ export function ColorEditorSheet({
               </p>
             )}
 
-            {/* Компактная цветовая спектральная полоса */}
             <div
               ref={trackRef}
               role="slider"
@@ -430,7 +445,7 @@ export function ColorEditorSheet({
               }}
             >
               <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[22px] h-[22px] rounded-full border-[2.5px] border-white pointer-events-none transition-[left] duration-75"
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[22px] h-[22px] rounded-full border-[2.5px] border-white pointer-events-none"
                 style={{
                   left: Math.max(4, Math.min(96, sliderPercent)) + '%',
                   backgroundColor: currentHex,
@@ -439,14 +454,12 @@ export function ColorEditorSheet({
               />
             </div>
 
-            {/* Живой превью-блок + HEX-редактор + Копировать HEX */}
             <div className="flex items-center gap-2.5 mb-4">
               <div
-                className="flex-1 h-11 rounded-[14px] border transition-colors duration-150"
+                className="flex-1 h-11 rounded-[14px] border"
                 style={{
                   backgroundColor: currentHex,
                   borderColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
-                  boxShadow: tokens.buttonShadow,
                 }}
               />
 
@@ -465,7 +478,7 @@ export function ColorEditorSheet({
                 aria-label="HEX"
                 value={hexInput}
                 onChange={(e) => handleHexChange(e.target.value)}
-                className="w-[104px] h-10 px-3 rounded-full text-center font-mono text-[13px] font-medium tracking-[0.04em] border outline-none transition-colors"
+                className="w-[104px] h-10 px-3 rounded-full text-center font-mono text-[13px] font-medium tracking-[0.04em] border outline-none"
                 style={{
                   backgroundColor: tokens.surface,
                   borderColor: tokens.borderStrong,
@@ -477,12 +490,11 @@ export function ColorEditorSheet({
                 type="button"
                 onClick={handleCopyHex}
                 aria-label={copied ? t.copied : 'HEX'}
-                className="w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-150 active:scale-90 cursor-pointer shrink-0"
+                className="w-10 h-10 rounded-full flex items-center justify-center border transition-transform duration-150 active:scale-90 cursor-pointer shrink-0"
                 style={{
                   backgroundColor: copied ? tokens.pillActiveBg : tokens.surface,
                   borderColor: copied ? tokens.pillActiveBg : tokens.borderStrong,
                   color: copied ? tokens.pillActiveText : tokens.ink,
-                  boxShadow: tokens.buttonShadow,
                 }}
               >
                 {copied ? (
@@ -516,7 +528,6 @@ export function ColorEditorSheet({
               </button>
             </div>
 
-            {/* Быстрые цвета + нативная iOS кнопка «+» и удаление */}
             <div className="flex items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-1.5 shrink-0">
                 <span
@@ -532,7 +543,7 @@ export function ColorEditorSheet({
                       hapticTap()
                       setManageQuickMode((v) => !v)
                     }}
-                    className="px-1.5 py-0.5 rounded-full text-[10px] font-sans border bg-transparent cursor-pointer transition-opacity"
+                    className="px-1.5 py-0.5 rounded-full text-[10px] font-sans border bg-transparent cursor-pointer"
                     style={{
                       borderColor: tokens.border,
                       color: manageQuickMode ? tokens.ink : tokens.inkMuted,
@@ -586,7 +597,6 @@ export function ColorEditorSheet({
                   )
                 })}
 
-                {/* Нативная iOS кнопка «+» добавления цвета */}
                 <button
                   type="button"
                   onClick={() => {
@@ -596,12 +606,11 @@ export function ColorEditorSheet({
                   disabled={!canAddCurrent}
                   aria-label={t.addColor}
                   title={t.addColor}
-                  className="w-7 h-7 rounded-full flex items-center justify-center border transition-all duration-150 active:scale-90 cursor-pointer shrink-0 disabled:opacity-40"
+                  className="w-7 h-7 rounded-full flex items-center justify-center border transition-transform duration-150 active:scale-90 cursor-pointer shrink-0 disabled:opacity-40"
                   style={{
                     backgroundColor: tokens.surface,
                     borderColor: tokens.borderStrong,
                     color: tokens.ink,
-                    boxShadow: tokens.buttonShadow,
                   }}
                 >
                   <svg
@@ -619,7 +628,6 @@ export function ColorEditorSheet({
               </div>
             </div>
 
-            {/* Кнопки «Сбросить» и «Применить» в стиле iPhone */}
             <div className="grid grid-cols-[1fr_1.45fr] gap-2.5 pt-1">
               <button
                 type="button"
@@ -632,7 +640,6 @@ export function ColorEditorSheet({
                   backgroundColor: tokens.surface,
                   borderColor: tokens.borderStrong,
                   color: tokens.ink,
-                  boxShadow: tokens.buttonShadow,
                 }}
               >
                 <svg
@@ -663,7 +670,6 @@ export function ColorEditorSheet({
                   backgroundColor: tokens.pillActiveBg,
                   borderColor: tokens.pillActiveBg,
                   color: tokens.pillActiveText,
-                  boxShadow: tokens.cardShadow,
                 }}
               >
                 <svg
@@ -688,4 +694,3 @@ export function ColorEditorSheet({
     </AnimatePresence>
   )
 }
-
