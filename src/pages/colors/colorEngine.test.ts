@@ -33,9 +33,6 @@ function assertClose(actual: number, expected: number, eps: number, label: strin
   }
 }
 
-/**
- * 20 unit-тестов цветового движка и mapping-матрицы (zero-dependency, совместимо с tsc -b).
- */
 export function runColorEngineTests(): ColorEngineTestReport {
   const cases: { name: string; run: () => void }[] = [
     {
@@ -209,25 +206,25 @@ export function runColorEngineTests(): ColorEngineTestReport {
       },
     },
     {
-      name: '16. mapPaletteToFootwear: пресет classic (60/30/10) маппит vamp=main, swoosh/outsole=accent',
+      name: '16. mapPaletteToFootwear: classic (60/30/10) держит протектор нейтральным, штрихи и Air — акцент',
       run: () => {
         const pal = ['#112233', '#445566', '#CC3311']
         const mapped = mapPaletteToFootwear(pal, 194, 0.05, 0.05, 0.85, 'ryb', 'classic', true)
-        assert(mapped.vamp === '#112233', 'classic vamp')
-        assert(mapped.quarters === '#445566', 'classic quarters')
-        assert(mapped.swoosh === '#CC3311', 'classic swoosh')
-        assert(mapped.outsole === '#CC3311', 'classic outsole')
+        assert(mapped.vamp === '#112233' && mapped.heel === '#112233', 'classic vamp/heel')
+        assert(mapped.quarters === '#445566' && mapped.eyestays === '#445566', 'classic 30%')
+        assert(mapped.swoosh === '#CC3311' && mapped.encap === '#CC3311', 'classic accent')
+        assert(mapped.outsole === '#181615', 'classic neutral outsole')
       },
     },
     {
-      name: '17. mapPaletteToFootwear: пресет toe-focus ставит main на toeBox и eyestays',
+      name: '17. mapPaletteToFootwear: toe-focus ставит main на toeBox/eyestays/encap, протектор нейтральный',
       run: () => {
         const pal = ['#112233', '#445566', '#CC3311']
         const mapped = mapPaletteToFootwear(pal, 194, 0.05, 0.05, 0.85, 'ryb', 'toe-focus', false)
-        assert(mapped.toeBox === '#112233', 'toe-focus toeBox')
-        assert(mapped.eyestays === '#112233', 'toe-focus eyestays')
-        assert(mapped.vamp === '#445566', 'toe-focus vamp')
-        assert(mapped.heel === '#CC3311', 'toe-focus heel')
+        assert(mapped.toeBox === '#112233' && mapped.eyestays === '#112233', 'toe-focus main')
+        assert(mapped.vamp === '#445566' && mapped.heel === '#445566', 'toe-focus secondary')
+        assert(mapped.swoosh === '#CC3311', 'toe-focus accent swoosh')
+        assert(mapped.outsole === '#2C2825', 'toe-focus neutral outsole')
       },
     },
     {
@@ -242,11 +239,11 @@ export function runColorEngineTests(): ColorEngineTestReport {
       },
     },
     {
-      name: '19. mapPaletteToFootwear: тетрада передаёт colors[2] в collar',
+      name: '19. mapPaletteToFootwear: тетрада передаёт colors[2] в collar и lining',
       run: () => {
         const pal = ['#112233', '#445566', '#778899', '#CC3311']
         const mapped = mapPaletteToFootwear(pal, 194, 0.05, 0.05, 0.85, 'ryb', 'classic', true)
-        assert(mapped.collar === '#778899', 'tetrad collar should use colors[2]')
+        assert(mapped.collar === '#778899' && mapped.lining === '#778899', 'tetrad collar/lining')
       },
     },
     {
@@ -281,4 +278,3 @@ export function runColorEngineTests(): ColorEngineTestReport {
 
   return { passed, failed: failures.length, failures }
 }
-
