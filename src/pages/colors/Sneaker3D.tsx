@@ -10,13 +10,17 @@ import {
   disposeObject3DResources,
   drawShadowGradient,
   ensureCleanGlbSegmentation,
+  getSneakerModelConfig,
+  resetZoneRegistry,
   type SneakerMaterials,
+  type SneakerModelId,
   type ZoneMaterialRegistry,
 } from './sneakerGeometry'
 
 export type Sneaker3DProps = {
   sneakerColors: SneakerColors
   isDark: boolean
+  modelId?: SneakerModelId
   onResetAll?: () => void
   resetLabel?: string
   loading3DLabel?: string
@@ -123,6 +127,7 @@ class SneakerErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 function Sneaker3DCanvas({
   sneakerColors,
   isDark,
+  modelId = 'aerostrap',
   onResetAll,
   resetLabel,
   loading3DLabel,
@@ -137,6 +142,8 @@ function Sneaker3DCanvas({
   latestColorsRef.current = sneakerColors
   const latestIsDarkRef = useRef<boolean>(isDark)
   latestIsDarkRef.current = isDark
+  const latestModelIdRef = useRef<SneakerModelId>(modelId)
+  latestModelIdRef.current = modelId
 
   const hemiLightRef = useRef<THREE_TYPES.HemisphereLight | null>(null)
   const shadowCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -144,6 +151,7 @@ function Sneaker3DCanvas({
 
   const requestSingleRenderRef = useRef<(() => void) | null>(null)
   const wakeCameraAnimationRef = useRef<(() => void) | null>(null)
+  const loadModelRef = useRef<((id: SneakerModelId) => void) | null>(null)
 
   const [isLoading3D, setIsLoading3D] = useState(true)
   const [webglError, setWebglError] = useState(false)
@@ -173,6 +181,7 @@ function Sneaker3DCanvas({
     let isLoopRunning = false
     let isVisibleInViewport = true
     let isDocumentVisible = typeof document !== 'undefined' ? !document.hidden : true
+    let loadRequestCounter = 0
     let cleanupFn: (() => void) | undefined
 
     const isAndroid = isAndroidDevice()
@@ -224,7 +233,6 @@ function Sneaker3DCanvas({
         container.appendChild(renderer.domElement)
 
         const scene = new THREE.Scene()
-        // Суженный диапазон глубины (0.5..20) повышает точность Z-буфера в 5x и убирает Z-fighting слоёв
         const camera = new THREE.PerspectiveCamera(29, width / height, 0.5, 20)
         camera.position.set(0, 0.44, 5.15)
         camera.lookAt(0, 0.04, 0)
@@ -363,18 +371,35 @@ function Sneaker3DCanvas({
         wakeCameraAnimationRef.current = wakeCameraLoop
 
         const mountProceduralFallback = () => {
-          if (disposed || pivotGroup.children.length > 0) return
+          if (disposed) return
+          disposeObject3DResources(pivotGroup, baseMaterialsSet)
+          pivotGroup.clear()
+          resetZoneRegistry(mats, registry)
           const proceduralMesh = buildSneakerMeshGroup(THREE, mats)
           pivotGroup.add(proceduralMesh)
+          shadowPlane.position.y = -0.42
           applyColorsToRegistry(latestColorsRef.current)
           setIsLoading3D(false)
           wakeCameraLoop()
         }
 
-        if (gltfMod?.GLTFLoader) {
-          const loader = new gltfMod.GLTFLoader()
+        const loader = gltfMod?.GLTFLoader ? new gltfMod.GLTFLoader() : null
+
+        const loadModelById = (targetId: SneakerModelId) => {
+          if (disposed) return
+          loadRequestCounter += 1
+          const myRequestId = loadRequestCounter
+          const modelCfg = getSneakerModelConfig(targetId)
+
+          setIsLoading3D(true)
+
+          if (!loader) {
+            mountProceduralFallback()
+            return
+          }
+
           const tryLoadGlb = (urls: string[], index = 0) => {
-            if (disposed) return
+            if (disposed || myRequestId !== loadRequestCounter) return
             if (index >= urls.length) {
               mountProceduralFallback()
               return
@@ -383,7 +408,7 @@ function Sneaker3DCanvas({
             loader.load(
               urls[index],
               (gltf) => {
-                if (disposed) {
+                if (disposed || myRequestId !== loadRequestCounter) {
                   if (gltf?.scene) disposeObject3DResources(gltf.scene)
                   return
                 }
@@ -397,9 +422,10 @@ function Sneaker3DCanvas({
                 box.getSize(size)
                 const maxDim = Math.max(size.x, size.y, size.z)
 
-                if (maxDim > 0 && maxDim < 10) {
+                if (maxDim > 0 && Number.isFinite(maxDim)) {
                   disposeObject3DResources(pivotGroup, baseMaterialsSet)
                   pivotGroup.clear()
+                  resetZoneRegistry(mats, registry)
 
                   ensureCleanGlbSegmentation(THREE, gltf.scene)
                   bindGlbMaterialsPreservingTextures(
@@ -409,9 +435,10 @@ function Sneaker3DCanvas({
                     registry,
                     latestColorsRef.current
                   )
+
                   const scale = SNEAKER_LAST_PARAMS.glbTargetMaxDim / maxDim
                   gltf.scene.scale.setScalar(scale)
-                  gltf.scene.rotation.y = Math.PI * 0.5
+                  gltf.scene.rotation.y = modelCfg.rotationY
                   gltf.scene.updateMatrixWorld(true)
 
                   const scaledBox = new THREE.Box3().setFromObject(gltf.scene)
@@ -420,7 +447,8 @@ function Sneaker3DCanvas({
                   gltf.scene.position.sub(scaledCenter)
                   gltf.scene.position.y += SNEAKER_LAST_PARAMS.glbVerticalOffset
 
-                  const minY = scaledBox.min.y - scaledCenter.y + SNEAKER_LAST_PARAMS.glbVerticalOffset
+                  const minY =
+                    scaledBox.min.y - scaledCenter.y + SNEAKER_LAST_PARAMS.glbVerticalOffset
                   shadowPlane.position.y = Math.min(-0.42, minY - 0.015)
 
                   pivotGroup.add(gltf.scene)
@@ -437,10 +465,11 @@ function Sneaker3DCanvas({
             )
           }
 
-          tryLoadGlb(['/sneaker_modular.glb', '/models/sneaker_modular.glb'])
-        } else {
-          mountProceduralFallback()
+          tryLoadGlb(modelCfg.urls)
         }
+
+        loadModelRef.current = loadModelById
+        loadModelById(latestModelIdRef.current)
 
         const updateViewportSize = () => {
           if (!container || disposed) return
@@ -516,6 +545,7 @@ function Sneaker3DCanvas({
           shadowTexRef.current = null
           requestSingleRenderRef.current = null
           wakeCameraAnimationRef.current = null
+          loadModelRef.current = null
         }
       })
       .catch((err) => {
@@ -534,6 +564,11 @@ function Sneaker3DCanvas({
       if (cleanupFn) cleanupFn()
     }
   }, [contextLostCount, applyColorsToRegistry])
+
+  // Переключение модели с мгновенным показом радужного лоадера
+  useEffect(() => {
+    loadModelRef.current?.(modelId)
+  }, [modelId])
 
   useEffect(() => {
     applyColorsToRegistry(sneakerColors)
@@ -585,6 +620,8 @@ function Sneaker3DCanvas({
     onResetAll?.()
   }
 
+  const activeModel = getSneakerModelConfig(modelId)
+
   return (
     <div className="relative w-full h-[178px] sm:h-[218px] md:h-[270px] select-none">
       {webglError ? (
@@ -597,7 +634,7 @@ function Sneaker3DCanvas({
         <div
           ref={mountRef}
           role="img"
-          aria-label="3D CORDWAINE AEROSTRAP"
+          aria-label={'3D ' + activeModel.name}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -608,21 +645,26 @@ function Sneaker3DCanvas({
       )}
 
       {isLoading3D && !webglError && (
-        <RainbowTilesLoader isDark={isDark} label={loading3DLabel} />
+        <RainbowTilesLoader
+          isDark={isDark}
+          label={loading3DLabel || '3D • ' + activeModel.name + '...'}
+        />
       )}
 
-      <button
-        type="button"
-        onClick={handleResetClick}
-        className={
-          'absolute bottom-1 right-2 px-3 py-1.5 min-h-[28px] text-[8.5px] font-sans uppercase tracking-[0.2em] border rounded-full transition-opacity opacity-85 hover:opacity-100 cursor-pointer ' +
-          (isDark
-            ? 'border-white/25 bg-[#0A0A0A]/80 text-[#F4F0E8]'
-            : 'border-black/25 bg-[#F2EFE9]/85 text-[#1C1816]')
-        }
-      >
-        {resetLabel || '360° • Сброс'}
-      </button>
+      {!isLoading3D && (
+        <button
+          type="button"
+          onClick={handleResetClick}
+          className={
+            'absolute bottom-1 right-2 px-3 py-1.5 min-h-[28px] text-[8.5px] font-sans uppercase tracking-[0.2em] border rounded-full transition-opacity opacity-85 hover:opacity-100 cursor-pointer ' +
+            (isDark
+              ? 'border-white/25 bg-[#0A0A0A]/80 text-[#F4F0E8]'
+              : 'border-black/25 bg-[#F2EFE9]/85 text-[#1C1816]')
+          }
+        >
+          {resetLabel || '360° • Сброс'}
+        </button>
+      )}
     </div>
   )
 }
