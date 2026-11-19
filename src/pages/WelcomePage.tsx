@@ -39,50 +39,51 @@ function getWin(): ExtendedWindow {
 }
 
 // ---------------------------------------------------------------------------
-// 0. MOLLANI CALLIGRAPHIC SCRIPT FONT LOADER & BRAND WORDMARK CONFIG
+// 0. FREE COMMERCIAL-SAFE CALLIGRAPHIC FONT LOADER (Great Vibes — SIL OFL)
 // ---------------------------------------------------------------------------
 const BRAND_WORDMARK = 'Cordwaine'
-const MOLLANI_FONT_URL =
-  'https://cdn.jsdelivr.net/gh/baechu-rpg/fonts@f3f7b6e3d8eec01179149bbcdfb30ec3deb5af15/Mollani-Regular.ttf'
+const BRAND_FONT_FAMILY = 'Great Vibes'
+const BRAND_FONT_CSS_URL =
+  'https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap'
 
-let mollaniFontReady = false
-let mollaniLoadPromise: Promise<boolean> | null = null
+let brandFontReady = false
+let brandFontPromise: Promise<boolean> | null = null
 
-function ensureMollaniFont(): Promise<boolean> {
+function ensureBrandFont(): Promise<boolean> {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return Promise.resolve(false)
   }
-  if (mollaniFontReady) return Promise.resolve(true)
-  if (mollaniLoadPromise) return mollaniLoadPromise
+  if (brandFontReady) return Promise.resolve(true)
+  if (brandFontPromise) return brandFontPromise
 
-  mollaniLoadPromise = (async () => {
+  brandFontPromise = (async () => {
     try {
-      if (typeof FontFace !== 'undefined') {
-        const face = new FontFace('Mollani', `url(${MOLLANI_FONT_URL}) format('truetype')`, {
-          weight: 'normal',
-          style: 'normal',
-          display: 'swap',
-        })
-        const loaded = await face.load()
-        document.fonts.add(loaded)
-        mollaniFontReady = true
-        return true
+      // Inject Google Fonts stylesheet once into <head> (100% CSP-compatible with fonts.googleapis.com)
+      const linkId = 'cordwaine-brand-font-css'
+      if (!document.getElementById(linkId)) {
+        const link = document.createElement('link')
+        link.id = linkId
+        link.rel = 'stylesheet'
+        link.href = BRAND_FONT_CSS_URL
+        document.head.appendChild(link)
       }
+
       if (document.fonts && typeof document.fonts.load === 'function') {
-        await document.fonts.load('64px "Mollani"')
-        mollaniFontReady = document.fonts.check('64px "Mollani"')
-        return mollaniFontReady
+        await document.fonts.load(`64px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
+        await document.fonts.ready
+        brandFontReady = document.fonts.check(`64px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
+        return brandFontReady
       }
     } catch {
-      mollaniFontReady = false
+      brandFontReady = false
     }
     return false
   })()
 
-  return mollaniLoadPromise
+  return brandFontPromise
 }
 
-void ensureMollaniFont()
+void ensureBrandFont()
 
 // ---------------------------------------------------------------------------
 // 1. VECTOR ORNAMENTS (Crown "the", Diamond Rules, Bespoke Under-Swash)
@@ -353,18 +354,15 @@ class SoundEngine {
 const sound = new SoundEngine()
 
 // ---------------------------------------------------------------------------
-// 3. BOOSTED 3-CHANNEL HAPTIC ENGINE (iOS Taptic + Android One UI 7 / Xiaomi HyperOS)
+// 3. GENTLE 3-CHANNEL HAPTIC ENGINE (Buttons Only — Softened Strength)
 // ---------------------------------------------------------------------------
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
-  const tgStyle: 'medium' | 'heavy' | 'rigid' =
-    style === 'light' ? 'medium' : style === 'medium' ? 'heavy' : 'rigid'
+  const tgStyle: 'light' | 'medium' =
+    style === 'heavy' ? 'medium' : style === 'medium' ? 'light' : 'light'
 
   try {
     const hf = getWin().Telegram?.WebApp?.HapticFeedback
     hf?.impactOccurred?.(tgStyle)
-    if (style === 'heavy') {
-      hf?.notificationOccurred?.('success')
-    }
   } catch {}
 
   try {
@@ -372,30 +370,15 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
     if (post) {
       post(
         'web_app_trigger_haptic_feedback',
-        JSON.stringify({ type: 'impact', impact_style: style === 'light' ? 'medium' : 'heavy' })
+        JSON.stringify({ type: 'impact', impact_style: tgStyle })
       )
-      if (style !== 'light') {
-        setTimeout(() => {
-          try {
-            post(
-              'web_app_trigger_haptic_feedback',
-              JSON.stringify({
-                type: style === 'heavy' ? 'notification' : 'impact',
-                impact_style: 'heavy',
-                notification_type: 'success',
-              })
-            )
-          } catch {}
-        }, 36)
-      }
     }
   } catch {}
 
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      const pattern =
-        style === 'heavy' ? [36, 28, 46] : style === 'medium' ? [26, 24, 20] : [18]
-      navigator.vibrate(pattern)
+      const ms = style === 'heavy' ? 18 : style === 'medium' ? 12 : 8
+      navigator.vibrate(ms)
     }
   } catch {}
 
@@ -404,8 +387,8 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
     const dest = sound.getDestination()
     if (!c || !dest) return
     const t0 = c.currentTime
-    const dur = style === 'heavy' ? 0.055 : style === 'medium' ? 0.042 : 0.028
-    const peakGain = style === 'heavy' ? 0.48 : style === 'medium' ? 0.36 : 0.24
+    const dur = style === 'heavy' ? 0.042 : style === 'medium' ? 0.032 : 0.024
+    const peakGain = style === 'heavy' ? 0.24 : style === 'medium' ? 0.16 : 0.1
 
     const subOsc = c.createOscillator()
     const clickOsc = c.createOscillator()
@@ -413,18 +396,18 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
     const clickGain = c.createGain()
 
     subOsc.type = 'sine'
-    subOsc.frequency.setValueAtTime(168, t0)
-    subOsc.frequency.exponentialRampToValueAtTime(46, t0 + dur)
+    subOsc.frequency.setValueAtTime(160, t0)
+    subOsc.frequency.exponentialRampToValueAtTime(48, t0 + dur)
 
     clickOsc.type = 'triangle'
-    clickOsc.frequency.setValueAtTime(1950, t0)
-    clickOsc.frequency.exponentialRampToValueAtTime(340, t0 + 0.014)
+    clickOsc.frequency.setValueAtTime(1850, t0)
+    clickOsc.frequency.exponentialRampToValueAtTime(340, t0 + 0.012)
 
     subGain.gain.setValueAtTime(peakGain, t0)
     subGain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
 
-    clickGain.gain.setValueAtTime(peakGain * 0.58, t0)
-    clickGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.014)
+    clickGain.gain.setValueAtTime(peakGain * 0.5, t0)
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.012)
 
     subOsc.connect(subGain)
     clickOsc.connect(clickGain)
@@ -434,7 +417,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
     subOsc.start(t0)
     clickOsc.start(t0)
     subOsc.stop(t0 + dur + 0.005)
-    clickOsc.stop(t0 + 0.018)
+    clickOsc.stop(t0 + 0.016)
   } catch {}
 }
 
@@ -630,7 +613,7 @@ export function WelcomePage({
   const motes = useMemo(() => buildCalligraphicMotes(), [])
 
   useEffect(() => {
-    void ensureMollaniFont()
+    void ensureBrandFont()
     try {
       const bgHex = '#6E6B66'
       getWin().Telegram?.WebApp?.setHeaderColor?.(bgHex)
@@ -687,7 +670,7 @@ export function WelcomePage({
   }[lang]
 
   // -------------------------------------------------------------------------
-  // SINGLE-CANVAS CALLIGRAPHIC SIGNATURE ENGINE (Auto-fitted via measureText)
+  // SINGLE-CANVAS CALLIGRAPHIC SIGNATURE ENGINE (Great Vibes — SIL OFL)
   // -------------------------------------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current
@@ -729,7 +712,7 @@ export function WelcomePage({
     let simTime = 0.0
     let waitTimeForFont = 0.0
 
-    const FONT_SPEC = '400 64px "Mollani", "Cormorant Garamond", Georgia, serif'
+    const FONT_SPEC = `400 66px "${BRAND_FONT_FAMILY}", "Cormorant Garamond", Georgia, serif`
 
     const measureWordBounds = () => {
       ctx.save()
@@ -741,15 +724,15 @@ export function WelcomePage({
 
       const leftExt = Math.max(m.actualBoundingBoxLeft || 135, m.width * 0.5)
       const rightExt = Math.max(m.actualBoundingBoxRight || 135, m.width * 0.5)
-      const padLeft = leftExt + 14
-      const padRight = rightExt + 16
+      const padLeft = leftExt + 16
+      const padRight = rightExt + 18
       const totalSpan = padLeft + padRight
       const opticalOffsetX = (leftExt - rightExt) * 0.5
 
       return { padLeft, padRight, totalSpan, opticalOffsetX }
     }
 
-    const drawMollaniWord = (fillColor: string, opticalOffsetX: number) => {
+    const drawBrandWord = (fillColor: string, opticalOffsetX: number) => {
       ctx.save()
       ctx.fillStyle = fillColor
       ctx.font = FONT_SPEC
@@ -765,9 +748,9 @@ export function WelcomePage({
       const dt = Math.max(0.001, Math.min(0.033, rawDt))
 
       const fontLoadedNow =
-        mollaniFontReady ||
+        brandFontReady ||
         (typeof document !== 'undefined' &&
-          Boolean(document.fonts?.check?.('64px "Mollani"')))
+          Boolean(document.fonts?.check?.(`66px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)))
 
       if (skipRequestedRef.current && simTime < 3.6) {
         simTime = 3.6
@@ -779,30 +762,26 @@ export function WelcomePage({
       }
       const elapsed = simTime
 
+      // Sound cues only during signature writing (haptics disabled during intro)
       if (!skipRequestedRef.current) {
         if (!mCrown && elapsed >= 0.08) {
           mCrown = true
-          haptic('light')
           sound.linenWhisper(1.0)
         }
         if (!mNibStart && elapsed >= 0.48) {
           mNibStart = true
-          haptic('medium')
           sound.suedeSwell()
         }
         if (!mStrokeMid1 && elapsed >= 1.05) {
           mStrokeMid1 = true
-          haptic('light')
           sound.softTick(1.02)
         }
         if (!mStrokeMid2 && elapsed >= 1.62) {
           mStrokeMid2 = true
-          haptic('medium')
           sound.softTick(1.16)
         }
         if (!mSwashLock && elapsed >= 2.18) {
           mSwashLock = true
-          haptic('heavy')
           sound.feltChord()
         }
         if (!mLightSweep && elapsed >= 2.55) {
@@ -823,7 +802,7 @@ export function WelcomePage({
       const bounds = measureWordBounds()
       const centerX = viewW * 0.5
       const centerY = viewH * 0.445
-      const logoMasterScale = Math.min((viewW * 0.84) / bounds.totalSpan, 1.32)
+      const logoMasterScale = Math.min((viewW * 0.84) / bounds.totalSpan, 1.34)
 
       const haloIn = easeOutCubic(clamp01((elapsed - 0.15) / 1.1))
       if (haloIn > 0) {
@@ -862,7 +841,7 @@ export function WelcomePage({
       const crownP = easeOutCubic(clamp01((elapsed - 0.14) / 0.72))
       if (crownP > 0) {
         ctx.save()
-        const liftY = -22.5 + (1 - crownP) * 5.0
+        const liftY = -20.0 + (1 - crownP) * 5.0
         ctx.translate(0, liftY)
 
         const ruleSpan = 28 + 70 * crownP
@@ -891,10 +870,10 @@ export function WelcomePage({
 
         ctx.save()
         ctx.beginPath()
-        ctx.rect(startX - 10, -76, nibX - (startX - 10), 152)
+        ctx.rect(startX - 12, -76, nibX - (startX - 12), 152)
         ctx.clip()
         ctx.globalAlpha = Math.min(1, writeRaw * 3.2)
-        drawMollaniWord('#141210', bounds.opticalOffsetX)
+        drawBrandWord('#141210', bounds.opticalOffsetX)
         ctx.restore()
 
         if (writeRaw < 0.99) {
@@ -902,10 +881,10 @@ export function WelcomePage({
           const edgeEnv = Math.sin(writeRaw * Math.PI)
           ctx.save()
           ctx.beginPath()
-          ctx.rect(nibX - bandWidth, -76, bandWidth + 10, 152)
+          ctx.rect(nibX - bandWidth, -76, bandWidth + 12, 152)
           ctx.clip()
           ctx.globalAlpha = Math.min(1, edgeEnv * 1.15)
-          drawMollaniWord('#B6863E', bounds.opticalOffsetX)
+          drawBrandWord('#B6863E', bounds.opticalOffsetX)
           ctx.restore()
 
           const nibY =
@@ -965,10 +944,10 @@ export function WelcomePage({
         ctx.clip()
 
         ctx.globalAlpha = env * 0.88
-        drawMollaniWord('#C99B53', bounds.opticalOffsetX)
+        drawBrandWord('#C99B53', bounds.opticalOffsetX)
         ctx.fillStyle = '#C99B53'
         ctx.save()
-        ctx.translate(0, -22.5)
+        ctx.translate(0, -20.0)
         ctx.fill(paths.thePath)
         ctx.restore()
         ctx.fill(paths.swashPath)
@@ -994,7 +973,7 @@ export function WelcomePage({
 
   const handleReplayOrSkip = useCallback(() => {
     sound.unlock()
-    haptic('medium')
+    haptic('light')
     sound.softTick(1.05)
     if (phase !== 'complete') {
       skipRequestedRef.current = true
@@ -1014,7 +993,7 @@ export function WelcomePage({
     (code: Lang) => {
       sound.unlock()
       if (code === lang) return
-      haptic('medium')
+      haptic('light')
       sound.softTick(code === 'ru' ? 0.95 : code === 'uk' ? 1.08 : 1.2)
       setLang(code)
       try {
@@ -1046,11 +1025,11 @@ export function WelcomePage({
         touchAction: 'manipulation',
       }}
     >
-      {/* Hidden DOM font-preloader so CSS immediately fetches Mollani-Regular.ttf on first mount */}
+      {/* Hidden DOM font-preloader so browser fetches Great Vibes from Google Fonts immediately */}
       <span
         aria-hidden="true"
         className="fixed -top-96 left-0 opacity-0 pointer-events-none select-none"
-        style={{ fontFamily: '"Mollani", serif' }}
+        style={{ fontFamily: `"${BRAND_FONT_FAMILY}", serif` }}
       >
         {BRAND_WORDMARK}
       </span>
@@ -1140,8 +1119,7 @@ export function WelcomePage({
         </div>
       </header>
 
-      {/* Center Signature Philosophy Subtitle ("THE ART OF SHOEMAKING")
-          Uses GPU-accelerated @keyframes so Android WebView NEVER skips the float-up animation */}
+      {/* Center Signature Philosophy Subtitle */}
       <div
         aria-live="polite"
         className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center justify-center text-center px-6"
@@ -1159,8 +1137,7 @@ export function WelcomePage({
         )}
       </div>
 
-      {/* Bottom Typographic Navigation & Primary Entry CTA
-          Mounted on phase === 'complete' with explicit GPU keyframe animation for identical iOS & Android smoothness */}
+      {/* Bottom Typographic Navigation & Primary Entry CTA */}
       {isComplete && (
         <footer
           className="fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 pointer-events-auto"
@@ -1226,13 +1203,6 @@ export function WelcomePage({
       )}
 
       <style>{`
-        @font-face {
-          font-family: 'Mollani';
-          src: url('${MOLLANI_FONT_URL}') format('truetype');
-          font-weight: normal;
-          font-style: normal;
-          font-display: swap;
-        }
         @keyframes cordwaineFloatUp {
           0% {
             opacity: 0;
