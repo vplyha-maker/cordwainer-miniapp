@@ -39,13 +39,13 @@ function getWin(): ExtendedWindow {
 }
 
 // ---------------------------------------------------------------------------
-// 0. FREE COMMERCIAL-SAFE COPPERPLATE SCRIPT FONT (Monsieur La Doulaise — SIL OFL)
-// Delicate hairline contrast & 1930s bespoke hand-lettered signature aesthetic
+// 0. BRAND & UI FONT LOADER (Cormorant Garamond Medium 500 + Inter — SIL OFL)
 // ---------------------------------------------------------------------------
 const BRAND_WORDMARK = 'Cordwaine'
-const BRAND_FONT_FAMILY = 'Monsieur La Doulaise'
+const BRAND_FONT_FAMILY = 'Cormorant Garamond'
+const UI_FONT_FAMILY = 'Inter'
 const BRAND_FONT_CSS_URL =
-  'https://fonts.googleapis.com/css2?family=Monsieur+La+Doulaise&display=swap'
+  'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500;600&display=swap'
 
 let brandFontReady = false
 let brandFontPromise: Promise<boolean> | null = null
@@ -69,9 +69,13 @@ function ensureBrandFont(): Promise<boolean> {
       }
 
       if (document.fonts && typeof document.fonts.load === 'function') {
-        await document.fonts.load(`72px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
+        await Promise.all([
+          document.fonts.load(`500 62px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK),
+          document.fonts.load(`italic 400 22px "${BRAND_FONT_FAMILY}"`, 'the'),
+          document.fonts.load(`500 14px "${UI_FONT_FAMILY}"`, 'Cardio'),
+        ])
         await document.fonts.ready
-        brandFontReady = document.fonts.check(`72px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
+        brandFontReady = document.fonts.check(`500 62px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)
         return brandFontReady
       }
     } catch {
@@ -94,8 +98,9 @@ const THE_ITALIC_PATH_D =
 const DIAMOND_RULES_PATH_D =
   'M-92.00 -24.85L-25.80 -24.85L-24.00 -26.55L-22.20 -24.85L-22.20 -24.15L-24.00 -22.45L-25.80 -24.15L-92.00 -24.15ZM92.00 -24.85L25.80 -24.85L24.00 -26.55L22.20 -24.85L22.20 -24.15L24.00 -22.45L25.80 -24.15L92.00 -24.15Z'
 
-const RIGHT_UNDER_SWASH_PATH_D =
-  'M-44.0 21.5Q-12.0 25.8 34.0 23.6Q78.0 21.4 116.0 16.8Q78.0 19.8 34.0 21.4Q-12.0 23.2 -44.0 21.5Z'
+// Symmetrical tapered gold-leaf underline centered beneath Cormorant Garamond Medium
+const CENTER_UNDER_SWASH_PATH_D =
+  'M-96.0 25.0Q-48.0 27.6 0.0 27.2Q48.0 26.8 96.0 25.0Q48.0 25.6 0.0 25.6Q-48.0 25.6 -96.0 25.0Z'
 
 type CompiledPaths = {
   thePath: Path2D
@@ -110,13 +115,14 @@ function getCompiledPaths(): CompiledPaths | null {
   cachedPaths = {
     thePath: new Path2D(THE_ITALIC_PATH_D),
     rulesPath: new Path2D(DIAMOND_RULES_PATH_D),
-    swashPath: new Path2D(RIGHT_UNDER_SWASH_PATH_D),
+    swashPath: new Path2D(CENTER_UNDER_SWASH_PATH_D),
   }
   return cachedPaths
 }
 
 // ---------------------------------------------------------------------------
-// 2. PROCEDURAL BESPOKE ATELIER SOUND ENGINE + HIGH-GAIN MASTER COMPRESSOR
+// 2. PROCEDURAL BESPOKE ATELIER SOUND ENGINE + MASTER COMPRESSOR
+// Clean organic intro (no button-click ticks during logo writing)
 // ---------------------------------------------------------------------------
 class SoundEngine {
   private ctx: AudioContext | null = null
@@ -213,7 +219,7 @@ class SoundEngine {
       filter.Q.setValueAtTime(2.6, t0)
 
       const gain = c.createGain()
-      const pk = 0.15 * intensity
+      const pk = 0.14 * intensity
       gain.gain.setValueAtTime(0.001, t0)
       gain.gain.linearRampToValueAtTime(pk, t0 + 0.018)
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
@@ -254,7 +260,7 @@ class SoundEngine {
 
       const gain = c.createGain()
       gain.gain.setValueAtTime(0.001, t0)
-      gain.gain.linearRampToValueAtTime(0.18, t0 + dur * 0.45)
+      gain.gain.linearRampToValueAtTime(0.17, t0 + dur * 0.45)
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
 
       src.connect(filter)
@@ -316,7 +322,7 @@ class SoundEngine {
         osc.frequency.setValueAtTime(freq, start)
 
         gain.gain.setValueAtTime(0.0001, start)
-        gain.gain.linearRampToValueAtTime(0.16 - idx * 0.025, start + 0.04)
+        gain.gain.linearRampToValueAtTime(0.15 - idx * 0.025, start + 0.04)
         gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.95)
 
         osc.connect(gain)
@@ -327,6 +333,7 @@ class SoundEngine {
     } catch {}
   }
 
+  // Strictly for UI button taps (never called during intro writing)
   public softTick(pitch = 1): void {
     if (!this.enabled) return
     const c = this.getContext()
@@ -513,7 +520,7 @@ function createPrebakedTextures(): PrebakedTextures | null {
 }
 
 // ---------------------------------------------------------------------------
-// 5. CALLIGRAPHIC GOLD-LEAF MICRO-SPARKS
+// 5. GOLD-LEAF MICRO-SPARKS
 // ---------------------------------------------------------------------------
 type GoldMote = {
   id: number
@@ -632,7 +639,8 @@ export function WelcomePage({
   }[lang]
 
   // -------------------------------------------------------------------------
-  // SINGLE-CANVAS CALLIGRAPHIC SIGNATURE ENGINE (Zero Haptics During Intro)
+  // SINGLE-CANVAS BESPOKE SIGNATURE ENGINE (Cormorant Garamond Medium 500)
+  // Zero haptics & zero button-click ticks during intro writing
   // -------------------------------------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current
@@ -663,8 +671,6 @@ export function WelcomePage({
 
     let mCrown = false
     let mNibStart = false
-    let mStrokeMid1 = false
-    let mStrokeMid2 = false
     let mSwashLock = false
     let mLightSweep = false
     let mDone = false
@@ -674,7 +680,8 @@ export function WelcomePage({
     let simTime = 0.0
     let waitTimeForFont = 0.0
 
-    const FONT_SPEC = `400 72px "${BRAND_FONT_FAMILY}", "Cormorant Garamond", Georgia, serif`
+    // Cormorant Garamond Medium (500) for refined bespoke shoemaking elegance
+    const FONT_SPEC = `500 62px "${BRAND_FONT_FAMILY}", Georgia, serif`
 
     const measureWordBounds = () => {
       ctx.save()
@@ -684,10 +691,10 @@ export function WelcomePage({
       const m = ctx.measureText(BRAND_WORDMARK)
       ctx.restore()
 
-      const leftExt = Math.max(m.actualBoundingBoxLeft || 135, m.width * 0.5)
-      const rightExt = Math.max(m.actualBoundingBoxRight || 135, m.width * 0.5)
-      const padLeft = leftExt + 16
-      const padRight = rightExt + 18
+      const leftExt = Math.max(m.actualBoundingBoxLeft || 132, m.width * 0.5)
+      const rightExt = Math.max(m.actualBoundingBoxRight || 132, m.width * 0.5)
+      const padLeft = leftExt + 14
+      const padRight = rightExt + 14
       const totalSpan = padLeft + padRight
       const opticalOffsetX = (leftExt - rightExt) * 0.5
 
@@ -700,7 +707,7 @@ export function WelcomePage({
       ctx.font = FONT_SPEC
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(BRAND_WORDMARK, opticalOffsetX, 4)
+      ctx.fillText(BRAND_WORDMARK, opticalOffsetX, 2)
       ctx.restore()
     }
 
@@ -712,7 +719,7 @@ export function WelcomePage({
       const fontLoadedNow =
         brandFontReady ||
         (typeof document !== 'undefined' &&
-          Boolean(document.fonts?.check?.(`72px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)))
+          Boolean(document.fonts?.check?.(`500 62px "${BRAND_FONT_FAMILY}"`, BRAND_WORDMARK)))
 
       if (skipRequestedRef.current && simTime < 3.6) {
         simTime = 3.6
@@ -724,6 +731,7 @@ export function WelcomePage({
       }
       const elapsed = simTime
 
+      // Pure organic audio cues during intro (NO softTick button clicks, NO haptics)
       if (!skipRequestedRef.current) {
         if (!mCrown && elapsed >= 0.08) {
           mCrown = true
@@ -732,14 +740,6 @@ export function WelcomePage({
         if (!mNibStart && elapsed >= 0.48) {
           mNibStart = true
           sound.suedeSwell()
-        }
-        if (!mStrokeMid1 && elapsed >= 1.05) {
-          mStrokeMid1 = true
-          sound.softTick(1.02)
-        }
-        if (!mStrokeMid2 && elapsed >= 1.62) {
-          mStrokeMid2 = true
-          sound.softTick(1.16)
         }
         if (!mSwashLock && elapsed >= 2.18) {
           mSwashLock = true
@@ -763,7 +763,7 @@ export function WelcomePage({
       const bounds = measureWordBounds()
       const centerX = viewW * 0.5
       const centerY = viewH * 0.445
-      const logoMasterScale = Math.min((viewW * 0.84) / bounds.totalSpan, 1.34)
+      const logoMasterScale = Math.min((viewW * 0.82) / bounds.totalSpan, 1.32)
 
       const haloIn = easeOutCubic(clamp01((elapsed - 0.15) / 1.1))
       if (haloIn > 0) {
@@ -799,10 +799,11 @@ export function WelcomePage({
         }
       }
 
+      // Upper Crown: italic "the" & diamond-tipped hairline dividers balanced above Cormorant Garamond
       const crownP = easeOutCubic(clamp01((elapsed - 0.14) / 0.72))
       if (crownP > 0) {
         ctx.save()
-        const liftY = -20.0 + (1 - crownP) * 5.0
+        const liftY = -14.5 + (1 - crownP) * 5.0
         ctx.translate(0, liftY)
 
         const ruleSpan = 28 + 70 * crownP
@@ -821,6 +822,7 @@ export function WelcomePage({
         ctx.restore()
       }
 
+      // Live Golden Reveal of "Cordwaine" in Cormorant Garamond Medium
       const writeRaw = clamp01((elapsed - 0.46) / 1.72)
       const writeP = easeInOutCubic(writeRaw)
 
@@ -831,30 +833,27 @@ export function WelcomePage({
 
         ctx.save()
         ctx.beginPath()
-        ctx.rect(startX - 12, -76, nibX - (startX - 12), 152)
+        ctx.rect(startX - 12, -70, nibX - (startX - 12), 140)
         ctx.clip()
         ctx.globalAlpha = Math.min(1, writeRaw * 3.2)
         drawBrandWord('#141210', bounds.opticalOffsetX)
         ctx.restore()
 
         if (writeRaw < 0.99) {
-          const bandWidth = 44
+          const bandWidth = 42
           const edgeEnv = Math.sin(writeRaw * Math.PI)
           ctx.save()
           ctx.beginPath()
-          ctx.rect(nibX - bandWidth, -76, bandWidth + 12, 152)
+          ctx.rect(nibX - bandWidth, -70, bandWidth + 12, 140)
           ctx.clip()
           ctx.globalAlpha = Math.min(1, edgeEnv * 1.15)
           drawBrandWord('#B6863E', bounds.opticalOffsetX)
           ctx.restore()
 
-          const nibY =
-            writeP < 0.28
-              ? Math.sin((writeP / 0.28) * Math.PI * 1.8) * 18
-              : Math.sin((writeP - 0.28) * 22.0) * 6.5
+          const nibY = Math.sin(writeP * 18.0) * 6.0
 
           ctx.save()
-          ctx.globalAlpha = edgeEnv * 0.78
+          ctx.globalAlpha = edgeEnv * 0.72
           ctx.drawImage(textures.nibSparkCanvas, nibX - 24, nibY - 24, 48, 48)
           ctx.restore()
         }
@@ -881,11 +880,13 @@ export function WelcomePage({
         }
       }
 
+      // Centered tapered gold-leaf underline beneath "Cordwaine"
       const swashP = easeOutCubic(clamp01((elapsed - 2.12) / 0.58))
       if (swashP > 0) {
         ctx.save()
+        const halfW = 104 * swashP
         ctx.beginPath()
-        ctx.rect(-48, 12, 170 * swashP, 20)
+        ctx.rect(-halfW, 18, halfW * 2, 16)
         ctx.clip()
         ctx.globalAlpha = Math.min(1, swashP * 1.15)
         ctx.fillStyle = '#9E7840'
@@ -893,6 +894,7 @@ export function WelcomePage({
         ctx.restore()
       }
 
+      // Golden Specular Light Sweep across the completed wordmark
       const sweepP = clamp01((elapsed - 2.48) / 0.74)
       if (sweepP > 0 && sweepP < 1) {
         const sweepHalf = Math.max(bounds.padLeft, bounds.padRight) + 25
@@ -901,14 +903,14 @@ export function WelcomePage({
 
         ctx.save()
         ctx.beginPath()
-        ctx.rect(bandX - 30, -72, 60, 144)
+        ctx.rect(bandX - 30, -68, 60, 136)
         ctx.clip()
 
         ctx.globalAlpha = env * 0.88
         drawBrandWord('#C99B53', bounds.opticalOffsetX)
         ctx.fillStyle = '#C99B53'
         ctx.save()
-        ctx.translate(0, -20.0)
+        ctx.translate(0, -14.5)
         ctx.fill(paths.thePath)
         ctx.restore()
         ctx.fill(paths.swashPath)
@@ -934,7 +936,6 @@ export function WelcomePage({
 
   const handleReplayOrSkip = useCallback(() => {
     sound.unlock()
-    sound.softTick(1.05)
     if (phase !== 'complete') {
       skipRequestedRef.current = true
       setPhase('complete')
@@ -979,17 +980,16 @@ export function WelcomePage({
       onPointerDown={() => sound.unlock()}
       className="fixed inset-0 w-full h-[100lvh] min-h-screen overflow-hidden select-none bg-[#6E6B66] text-[#141210]"
       style={{
-        fontFamily:
-          '"Cormorant Garamond", "Playfair Display", "Didot", "Bodoni MT", "Georgia", serif',
+        fontFamily: `"${UI_FONT_FAMILY}", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`,
         WebkitTapHighlightColor: 'transparent',
         touchAction: 'manipulation',
       }}
     >
-      {/* Hidden DOM font-preloader */}
+      {/* Hidden DOM font-preloader for Cormorant Garamond Medium & Inter */}
       <span
         aria-hidden="true"
         className="fixed -top-96 left-0 opacity-0 pointer-events-none select-none"
-        style={{ fontFamily: `"${BRAND_FONT_FAMILY}", serif` }}
+        style={{ fontFamily: `"${BRAND_FONT_FAMILY}", Georgia, serif`, fontWeight: 500 }}
       >
         {BRAND_WORDMARK}
       </span>
@@ -1001,7 +1001,7 @@ export function WelcomePage({
         className="fixed inset-0 w-full h-full pointer-events-none block"
       />
 
-      {/* Top Bar */}
+      {/* Top Bar (Inter UI Typography) */}
       <header
         className="relative z-20 flex items-center justify-between px-5 sm:px-8"
         style={{
@@ -1020,7 +1020,7 @@ export function WelcomePage({
             >
               {isComplete ? '↻' : '⏭'}
             </span>
-            <span className="italic text-[14px] tracking-[0.04em]">
+            <span className="text-[13px] font-medium tracking-[0.02em]">
               {isComplete ? t.replay : t.skip}
             </span>
           </button>
@@ -1037,7 +1037,7 @@ export function WelcomePage({
           </button>
         </div>
 
-        {/* Luminous Pearl Segmented Language Switcher */}
+        {/* Luminous Pearl Segmented Language Switcher (Inter) */}
         <div
           role="tablist"
           aria-label="Language switcher"
@@ -1066,7 +1066,7 @@ export function WelcomePage({
                 role="tab"
                 aria-selected={active}
                 onClick={() => handleSelectLang(item.code)}
-                className={`relative z-10 flex items-center justify-center h-full rounded-full text-[11px] tracking-[0.06em] font-sans transition-colors duration-300 cursor-pointer ${
+                className={`relative z-10 flex items-center justify-center h-full rounded-full text-[11px] tracking-[0.05em] transition-colors duration-300 cursor-pointer ${
                   active
                     ? 'text-[#141210] font-semibold'
                     : 'text-[#141210]/65 hover:text-[#141210]/90 font-normal'
@@ -1083,21 +1083,24 @@ export function WelcomePage({
       <div
         aria-live="polite"
         className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center justify-center text-center px-6"
-        style={{ top: '56.5%' }}
+        style={{ top: '55.5%' }}
       >
         {isComplete && (
           <>
-            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E5028] font-sans font-medium will-change-[transform,opacity] animate-[cordwaineFloatUpSub_900ms_cubic-bezier(0.22,1,0.36,1)_both]">
+            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E5028] font-medium will-change-[transform,opacity] animate-[cordwaineFloatUpSub_900ms_cubic-bezier(0.22,1,0.36,1)_both]">
               THE ART OF SHOEMAKING
             </p>
-            <p className="mt-1.5 text-[11px] italic tracking-[0.12em] text-[#141210]/60 will-change-[transform,opacity] animate-[cordwaineFloatUp_950ms_cubic-bezier(0.22,1,0.36,1)_90ms_both]">
+            <p
+              className="mt-1.5 text-[12px] italic tracking-[0.08em] text-[#141210]/60 will-change-[transform,opacity] animate-[cordwaineFloatUp_950ms_cubic-bezier(0.22,1,0.36,1)_90ms_both]"
+              style={{ fontFamily: `"${BRAND_FONT_FAMILY}", Georgia, serif` }}
+            >
               {t.atelierSub}
             </p>
           </>
         )}
       </div>
 
-      {/* Bottom Typographic Navigation & Primary Entry CTA */}
+      {/* Bottom Typographic Navigation & Primary Entry CTA (Inter) */}
       {isComplete && (
         <footer
           className="fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 pointer-events-auto"
@@ -1112,7 +1115,7 @@ export function WelcomePage({
             <button
               type="button"
               onClick={() => handleAction(onOpenMaterials ?? onStart)}
-              className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+              className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
             >
               {t.ch1}
             </button>
@@ -1125,7 +1128,7 @@ export function WelcomePage({
             <button
               type="button"
               onClick={() => handleAction(onOpenStyles ?? onStart)}
-              className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+              className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
             >
               {t.ch2}
             </button>
@@ -1138,7 +1141,7 @@ export function WelcomePage({
             <button
               type="button"
               onClick={() => handleAction(onOpenCalc ?? onStart)}
-              className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+              className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
             >
               {t.ch3}
             </button>
@@ -1149,7 +1152,7 @@ export function WelcomePage({
             onClick={() => handleAction(onStart, true)}
             className="group flex flex-col items-center gap-2.5 pt-1 text-[#141210]/95 hover:text-[#141210] active:scale-95 transition-colors duration-300 cursor-pointer will-change-[transform,opacity] animate-[cordwaineFloatUp_1000ms_cubic-bezier(0.22,1,0.36,1)_160ms_both]"
           >
-            <span className="text-[11px] uppercase tracking-[0.38em] font-sans font-medium pl-[0.38em]">
+            <span className="text-[11px] uppercase tracking-[0.38em] font-medium pl-[0.38em]">
               {t.enter}
             </span>
             <span className="relative w-[1px] h-7 bg-[#141210]/25 overflow-hidden">
