@@ -137,10 +137,13 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
  * Распознаёт конструктивную зону меша GLB по имени узла, родительского узла и материала.
  */
 export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
-  const normalized = rawName.trim().toLowerCase().replace(/[\s.-]+/g, '_')
+  const normalized = rawName
+    .trim()
+    .toLowerCase()
+    .replace(/[\s.-]+/g, '_')
+    .replace(/(sock|sole|material|cube|plane)(\d+)/g, '$1_$2')
   if (!normalized) return null
-  if (GLB_EXPLICIT_ZONE_MAP[normalized]) {
-    return GLB_EXPLICIT_ZONE_MAP[normalized]
+
   }
 
   if (normalized.includes('sock_upper')) return 'vamp'
