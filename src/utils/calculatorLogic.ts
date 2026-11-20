@@ -1,6 +1,16 @@
 import { Pigment } from '../data/pigments'
 import { Lang } from '../App'
-import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint, WET_EMULSION_SPECTRUM } from './colorScience'
+import {
+  mixSpectra,
+  spectrumToRGB,
+  rgbToHex,
+  interpolateReflectance,
+  SPECTRUM_LEN,
+  WL_START,
+  WL_STEP,
+  SpectrumPoint,
+  WET_EMULSION_SPECTRUM,
+} from './colorScience'
 
 export { WET_EMULSION_SPECTRUM }
 export type CoverageSystem = 'aniline' | 'acrylic'
@@ -344,12 +354,36 @@ export function simulateLayersKM(
 
   strength = Math.max(16, Math.min(58, strength))
 
-  const mixLayer = (current: SpectrumPoint[], paint: SpectrumPoint[], s: number) =>
-    mixSpectra([{ spectrum: current, volume: 100 - s }, { spectrum: paint, volume: s }])
+  // Кумулятивная укрывистость слоёв без многократного наложения поправки Саундерсона
+  const p1 = strength / 100
+  const p2 = (strength * 0.94) / 100
+  const p3 = (strength * 0.91) / 100
 
-  const layer1 = mixLayer(baseSpectrum, paintSpectrum, strength)
-  const layer2 = mixLayer(layer1, paintSpectrum, strength * 0.94)
-  const layer3 = mixLayer(layer2, paintSpectrum, strength * 0.91)
+  const cov1 = p1
+  const cov2 = 1 - (1 - p1) * (1 - p2)
+  const cov3 = 1 - (1 - p1) * (1 - p2) * (1 - p3)
 
-  return { layer1, layer2, layer3, final: paintSpectrum, strength: Math.round(strength), deltaL }
+  const blendKM = (coverage: number): SpectrumPoint[] => {
+    const out: SpectrumPoint[] = new Array(SPECTRUM_LEN)
+    for (let i = 0; i < SPECTRUM_LEN; i++) {
+      const wl = WL_START + i * WL_STEP
+      const rBase = Math.max(0.001, Math.min(0.999, interpolateReflectance(baseSpectrum, wl) * 0.01))
+      const rPaint = Math.max(0.001, Math.min(0.999, interpolateReflectance(paintSpectrum, wl) * 0.01))
+      const ksBase = ((1 - rBase) * (1 - rBase)) / (2 * rBase)
+      const ksPaint = ((1 - rPaint) * (1 - rPaint)) / (2 * rPaint)
+      const ksMix = (1 - coverage) * ksBase + coverage * ksPaint
+      const rMix = 1 + ksMix - Math.sqrt(ksMix * ksMix + 2 * ksMix)
+      out[i] = { wavelength: wl, reflectance: Math.max(0.1, Math.min(99.9, rMix * 100)) }
+    }
+    return out
+  }
+
+  return {
+    layer1: blendKM(cov1),
+    layer2: blendKM(cov2),
+    layer3: blendKM(cov3),
+    final: paintSpectrum,
+    strength: Math.round(strength),
+    deltaL,
+  }
 }
