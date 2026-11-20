@@ -679,8 +679,8 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
         className={
           'relative w-full transition-[height] duration-200 ' +
           (compact
-            ? 'h-[158px] sm:h-[192px]'
-            : 'h-[194px] sm:h-[230px] md:h-[264px]')
+            ? 'h-[158px] sm:h-[192px] md:h-[340px] lg:h-[400px]'
+            : 'h-[194px] sm:h-[230px] md:h-[360px] lg:h-[430px]')
         }
       >
         {webglError ? (
