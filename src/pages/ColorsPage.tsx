@@ -376,6 +376,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const t: TranslationDict = TRANSLATIONS[normalizeSupportedLang(localLang)] ?? TRANSLATIONS.ru
   const activeModel = getSneakerModelConfig(modelId)
+  const isTelegramEnv = useMemo(() => {
+    const tg = getTelegramWebApp()
+    return Boolean(tg && (tg.initData || tg.initDataUnsafe?.user?.id))
+  }, [])
 
   const {
     paymentState,
@@ -1070,6 +1074,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        html, body { -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
         .cw-press {
           transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, opacity 120ms ease;
         }
@@ -1084,7 +1089,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       {/* 1. ЕДИНАЯ КОМПАКТНАЯ ШАПКА БЕЗ ДУБЛИРОВАНИЯ CORDWAINE */}
       <header
-        className="relative px-4 py-2 flex items-center justify-between max-w-xl mx-auto w-full z-30 border-b"
+        className="relative px-4 py-2 flex items-center justify-between max-w-xl md:max-w-5xl lg:max-w-6xl mx-auto w-full z-30 border-b"
         style={{ borderColor: tokens.divider }}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -1113,12 +1118,21 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </svg>
           </button>
 
-          <span
-            className="text-[15px] font-sans font-semibold tracking-[-0.01em] truncate"
-            style={{ color: tokens.ink }}
-          >
-            {showSettings ? t.settingsTitle : t.title}
-          </span>
+          {!isTelegramEnv && !showSettings ? (
+            <span
+              className="font-serif text-[22px] sm:text-[24px] tracking-[-0.02em] leading-none truncate"
+              style={{ color: tokens.ink }}
+            >
+              {t.brandName}
+            </span>
+          ) : (
+            <span
+              className="text-[15px] font-sans font-semibold tracking-[-0.01em] truncate"
+              style={{ color: tokens.ink }}
+            >
+              {showSettings ? t.settingsTitle : t.title}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -1245,7 +1259,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       {/* 2. ВКЛАДКИ НАВИГАЦИИ (скрыты, когда открыты Настройки студии) */}
       {!showSettings && (
         <nav
-          className="px-4 max-w-xl mx-auto w-full border-b"
+          className="px-4 max-w-xl md:max-w-5xl lg:max-w-6xl mx-auto w-full border-b"
           style={{ borderColor: tokens.divider }}
           aria-label="Studio sections"
         >
@@ -1336,7 +1350,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       )}
 
       {/* ОСНОВНАЯ РАБОЧАЯ ОБЛАСТЬ */}
-      <main className="flex-1 flex flex-col px-4 pt-2 pb-3 max-w-xl mx-auto w-full">
+      <main className="flex-1 flex flex-col px-4 pt-2 pb-3 max-w-xl md:max-w-5xl lg:max-w-6xl mx-auto w-full">
         {!showSettings && (
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
             <button
@@ -1385,8 +1399,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         )}
 
-        {/* 3D-МОДЕЛЬ ОБУВИ (высокое качество без артефактов + императивный ref для 60fps ползунков) */}
-        <div className="my-0.5">
+        {/* АДАПТИВНАЯ СЕТКА: 1 колонка на смартфоне, 2 колонки (3D слева + панель справа) на планшете и Chrome/Safari */}
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-[1.15fr_1fr] md:gap-6 md:items-start">
+        <div className="my-0.5 md:sticky md:top-4">
           <Sneaker3D
             ref={sneakerRef}
             sneakerColors={sneakerColors}
@@ -1402,6 +1417,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           />
         </div>
 
+        <div className="flex-1 flex flex-col min-w-0">
         {/* ЭКРАН НАСТРОЕК СТУДИИ */}
         {showSettings ? (
           <StudioSettingsPanel
@@ -2113,6 +2129,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             )}
           </>
         )}
+        </div>
+        </div>
       </main>
 
       {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ */}
@@ -2125,7 +2143,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
           }}
         >
-          <div className="max-w-xl mx-auto flex items-center justify-between gap-2">
+          <div className="max-w-xl md:max-w-5xl lg:max-w-6xl mx-auto flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => {
@@ -2343,7 +2361,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             }}
           >
-            <div className="px-6 pt-8 pb-5 flex items-start justify-between gap-3 shrink-0 max-w-xl mx-auto w-full">
+            <div className="px-6 pt-8 pb-5 flex items-start justify-between gap-3 shrink-0 max-w-xl md:max-w-5xl lg:max-w-6xl mx-auto w-full">
               <h2
                 id="color-guide-title"
                 className="font-serif text-3xl sm:text-4xl leading-tight tracking-tight"
@@ -2368,7 +2386,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-20 scrollbar-hide space-y-9 max-w-xl mx-auto w-full">
+            <div className="flex-1 overflow-y-auto px-6 pb-20 scrollbar-hide space-y-9 max-w-xl md:max-w-5xl lg:max-w-6xl mx-auto w-full">
               <p className="text-[14.5px] leading-[1.75] font-light">{t.guideIntro}</p>
 
               <div>
