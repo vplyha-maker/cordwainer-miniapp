@@ -324,7 +324,7 @@ export function ColorEditorSheet({
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0.04, bottom: 0.4 }}
             onDragEnd={handleDragEnd}
-            className="pointer-events-auto w-full max-w-xl mx-auto rounded-t-[28px] px-5 pt-2.5 pb-5 border-t"
+            className="pointer-events-auto w-full max-w-xl md:max-w-[460px] mx-auto md:ml-auto md:mr-6 md:mb-6 rounded-t-[28px] md:rounded-[28px] px-5 pt-2.5 pb-5 border-t md:border"
             style={{
               backgroundColor: tokens.sheetBg,
               borderColor: tokens.border,
