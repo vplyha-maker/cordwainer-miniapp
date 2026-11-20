@@ -15,7 +15,7 @@ import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 import { GlossaryPage } from './pages/GlossaryPage'
 import { PricesPage } from './pages/PricesPage/PricesPage'
 import { StylesPage } from './pages/StylesPage'
-import { SalaryCalcPage } from './pages/salary' 
+import { SalaryCalcPage } from './pages/salary'
 import { SettingsPage } from './pages/SettingsPage'
 import SneakerIndex from './pages/SneakerIndex'
 import Materials from './pages/Materials'
@@ -42,7 +42,7 @@ export type Screen =
   | 'width-calc'
   | 'heel-calc'
   | 'color-calc'
-  | 'salary-calc' 
+  | 'salary-calc'
   | 'colors'
   | 'seo-width'
   | 'glossary'
@@ -63,6 +63,18 @@ export interface FavoriteItem {
 
 function getIsDarkTheme(): boolean {
   try {
+    // Сначала проверяем актуальный ключ темы студии (day / night / auto)
+    const studioMode = localStorage.getItem('cordwainer_theme_mode_v1')
+    if (studioMode === 'night') return true
+    if (studioMode === 'day') return false
+    if (studioMode === 'auto') {
+      const tg = window.Telegram?.WebApp
+      if (tg?.initData && tg.initData.trim().length > 0 && tg.colorScheme) {
+        return tg.colorScheme === 'dark'
+      }
+      return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+    }
+
     const savedTheme = localStorage.getItem('cordwainer_theme')
     if (savedTheme === 'dark') return true
     if (savedTheme === 'light') return false
@@ -89,10 +101,10 @@ export function applyImmediateMutedTheme(isDark: boolean) {
   }
 
   const oldColors = [
-    'bg', 'surface', 'surface-2', 'ink', 'muted', 
-    'accent', 'accent-strong', 'danger', 'border', 'info', 'success'
+    'bg', 'surface', 'surface-2', 'ink', 'muted',
+    'accent', 'accent-strong', 'danger', 'border', 'info', 'success',
   ]
-  oldColors.forEach(c => root.style.removeProperty(`--color-${c}`))
+  oldColors.forEach((c) => root.style.removeProperty(`--color-${c}`))
 
   root.style.setProperty('--pigment-lac-dye', '#8B0000')
   root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
@@ -103,7 +115,7 @@ export function applyImmediateMutedTheme(isDark: boolean) {
   root.style.setProperty('--pigment-lead-white', '#F5F1EA')
   root.style.setProperty('--pigment-bone-black', '#1C1816')
 
-  const bg = isDark ? '#0A0A0A' : '#F2EFE9'
+  const bg = isDark ? '#0E0E10' : '#F5F1EB'
   root.style.backgroundColor = bg
   if (document.body) {
     document.body.style.backgroundColor = bg
@@ -133,7 +145,7 @@ function getInitialScreen(): Screen {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
-  const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome') 
+  const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome')
 
   const [isMobileWebView] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -143,7 +155,7 @@ export default function App() {
       navigator.maxTouchPoints > 0
     )
   })
-  
+
   const [lang, setLang] = useState<Lang>(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search)
@@ -164,7 +176,7 @@ export default function App() {
       if (['ru', 'uk', 'de'].includes(sysLang)) {
         return sysLang as Lang
       }
-      
+
       return 'ru'
     } catch {
       return 'ru'
@@ -298,8 +310,15 @@ export default function App() {
     }
   }, [])
 
+  const isWideStudioScreen = screen === 'colors'
+
   const appContent = (
-    <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
+    <div
+      className={
+        (isWideStudioScreen ? 'w-full max-w-none' : 'app-shell') +
+        ' min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe'
+      }
+    >
       {showPerfHint && (
         <div
           className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB] max-w-[var(--app-max-width)] mx-auto"
@@ -317,7 +336,8 @@ export default function App() {
         </div>
       )}
 
-      <AnimatePresence mode="wait">
+      {/* Без mode="wait" — исключает зависание на чёрном экране при быстром нажатии Назад */}
+      <AnimatePresence>
         {screen === 'welcome' && (
           <WelcomePage
             key="welcome"
@@ -340,7 +360,7 @@ export default function App() {
             key="home"
             onChangeTab={(tab) => {
               if (tab === 'settings') { setPrevMainScreen('home'); setScreen('settings') }
-              if (tab === 'profile') setScreen('welcome') 
+              if (tab === 'profile') setScreen('welcome')
             }}
             onBack={() => setScreen('welcome')}
             onOpenBlog={() => setScreen('blog')}
@@ -348,7 +368,7 @@ export default function App() {
             onOpenColors={() => setScreen('colors')}
             onOpenStyles={() => setScreen('styles')}
             onOpenSneakers={() => setScreen('sneakers')}
-            onOpenMaterials={() => setScreen('materials')} 
+            onOpenMaterials={() => setScreen('materials')}
             onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
             onOpenPrices={() => setScreen('prices')}
             lang={lang}
@@ -388,8 +408,6 @@ export default function App() {
         {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
         {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
         {screen === 'sneakers' && <SneakerIndex key="sneakers" onBack={() => setScreen('home')} />}
-        
-        {/* Передаем lang={lang} в Materials */}
         {screen === 'materials' && <Materials key="materials" lang={lang} onBack={() => setScreen('home')} />}
 
         {screen === 'settings' && (
@@ -411,7 +429,7 @@ export default function App() {
   return (
     <>
       {!isMobileWebView && <CustomCursor />}
-      {isMobileWebView ? appContent : <SmoothScroll>{appContent}</SmoothScroll>}
+      {isMobileWebView || isWideStudioScreen ? appContent : <SmoothScroll>{appContent}</SmoothScroll>}
     </>
   )
 }
