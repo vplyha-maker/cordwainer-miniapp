@@ -310,8 +310,15 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
         })
         const shadowPlane = new THREE.Mesh(shadowGeom, shadowMat)
         shadowPlane.rotation.x = -Math.PI / 2
-        shadowPlane.position.y = -0.42
+        shadowPlane.renderOrder = -1
+        let baseShadowY = -0.48
+        shadowPlane.position.y = baseShadowY
         scene.add(shadowPlane)
+
+        const syncShadowHeight = (pitchRad: number) => {
+          const pitchDrop = Math.abs(Math.sin(pitchRad)) * 0.72
+          shadowPlane.position.y = baseShadowY - pitchDrop
+        }
 
         const clock = new THREE.Clock()
 
@@ -322,6 +329,7 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
               shoeRootRef.current.rotation.y = rotCurrent.current.yaw
               shoeRootRef.current.rotation.x = rotCurrent.current.pitch
             }
+            syncShadowHeight(rotCurrent.current.pitch)
             renderer.render(scene, camera)
           }
         }
@@ -352,6 +360,7 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
               shoeRootRef.current.rotation.x = rotCurrent.current.pitch
               shoeRootRef.current.position.y = 0
             }
+            syncShadowHeight(rotCurrent.current.pitch)
             isLoopRunning = false
             renderer.render(scene, camera)
             return
@@ -381,6 +390,7 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
                 ? 0
                 : Math.sin(elapsed * 1.5) * 0.015 * swayDamping
           }
+          syncShadowHeight(rotCurrent.current.pitch)
 
           renderer.render(scene, camera)
         }
@@ -405,7 +415,8 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
           resetZoneRegistry(mats, registry)
           const proceduralMesh = buildSneakerMeshGroup(THREE, mats)
           pivotGroup.add(proceduralMesh)
-          shadowPlane.position.y = -0.42
+          baseShadowY = -0.48
+          syncShadowHeight(rotCurrent.current.pitch)
           applyColorsToRegistry(latestColorsRef.current)
           setIsLoading3D(false)
           wakeCameraLoop()
@@ -477,7 +488,8 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
 
                   const minY =
                     scaledBox.min.y - scaledCenter.y + SNEAKER_LAST_PARAMS.glbVerticalOffset
-                  shadowPlane.position.y = Math.min(-0.42, minY - 0.015)
+                  baseShadowY = Math.min(-0.46, minY - 0.055)
+                  syncShadowHeight(rotCurrent.current.pitch)
 
                   pivotGroup.add(gltf.scene)
                   applyColorsToRegistry(latestColorsRef.current)
