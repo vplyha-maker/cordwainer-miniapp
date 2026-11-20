@@ -1,1 +1,547 @@
+import { useState, useMemo, useRef, type PointerEvent } from 'react'
+import { WL_START, WL_STEP, SPECTRUM_LEN, type SpectrumPoint } from '../../utils/colorScience'
+import type { ColorCalcDict } from './i18n'
+
+export type SpectralChartMode = 'reflectance' | 'ks'
+
+export interface SpectralSeries {
+  id: string
+  label: string
+  color: string
+  spectrum: SpectrumPoint[]
+  isPrimary?: boolean
+}
+
+export interface SpectrumSummary {
+  peakWl: number
+  peakReflectance: number
+  minWl: number
+  minReflectance: number
+  meanReflectance: number
+}
+
+const K1_SURFACE = 0.0365
+const K2_INTERNAL = 0.42
+const WL_END = WL_START + (SPECTRUM_LEN - 1) * WL_STEP // 780 nm
+
+/**
+ * Перевод измеренного отражения R (%) во внутреннее отношение K/S
+ * по той же формуле Саундерсона + Кубелки–Мунка, что и в colorScience.ts.
+ */
+export function reflectanceToKS(reflectancePercent: number): number {
+  const rMeas = Math.max(0.0008, Math.min(0.999, reflectancePercent * 0.01))
+  const rClean = Math.max(0.0008, rMeas - K1_SURFACE * (1 - 0.5 * rMeas))
+  const denom = Math.max(0.05, 1 - K1_SURFACE - K2_INTERNAL * (1 - rClean))
+  const rInt = Math.max(0.0008, Math.min(0.996, rClean / denom))
+  return ((1 - rInt) * (1 - rInt)) / (2 * rInt)
+}
+
+export function getSpectrumSummary(spectrum: SpectrumPoint[]): SpectrumSummary | null {
+  if (!spectrum || spectrum.length === 0) return null
+  let peakWl = spectrum[0].wavelength
+  let peakReflectance = -Infinity
+  let minWl = spectrum[0].wavelength
+  let minReflectance = Infinity
+  let sum = 0
+
+  for (let i = 0; i < spectrum.length; i++) {
+    const pt = spectrum[i]
+    sum += pt.reflectance
+    if (pt.reflectance > peakReflectance) {
+      peakReflectance = pt.reflectance
+      peakWl = pt.wavelength
+    }
+    if (pt.reflectance < minReflectance) {
+      minReflectance = pt.reflectance
+      minWl = pt.wavelength
+    }
+  }
+
+  return {
+    peakWl,
+    peakReflectance,
+    minWl,
+    minReflectance,
+    meanReflectance: sum / spectrum.length,
+  }
+}
+
+export function sampleSeriesAtIndex(spectrum: SpectrumPoint[], idx: number): SpectrumPoint | null {
+  if (!spectrum || spectrum.length === 0) return null
+  const clamped = Math.max(0, Math.min(spectrum.length - 1, idx))
+  return spectrum[clamped]
+}
+
+interface SpectralSparklineProps {
+  spectrum?: SpectrumPoint[]
+  strokeColor?: string
+  width?: number
+  height?: number
+}
+
+export function SpectralSparkline({
+  spectrum,
+  strokeColor = '#D8A35C',
+  width = 64,
+  height = 24,
+}: SpectralSparklineProps) {
+  const path = useMemo(() => {
+    if (!spectrum || spectrum.length < 2) return ''
+    const padY = 2
+    const innerH = height - padY * 2
+    const step = Math.max(1, Math.floor(spectrum.length / 28))
+    const coords: string[] = []
+
+    for (let i = 0; i < spectrum.length; i += step) {
+      const pt = spectrum[i]
+      const x = ((pt.wavelength - WL_START) / (WL_END - WL_START)) * width
+      const clampedR = Math.max(0, Math.min(100, pt.reflectance))
+      const y = padY + innerH * (1 - clampedR / 100)
+      coords.push(`${x.toFixed(1)},${y.toFixed(1)}`)
+    }
+    const last = spectrum[spectrum.length - 1]
+    const lastX = ((last.wavelength - WL_START) / (WL_END - WL_START)) * width
+    const lastY = padY + innerH * (1 - Math.max(0, Math.min(100, last.reflectance)) / 100)
+    coords.push(`${lastX.toFixed(1)},${lastY.toFixed(1)}`)
+
+    return 'M' + coords.join(' L')
+  }, [spectrum, width, height])
+
+  if (!path) {
+    return (
+      <div
+        style={{
+          width,
+          height,
+          opacity: 0.25,
+          borderBottom: '1px dashed currentColor',
+        }}
+      />
+    )
+  }
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="shrink-0 overflow-visible"
+      aria-hidden="true"
+    >
+      <path
+        d={path}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+interface SpectralChartProps {
+  primarySpectrum: SpectrumPoint[] | null
+  primaryColor: string
+  primaryLabel: string
+  componentSeries?: SpectralSeries[]
+  dict: ColorCalcDict
+  compact?: boolean
+}
+
+const VB_W = 560
+const VB_H = 220
+const PAD_L = 42
+const PAD_R = 14
+const PAD_T = 16
+const PAD_B = 34
+const PLOT_W = VB_W - PAD_L - PAD_R
+const PLOT_H = VB_H - PAD_T - PAD_B
+
+export function SpectralChart({
+  primarySpectrum,
+  primaryColor,
+  primaryLabel,
+  componentSeries = [],
+  dict,
+  compact = false,
+}: SpectralChartProps) {
+  const [mode, setMode] = useState<SpectralChartMode>('reflectance')
+  const [showComponents, setShowComponents] = useState(true)
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  const summary = useMemo(
+    () => (primarySpectrum ? getSpectrumSummary(primarySpectrum) : null),
+    [primarySpectrum]
+  )
+
+  const activeComponents = useMemo(
+    () => (showComponents ? componentSeries.filter((s) => s.spectrum.length > 1) : []),
+    [showComponents, componentSeries]
+  )
+
+  const ksMax = useMemo(() => {
+    if (mode !== 'ks') return 100
+    let maxVal = 2
+    const inspect = (spec: SpectrumPoint[]) => {
+      for (let i = 0; i < spec.length; i++) {
+        const v = reflectanceToKS(spec[i].reflectance)
+        if (v > maxVal) maxVal = v
+      }
+    }
+    if (primarySpectrum) inspect(primarySpectrum)
+    activeComponents.forEach((s) => inspect(s.spectrum))
+    return Math.min(35, Math.ceil(maxVal * 1.1))
+  }, [mode, primarySpectrum, activeComponents])
+
+  const yMax = mode === 'reflectance' ? 100 : ksMax
+
+  const mapX = (wl: number) => PAD_L + ((wl - WL_START) / (WL_END - WL_START)) * PLOT_W
+  const mapY = (val: number) => {
+    const clamped = Math.max(0, Math.min(yMax, val))
+    return PAD_T + PLOT_H * (1 - clamped / yMax)
+  }
+
+  const buildPath = (spec: SpectrumPoint[]) => {
+    if (spec.length < 2) return ''
+    const parts: string[] = []
+    for (let i = 0; i < spec.length; i++) {
+      const pt = spec[i]
+      const yVal = mode === 'reflectance' ? pt.reflectance : reflectanceToKS(pt.reflectance)
+      const cmd = i === 0 ? 'M' : 'L'
+      parts.push(`${cmd}${mapX(pt.wavelength).toFixed(1)},${mapY(yVal).toFixed(1)}`)
+    }
+    return parts.join(' ')
+  }
+
+  const primaryLinePath = useMemo(
+    () => (primarySpectrum ? buildPath(primarySpectrum) : ''),
+    [primarySpectrum, mode, yMax]
+  )
+
+  const primaryAreaPath = useMemo(() => {
+    if (!primaryLinePath || !primarySpectrum || primarySpectrum.length < 2) return ''
+    const firstX = mapX(primarySpectrum[0].wavelength).toFixed(1)
+    const lastX = mapX(primarySpectrum[primarySpectrum.length - 1].wavelength).toFixed(1)
+    const baseY = (PAD_T + PLOT_H).toFixed(1)
+    return `${primaryLinePath} L${lastX},${baseY} L${firstX},${baseY} Z`
+  }, [primaryLinePath, primarySpectrum])
+
+  const handlePointer = (e: PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg || !primarySpectrum || primarySpectrum.length === 0) return
+    const rect = svg.getBoundingClientRect()
+    if (rect.width <= 0) return
+    const vbX = ((e.clientX - rect.left) / rect.width) * VB_W
+    const ratio = (vbX - PAD_L) / PLOT_W
+    const clampedRatio = Math.max(0, Math.min(1, ratio))
+    const idx = Math.round(clampedRatio * (primarySpectrum.length - 1))
+    setHoverIdx(idx)
+  }
+
+  const hoveredPoint =
+    primarySpectrum && hoverIdx !== null
+      ? sampleSeriesAtIndex(primarySpectrum, hoverIdx)
+      : null
+
+  const hoveredYVal = hoveredPoint
+    ? mode === 'reflectance'
+      ? hoveredPoint.reflectance
+      : reflectanceToKS(hoveredPoint.reflectance)
+    : null
+
+  const yTicks = mode === 'reflectance'
+    ? [0, 25, 50, 75, 100]
+    : [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax]
+
+  const xTicks = [400, 480, 560, 640, 720, 780]
+
+  return (
+    <section
+      className="border overflow-hidden"
+      style={{
+        background: 'var(--color-surface, #1C1917)',
+        borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
+      }}
+    >
+      {/* Верхняя панель управления графиком */}
+      <div
+        className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 border-b"
+        style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
+      >
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-[0.2em] font-semibold opacity-80">
+            {dict.spectralTitle}
+          </div>
+          {!compact && (
+            <div className="text-[10px] font-mono opacity-45 mt-0.5">
+              {dict.spectralSubtitle}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {(['reflectance', 'ks'] as const).map((m) => {
+            const active = mode === m
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className="px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] font-semibold border transition-colors"
+                style={{
+                  borderColor: active
+                    ? 'var(--color-accent, #D8A35C)'
+                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
+                  background: active
+                    ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 16%, transparent)'
+                    : 'transparent',
+                  color: active
+                    ? 'var(--color-accent, #D8A35C)'
+                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)',
+                }}
+              >
+                {m === 'reflectance' ? dict.modeReflectance : dict.modeKS}
+              </button>
+            )
+          })}
+
+          {componentSeries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowComponents((v) => !v)}
+              className="px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] border transition-colors"
+              style={{
+                borderColor: showComponents
+                  ? 'color-mix(in srgb, var(--color-ink, #F5F1EA) 36%, transparent)'
+                  : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
+                background: showComponents
+                  ? 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)'
+                  : 'transparent',
+                color: 'var(--color-ink, #F5F1EA)',
+                opacity: showComponents ? 0.95 : 0.55,
+              }}
+            >
+              {dict.showComponents}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Тело графика */}
+      <div className="p-3 sm:p-4">
+        {!primarySpectrum || primarySpectrum.length === 0 ? (
+          <div className="py-10 px-4 text-center text-[12px] opacity-55">
+            {dict.noSpectrumHint}
+          </div>
+        ) : (
+          <>
+            {/* Живая телеметрия: либо точка под курсором, либо сводка пика */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-[11px] font-mono">
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/25"
+                  style={{ backgroundColor: primaryColor }}
+                />
+                <span className="truncate opacity-85">{primaryLabel}</span>
+              </div>
+
+              {hoveredPoint && hoveredYVal !== null ? (
+                <div
+                  className="px-2 py-0.5 border text-[11px]"
+                  style={{
+                    borderColor: 'var(--color-accent, #D8A35C)',
+                    background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 14%, transparent)',
+                    color: 'var(--color-ink, #F5F1EA)',
+                  }}
+                >
+                  {hoveredPoint.wavelength} nm · R {hoveredPoint.reflectance.toFixed(1)}% · K/S{' '}
+                  {reflectanceToKS(hoveredPoint.reflectance).toFixed(2)}
+                </div>
+              ) : (
+                summary && (
+                  <div className="flex items-center gap-3 opacity-65 text-[10px]">
+                    <span>
+                      {dict.peakWl}: {summary.peakWl} nm ({summary.peakReflectance.toFixed(0)}%)
+                    </span>
+                    <span>
+                      {dict.meanRefl}: {summary.meanReflectance.toFixed(0)}%
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
+
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${VB_W} ${VB_H}`}
+              className="w-full h-auto select-none touch-none block"
+              role="img"
+              aria-label={dict.spectralTitle}
+              onPointerDown={handlePointer}
+              onPointerMove={(e) => {
+                if (e.pointerType === 'mouse' || e.buttons > 0) handlePointer(e)
+              }}
+              onPointerLeave={() => setHoverIdx(null)}
+            >
+              <defs>
+                <linearGradient id="cordwaine-vis-bar" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#4B0082" />
+                  <stop offset="14%" stopColor="#2A4BFF" />
+                  <stop offset="28%" stopColor="#00C4FF" />
+                  <stop offset="44%" stopColor="#19D25B" />
+                  <stop offset="56%" stopColor="#E6E100" />
+                  <stop offset="68%" stopColor="#FF7A00" />
+                  <stop offset="84%" stopColor="#E01B1B" />
+                  <stop offset="100%" stopColor="#5C0000" />
+                </linearGradient>
+
+                <linearGradient id="cordwaine-area-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={primaryColor} stopOpacity="0.34" />
+                  <stop offset="100%" stopColor={primaryColor} stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+
+              {/* Горизонтальная сетка и подписи оси Y */}
+              {yTicks.map((tick) => {
+                const y = mapY(tick)
+                return (
+                  <g key={tick}>
+                    <line
+                      x1={PAD_L}
+                      y1={y}
+                      x2={VB_W - PAD_R}
+                      y2={y}
+                      stroke="currentColor"
+                      strokeOpacity="0.1"
+                      strokeDasharray="3 3"
+                    />
+                    <text
+                      x={PAD_L - 6}
+                      y={y + 3}
+                      textAnchor="end"
+                      fill="currentColor"
+                      fillOpacity="0.48"
+                      fontSize="9"
+                      fontFamily="monospace"
+                    >
+                      {mode === 'reflectance' ? `${tick}%` : tick}
+                    </text>
+                  </g>
+                )
+              })}
+
+              {/* Вертикальные линии сетки и ось длин волн */}
+              {xTicks.map((wl) => {
+                const x = mapX(wl)
+                return (
+                  <g key={wl}>
+                    <line
+                      x1={x}
+                      y1={PAD_T}
+                      x2={x}
+                      y2={PAD_T + PLOT_H}
+                      stroke="currentColor"
+                      strokeOpacity="0.07"
+                    />
+                    <text
+                      x={x}
+                      y={VB_H - 4}
+                      textAnchor="middle"
+                      fill="currentColor"
+                      fillOpacity="0.52"
+                      fontSize="9"
+                      fontFamily="monospace"
+                    >
+                      {wl} nm
+                    </text>
+                  </g>
+                )
+              })}
+
+              {/* Полоса видимого спектра 380–780 нм */}
+              <rect
+                x={PAD_L}
+                y={PAD_T + PLOT_H + 6}
+                width={PLOT_W}
+                height={5}
+                rx={2}
+                fill="url(#cordwaine-vis-bar)"
+                opacity="0.88"
+              />
+
+              {/* Кривые отдельных компонентов (пунктир) */}
+              {activeComponents.map((series) => (
+                <path
+                  key={series.id}
+                  d={buildPath(series.spectrum)}
+                  fill="none"
+                  stroke={series.color}
+                  strokeWidth="1.35"
+                  strokeOpacity="0.62"
+                  strokeDasharray="4 3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+
+              {/* Заливка и главная кривая смеси */}
+              {primaryAreaPath && <path d={primaryAreaPath} fill="url(#cordwaine-area-fill)" />}
+              {primaryLinePath && (
+                <path
+                  d={primaryLinePath}
+                  fill="none"
+                  stroke={primaryColor}
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+
+              {/* Интерактивный курсор замера */}
+              {hoveredPoint && hoveredYVal !== null && (
+                <g>
+                  <line
+                    x1={mapX(hoveredPoint.wavelength)}
+                    y1={PAD_T}
+                    x2={mapX(hoveredPoint.wavelength)}
+                    y2={PAD_T + PLOT_H}
+                    stroke="#D8A35C"
+                    strokeWidth="1"
+                    strokeDasharray="2 2"
+                  />
+                  <circle
+                    cx={mapX(hoveredPoint.wavelength)}
+                    cy={mapY(hoveredYVal)}
+                    r="4.5"
+                    fill="#D8A35C"
+                    stroke="#141210"
+                    strokeWidth="1.5"
+                  />
+                </g>
+              )}
+            </svg>
+
+            {/* Легенда компонентов и подсказка */}
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {activeComponents.map((s) => (
+                  <span key={s.id} className="inline-flex items-center gap-1.5 text-[10px] opacity-75">
+                    <span
+                      className="w-2.5 h-0.5 inline-block"
+                      style={{ backgroundColor: s.color }}
+                    />
+                    <span className="truncate max-w-[130px]">{s.label}</span>
+                  </span>
+                ))}
+              </div>
+              <span className="text-[10px] opacity-45">{dict.touchChartHint}</span>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
 
