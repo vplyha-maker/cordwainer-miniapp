@@ -6,33 +6,33 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#151210" />
+    <meta name="theme-color" content="#0E0E10" />
     <meta
       name="description"
       content="Справочник, калькуляторы и инструменты для обувщиков, дизайнеров и колодочников."
     />
-    <title>Cordwainer — Энциклопедия сапожного ремесла</title>
+    <title>Cordwaine — Энциклопедия сапожного ремесла</title>
 
     <!-- ===== Open Graph ===== -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Cordwainer" />
-    <meta property="og:title" content="Cordwainer — Энциклопедия сапожного ремесла" />
+    <meta property="og:site_name" content="Cordwaine" />
+    <meta property="og:title" content="Cordwaine — Энциклопедия сапожного ремесла" />
     <meta property="og:description" content="Справочник, калькуляторы размеров, полноты колодки, каблука, цвета, глоссарий и цены для обувщиков, дизайнеров и ортопедов." />
     <meta property="og:url" content="https://www.cordwaine.app/" />
     <meta property="og:image" content="https://www.cordwaine.app/hero-cover.webp" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Cordwainer — энциклопедия сапожного ремесла" />
+    <meta property="og:image:alt" content="Cordwaine — энциклопедия сапожного ремесла" />
     <meta property="og:locale" content="ru_RU" />
     <meta property="og:locale:alternate" content="uk_UA" />
     <meta property="og:locale:alternate" content="de_DE" />
 
     <!-- ===== Twitter Card ===== -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Cordwainer — Энциклопедия сапожного ремесла" />
+    <meta name="twitter:title" content="Cordwaine — Энциклопедия сапожного ремесла" />
     <meta name="twitter:description" content="Справочник, калькуляторы размеров, полноты колодки, каблука, цвета, глоссарий и цены для обувщиков, дизайнеров и ортопедов." />
     <meta name="twitter:image" content="https://www.cordwaine.app/hero-cover.webp" />
-    <meta name="twitter:image:alt" content="Cordwainer — энциклопедия сапожного ремесла" />
+    <meta name="twitter:image:alt" content="Cordwaine — энциклопедия сапожного ремесла" />
 
     <!-- ===== Schema.org JSON-LD ===== -->
     <script type="application/ld+json">
@@ -43,8 +43,8 @@
           "@type": "WebSite",
           "@id": "https://www.cordwaine.app/#website",
           "url": "https://www.cordwaine.app/",
-          "name": "Cordwainer",
-          "alternateName": ["Cordwainer Mini App", "Кордвейн"],
+          "name": "Cordwaine",
+          "alternateName": ["Cordwaine Mini App", "Кордвейн"],
           "description": "Энциклопедия сапожного ремесла: калькуляторы размеров, полноты колодки, каблука, цвета, глоссарий, цены на материалы и блог для обувщиков, дизайнеров и ортопедов.",
           "inLanguage": ["ru", "uk", "de"],
           "publisher": {
@@ -54,7 +54,7 @@
         {
           "@type": "Organization",
           "@id": "https://www.cordwaine.app/#organization",
-          "name": "Cordwainer",
+          "name": "Cordwaine",
           "url": "https://www.cordwaine.app/",
           "logo": {
             "@type": "ImageObject",
@@ -70,7 +70,7 @@
         {
           "@type": "SoftwareApplication",
           "@id": "https://www.cordwaine.app/#app",
-          "name": "Cordwainer",
+          "name": "Cordwaine",
           "applicationCategory": "UtilitiesApplication",
           "operatingSystem": "Web, Telegram",
           "url": "https://www.cordwaine.app/",
@@ -87,7 +87,7 @@
         },
         {
           "@type": "WebApplication",
-          "name": "Калькулятор полноты колодки — Cordwainer",
+          "name": "Калькулятор полноты колодки — Cordwaine",
           "url": "https://www.cordwaine.app/forward-ortho-converter",
           "applicationCategory": "UtilitiesApplication",
           "operatingSystem": "Web",
@@ -119,9 +119,10 @@
     <link rel="manifest" href="/manifest.json?v=4" />
     <link rel="icon" type="image/png" href="/icon-192.png?v=4" />
     <link rel="apple-touch-icon" href="/icon-192.png?v=4" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Cordwainer" />
+    <meta name="apple-mobile-web-app-title" content="Cordwaine" />
 
     <!-- Динамический canonical для SPA -->
     <script>
@@ -166,21 +167,34 @@
     <!-- Telegram: defer -->
     <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
 
-    <!-- Тёмная тема в браузере до React -->
+    <!-- Инициализация темы до рендера React (учитывает сохранённый выбор Day/Night/Auto) -->
     <script>
       (function () {
         try {
-          var tg = window.Telegram && window.Telegram.WebApp
-          var isTelegram = tg && tg.initData && String(tg.initData).trim().length > 0
-          if (!isTelegram) {
-            document.documentElement.classList.add('dark')
+          var saved = localStorage.getItem('cordwainer_theme_mode_v1');
+          var tg = window.Telegram && window.Telegram.WebApp;
+          var isTelegram = tg && tg.initData && String(tg.initData).trim().length > 0;
+          var isDark = false;
+          if (saved === 'night') {
+            isDark = true;
+          } else if (saved === 'day') {
+            isDark = false;
+          } else if (isTelegram && tg.colorScheme) {
+            isDark = tg.colorScheme === 'dark';
+          } else if (window.matchMedia) {
+            isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          }
+          document.documentElement.classList.toggle('dark', isDark);
+          var metaTheme = document.querySelector('meta[name="theme-color"]');
+          if (metaTheme) {
+            metaTheme.setAttribute('content', isDark ? '#0E0E10' : '#F5F1EB');
           }
         } catch (e) {}
-      })()
+      })();
     </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-      </html>
+</html>
