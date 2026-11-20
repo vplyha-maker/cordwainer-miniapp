@@ -14,6 +14,9 @@ export interface LayerSwatchItem {
   hex: string
 }
 
+type AmountInputMap = Map<string, HTMLInputElement>
+type LabColor = { L: number; a: number; b: number }
+
 interface FormulaPanelProps {
   lang: Lang
   dict: ColorCalcDict
@@ -22,7 +25,7 @@ interface FormulaPanelProps {
   loadError: boolean
   onRetryLoad: () => void
   paints: PaintPart[]
-  amountRefs: MutableRefObject>
+  amountRefs: MutableRefObject<AmountInputMap>
   totalAmount: number
   onAddPaint: () => void
   onRemovePaint: (id: string) => void
@@ -36,7 +39,7 @@ interface FormulaPanelProps {
   selectedCoatIdx: number
   onSelectCoat: (idx: number) => void
   displayHex: string | null
-  activeLab: { L: number; a: number; b: number } | null
+  activeLab: LabColor | null
   activeTarget: string | null
   onClearTarget: () => void
   liveDeltaE: number | null
@@ -97,7 +100,6 @@ export function FormulaPanel({
           borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
         }}
       >
-        {/* Верхняя планка */}
         <div
           className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b"
           style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
@@ -147,7 +149,6 @@ export function FormulaPanel({
           </button>
         </div>
 
-        {/* Подсказка Сухая / Мокрая */}
         <div
           className="px-4 py-1.5 text-[11px] opacity-70 border-b"
           style={{
@@ -158,7 +159,6 @@ export function FormulaPanel({
           {isWet ? dict.wetExplain : dict.dryExplain}
         </div>
 
-        {/* Основное поле выкраски (50/50 при активной цели) */}
         <div className="relative w-full flex overflow-hidden" style={{ height: 156 }}>
           {activeTarget && (
             <div
@@ -231,7 +231,7 @@ export function FormulaPanel({
           </div>
         </div>
 
-        {/* Переключатель освещения (проверка метамеризма) */}
+        {/* Переключатель освещения (метамеризм) */}
         <div
           className="px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 border-t"
           style={{
@@ -335,7 +335,7 @@ export function FormulaPanel({
           </>
         )}
 
-        {/* Технический подвал HEX / CIELAB / Объём */}
+        {/* Технический подвал */}
         <div
           className="p-4 flex flex-wrap items-center justify-between gap-3 border-t"
           style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
@@ -473,7 +473,6 @@ export function FormulaPanel({
                     borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
                   }}
                 >
-                  {/* Ярус 1: Номер + Селектор + Мини-спектр + Удалить */}
                   <div className="flex items-center gap-2 w-full">
                     <span className="font-mono text-[10px] opacity-40 w-[18px] shrink-0">
                       0{idx + 1}
@@ -511,7 +510,6 @@ export function FormulaPanel({
                     </button>
                   </div>
 
-                  {/* Ярус 2: Ползунок + мл + % */}
                   <div className="flex items-center gap-2 pl-[26px] pr-0.5 mt-2.5 w-full">
                     <input
                       type="range"
@@ -565,7 +563,6 @@ export function FormulaPanel({
                     </span>
                   </div>
 
-                  {/* Ярус 3: Укрывистость + Бренд + Паспорт */}
                   <div
                     className="flex items-center justify-between gap-2 pl-[26px] mt-2 pt-1.5 border-t text-[11px]"
                     style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 7%, transparent)' }}
@@ -631,4 +628,3 @@ export function FormulaPanel({
     </div>
   )
 }
-
