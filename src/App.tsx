@@ -310,7 +310,8 @@ export default function App() {
     }
   }, [])
 
-  const isWideStudioScreen = screen === 'colors'
+  const isWideStudioScreen = screen === 'colors' || screen === 'color-calc'
+
 
   const appContent = (
     <div
