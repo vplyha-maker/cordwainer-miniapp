@@ -1415,6 +1415,72 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             studioBgHex={studioBgHex}
             autoContrast={studioSettings.autoContrast}
           />
+
+          {/* На планшете и ПК: техкарта 13 зон сразу под 3D-моделью */}
+          {!showSettings && (
+            <div
+              className="hidden min-[820px]:block mt-3 rounded-[20px] p-3.5 border space-y-2.5"
+              style={{
+                backgroundColor: tokens.surface,
+                borderColor: tokens.border,
+                boxShadow: tokens.cardShadow,
+              }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className="text-[11px] font-sans font-semibold uppercase tracking-[0.12em]"
+                  style={{ color: tokens.inkSecondary }}
+                >
+                  {activeModel.shortLabel} • 13
+                </span>
+                <button
+                  type="button"
+                  onClick={handleExportFullSpec}
+                  className="cw-press px-3 py-1 rounded-full text-[11px] font-sans font-medium border bg-transparent cursor-pointer"
+                  style={{ borderColor: tokens.borderStrong, color: tokens.ink }}
+                >
+                  {copiedKey === '__full_spec__' ? t.exportCopied : t.exportSpecBtn}
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {allZonesSpec.map((item) => {
+                  const zoneKey = 'desk-zone:' + item.key + ':' + item.hex
+                  const isZoneCopied = copiedKey === zoneKey
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(
+                          zoneKey,
+                          item.hex,
+                          item.label + ' ' + item.hex + ' ' + t.copied
+                        )
+                      }
+                      className="cw-press flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-[10px] border cursor-pointer"
+                      style={{
+                        backgroundColor: tokens.surfaceSoft,
+                        borderColor: tokens.border,
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/15 shrink-0"
+                          style={{ backgroundColor: item.hex }}
+                        />
+                        <span className="text-[10.5px] font-sans truncate" style={{ color: tokens.ink }}>
+                          {item.label}
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono shrink-0" style={{ color: tokens.inkMuted }}>
+                        {isZoneCopied ? t.copied : item.hex}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
@@ -1653,6 +1719,67 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 />
 
                 {/* ПАНЕЛЬ ДЕТАЛЕЙ: БЫСТРОЕ ИЗМЕНЕНИЕ ПОДОШВЫ / ПРОТЕКТОРА / ВЕРХА В 1 КАСАНИЕ */}
+                {/* На планшете и ПК: независимые 5 материалов обуви всегда под рукой справа */}
+                {!isDetailsOpen && (
+                  <div
+                    className="hidden min-[820px]:block rounded-[20px] p-3.5 border mt-3 space-y-2"
+                    style={{
+                      backgroundColor: tokens.surface,
+                      borderColor: tokens.border,
+                      boxShadow: tokens.cardShadow,
+                    }}
+                  >
+                    <div
+                      className="text-[11px] font-sans font-semibold uppercase tracking-[0.12em]"
+                      style={{ color: tokens.inkSecondary }}
+                    >
+                      {t.materialsTitle}
+                    </div>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {QUICK_MATERIALS.map((mat) => {
+                        const hex = getMaterialZoneHex(sneakerColors, mat.key)
+                        return (
+                          <button
+                            key={mat.key}
+                            type="button"
+                            onClick={() => {
+                              hapticSwatch()
+                              setEditorTarget({ kind: 'material', zone: mat.key })
+                            }}
+                            className="cw-press flex items-center justify-between gap-2 px-3 py-2 rounded-[12px] border cursor-pointer"
+                            style={{
+                              backgroundColor: tokens.surfaceSoft,
+                              borderColor: tokens.border,
+                            }}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className="w-5 h-5 rounded-[6px] border shrink-0"
+                                style={{
+                                  backgroundColor: hex,
+                                  borderColor: tokens.borderStrong,
+                                }}
+                              />
+                              <span
+                                className="text-[12.5px] font-sans font-medium truncate"
+                                style={{ color: tokens.ink }}
+                              >
+                                {mat.label}
+                              </span>
+                            </div>
+                            <span
+                              className="text-[11px] font-mono shrink-0"
+                              style={{ color: tokens.inkMuted }}
+                            >
+                              {hex}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <AnimatePresence initial={false}>
                   {isDetailsOpen && (
                     <motion.div
