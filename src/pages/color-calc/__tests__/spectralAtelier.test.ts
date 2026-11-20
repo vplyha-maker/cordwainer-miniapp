@@ -197,7 +197,7 @@ describe('Cordwaine Spectral Atelier — Colorimetry & Engine', () => {
     ).toBeGreaterThan(50)
   })
 
-  it('10. simulateLayersKM increases hiding monotonically and acrylic > aniline', () => {
+  it('10. simulateLayersKM converges monotonically to final and acrylic > aniline', () => {
     const base = makeFlatSpectrum(78)
     const paint = parseSpectrum(BLUE_BICE_SAMPLE)
     const acrylic = simulateLayersKM(base, paint, 'acrylic')
@@ -210,13 +210,21 @@ describe('Cordwaine Spectral Atelier — Colorimetry & Engine', () => {
       return rgbToLab(rgb.r, rgb.g, rgb.b)
     }
     const baseLab = labOf(base)
+    const finalLab = labOf(acrylic.final)
+
     const cov1 = calculateDeltaE2000(baseLab, labOf(acrylic.layer1))
     const cov2 = calculateDeltaE2000(baseLab, labOf(acrylic.layer2))
     const cov3 = calculateDeltaE2000(baseLab, labOf(acrylic.layer3))
-
     expect(cov1).toBeGreaterThan(0)
     expect(cov2).toBeGreaterThan(cov1)
     expect(cov3).toBeGreaterThan(cov2)
+
+    const d1 = calculateDeltaE2000(labOf(acrylic.layer1), finalLab)
+    const d2 = calculateDeltaE2000(labOf(acrylic.layer2), finalLab)
+    const d3 = calculateDeltaE2000(labOf(acrylic.layer3), finalLab)
+    expect(d1).toBeGreaterThan(d2)
+    expect(d2).toBeGreaterThan(d3)
+    expect(d3).toBeGreaterThan(0)
   })
 
   it('11. findRecipeByHex recovers known mix (ΔE ≤ 2.0) and toggles binder by system', () => {
