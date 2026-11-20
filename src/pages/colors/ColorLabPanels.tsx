@@ -137,7 +137,7 @@ export const ToneControlCard = memo(function ToneControlCard({
             </svg>
           </button>
 
-          <div className="grid grid-cols-[62px_1fr] gap-3.5 items-center pt-3 pr-1">
+          <div className="grid grid-cols-[50px_1fr] sm:grid-cols-[60px_1fr] gap-2.5 sm:gap-3.5 items-center pt-3">
             <button
               type="button"
               onClick={() => {
@@ -145,7 +145,7 @@ export const ToneControlCard = memo(function ToneControlCard({
                 onOpenEditor()
               }}
               aria-label={t.editorTitle}
-              className="cw-press w-[62px] h-[62px] rounded-[16px] border cursor-pointer"
+              className="cw-press w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] rounded-[14px] sm:rounded-[16px] border cursor-pointer"
               style={{
                 backgroundColor: activeColorHex,
                 borderColor: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.08)',
@@ -153,7 +153,7 @@ export const ToneControlCard = memo(function ToneControlCard({
             />
 
             <div
-              className="flex flex-col pl-3 border-l"
+              className="min-w-0 flex flex-col pl-2.5 border-l"
               style={{ borderColor: tokens.divider }}
             >
               {rows.map((row, idx) => (
@@ -180,9 +180,9 @@ export const ToneControlCard = memo(function ToneControlCard({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <span
-                      className="text-[13px] font-sans font-semibold tabular-nums w-9 text-right"
+                      className="text-[12px] font-sans font-semibold tabular-nums w-8 text-right"
                       style={{ color: tokens.ink }}
                     >
                       {row.pct}%
@@ -192,7 +192,7 @@ export const ToneControlCard = memo(function ToneControlCard({
                       type="button"
                       onClick={row.onDec}
                       aria-label={row.label + ' -'}
-                      className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
+                      className="cw-press w-7 h-7 rounded-full flex items-center justify-center border cursor-pointer"
                       style={{
                         backgroundColor: tokens.surfaceSoft,
                         borderColor: tokens.borderStrong,
@@ -216,7 +216,7 @@ export const ToneControlCard = memo(function ToneControlCard({
                       type="button"
                       onClick={row.onInc}
                       aria-label={row.label + ' +'}
-                      className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
+                      className="cw-press w-7 h-7 rounded-full flex items-center justify-center border cursor-pointer"
                       style={{
                         backgroundColor: tokens.surfaceSoft,
                         borderColor: tokens.borderStrong,
@@ -416,7 +416,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
                       }}
                       aria-label={t.btnReset}
                       title={t.btnReset}
-                      className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
+                      className="cw-press w-7 h-7 rounded-full flex items-center justify-center border cursor-pointer"
                       style={{
                         backgroundColor: tokens.surfaceSoft,
                         borderColor: tokens.border,
@@ -446,7 +446,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
                       onEditMaterial(row.key)
                     }}
                     aria-label={t.editorTitle}
-                    className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
+                    className="cw-press w-7 h-7 rounded-full flex items-center justify-center border cursor-pointer"
                     style={{
                       backgroundColor: tokens.surfaceElevated,
                       borderColor: tokens.borderStrong,
