@@ -1060,7 +1060,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={prefersReduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
       transition={{ duration: prefersReduced ? 0.05 : 0.22, ease: [0.16, 1, 0.3, 1] }}
-      className="relative min-h-[100dvh] w-full overflow-x-hidden flex flex-col justify-between transition-colors duration-200"
+      className="fixed inset-0 z-30 min-h-[100dvh] w-full overflow-y-auto overflow-x-hidden flex flex-col justify-between transition-colors duration-200"
       style={{
         backgroundColor: tokens.pageBg,
         color: tokens.ink,
@@ -1400,8 +1400,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         )}
 
         {/* АДАПТИВНАЯ СЕТКА: 1 колонка на смартфоне, 2 колонки (3D слева + панель справа) на планшете и Chrome/Safari */}
-        <div className="flex-1 flex flex-col md:grid md:grid-cols-[1.15fr_1fr] md:gap-6 md:items-start">
-        <div className="my-0.5 md:sticky md:top-4">
+        <div className="flex-1 flex flex-col min-[820px]:grid min-[820px]:grid-cols-[1.15fr_1fr] min-[820px]:gap-7 min-[820px]:items-start">
+        <div className="my-0.5 min-[820px]:sticky min-[820px]:top-4 min-w-0">
           <Sneaker3D
             ref={sneakerRef}
             sneakerColors={sneakerColors}
