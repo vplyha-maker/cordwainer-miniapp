@@ -239,6 +239,39 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const activePigmentIds = useMemo(() => paints.map((p) => p.pigmentId), [paints])
 
+  const scaleFormulaToVolume = useCallback(
+    (targetMl: number) => {
+      if (!Number.isFinite(targetMl) || targetMl <= 0 || totalAmount <= 0) return
+      hapticConfirm()
+      const factor = targetMl / totalAmount
+      setPaints((prev) => {
+        let maxIdx = -1
+        let maxVal = -1
+        const scaledNums = prev.map((row, idx) => {
+          const cur = parseFloat(row.amount) || 0
+          if (cur <= 0) return 0
+          const val = Math.max(0.05, Math.round(cur * factor * 100) / 100)
+          if (val > maxVal) {
+            maxVal = val
+            maxIdx = idx
+          }
+          return val
+        })
+        if (maxIdx >= 0) {
+          const sum = scaledNums.reduce((a, b) => a + b, 0)
+          const diff = Math.round((targetMl - sum) * 100) / 100
+          if (scaledNums[maxIdx] + diff >= 0.05) {
+            scaledNums[maxIdx] = Math.round((scaledNums[maxIdx] + diff) * 100) / 100
+          }
+        }
+        return prev.map((row, idx) =>
+          scaledNums[idx] > 0 ? { ...row, amount: String(scaledNums[idx]) } : row
+        )
+      })
+    },
+    [totalAmount, setPaints]
+  )
+
   const handleAddFromArchive = useCallback(
     (pigmentId: string) => {
       hapticConfirm()
@@ -507,6 +540,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         hapticTap()
         clearAllAmounts()
       }}
+      onScaleToVolume={scaleFormulaToVolume}
       isWet={isWet}
       onToggleWet={() => {
         hapticSelect()
@@ -844,7 +878,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </div>
       </main>
 
-      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ (контекстно синхронизирована с активной вкладкой) */}
+      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ */}
       <footer
         className="sticky bottom-0 z-30 border-t px-4 py-2.5"
         style={{
