@@ -1,4 +1,4 @@
-import type { MutableRefObject } from 'react'
+import { useRef, useState, type MutableRefObject } from 'react'
 import type { Lang } from '../../App'
 import type { Pigment } from '../../data/pigments'
 import { getPigmentLore } from '../../data/pigmentLore'
@@ -8,6 +8,7 @@ import { PigmentSelector } from '../../components/PigmentSelector'
 import { SpectralSparkline } from './SpectralChart'
 import type { ColorCalcDict } from './i18n'
 import { SUBSTRATE_PRESETS, type SubstratePresetId } from './substrate'
+import { hapticSelect, hapticTap } from './haptics'
 
 export interface LayerSwatchItem {
   short: string
@@ -64,6 +65,55 @@ const SUBSTRATE_TITLES: Record<Lang, { title: string; custom: string }> = {
   de: { title: 'Grundleder (Untergrund)', custom: 'Eigene' },
 }
 
+const MAX_MANUAL_ML = 1000
+const SLIDER_TICKS = [
+  { ml: 0, pct: 0, label: '0' },
+  { ml: 5, pct: 35, label: '5' },
+  { ml: 30, pct: 70, label: '30' },
+  { ml: 100, pct: 100, label: '100' },
+] as const
+
+/** Перевод мл (0..100+) в позицию ползунка (0..1000) по кусочно-точной шкале */
+function mlToSliderPos(ml: number): number {
+  if (!Number.isFinite(ml) || ml <= 0) return 0
+  if (ml <= 5) return Math.round((ml / 5) * 350)
+  if (ml <= 30) return Math.round(350 + ((ml - 5) / 25) * 350)
+  if (ml <= 100) return Math.round(700 + ((ml - 30) / 70) * 300)
+  return 1000
+}
+
+/** Перевод позиции ползунка (0..1000) в мл с удобным округлением шага */
+function sliderPosToMl(pos: number): number {
+  if (!Number.isFinite(pos) || pos <= 0) return 0
+  if (pos <= 350) {
+    const raw = (pos / 350) * 5
+    return Math.round(raw * 10) / 10 // шаг 0.1 мл
+  }
+  if (pos <= 700) {
+    const raw = 5 + ((pos - 350) / 350) * 25
+    return Math.round(raw * 2) / 2 // шаг 0.5 мл
+  }
+  const raw = 30 + ((pos - 700) / 300) * 70
+  return Math.round(raw) // шаг 1 мл
+}
+
+function getMicroStep(currentMl: number, deltaDir: -1 | 1): number {
+  if (deltaDir < 0) {
+    if (currentMl <= 5) return 0.1
+    if (currentMl <= 30) return 0.5
+    return 1
+  }
+  if (currentMl < 5) return 0.1
+  if (currentMl < 30) return 0.5
+  return 1
+}
+
+function formatMlValue(ml: number): string {
+  if (!Number.isFinite(ml) || ml <= 0) return ''
+  const rounded = Math.round(ml * 10) / 10
+  return String(rounded)
+}
+
 export function FormulaPanel({
   lang,
   dict,
@@ -101,10 +151,52 @@ export function FormulaPanel({
   onInspectPigment,
   onOpenGuide,
 }: FormulaPanelProps) {
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const lastTickTimeRef = useRef<number>(0)
+  const lastValueMapRef = useRef>(new Map())
+
   const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
   const squareColor = displayHex || '#1E1B19'
   const activeIllInfo = dict.illuminants[illuminant]
   const subText = SUBSTRATE_TITLES[lang] || SUBSTRATE_TITLES.ru
+
+  const handleSliderChange = (paintId: string, rawPos: number) => {
+    const nextMl = sliderPosToMl(rawPos)
+    const prevMl = lastValueMapRef.current.get(paintId) ?? -1
+
+    if (nextMl !== prevMl) {
+      lastValueMapRef.current.set(paintId, nextMl)
+      onUpdatePaint(paintId, 'amount', formatMlValue(nextMl))
+
+      const now = Date.now()
+      const hitDetent =
+        nextMl === 0 ||
+        nextMl === 5 ||
+        nextMl === 30 ||
+        nextMl === 100 ||
+        (prevMl >= 0 &&
+          ((prevMl < 5 && nextMl >= 5) ||
+            (prevMl > 5 && nextMl <= 5) ||
+            (prevMl < 30 && nextMl >= 30) ||
+            (prevMl > 30 && nextMl <= 30)))
+
+      if (hitDetent) {
+        hapticTap('medium')
+        lastTickTimeRef.current = now
+      } else if (now - lastTickTimeRef.current >= 42) {
+        hapticSelect()
+        lastTickTimeRef.current = now
+      }
+    }
+  }
+
+  const handleStep = (paintId: string, currentMl: number, dir: -1 | 1) => {
+    const step = getMicroStep(currentMl, dir)
+    const nextMl = Math.max(0, Math.min(MAX_MANUAL_ML, Math.round((currentMl + dir * step) * 10) / 10))
+    lastValueMapRef.current.set(paintId, nextMl)
+    onUpdatePaint(paintId, 'amount', formatMlValue(nextMl))
+    hapticTap('light')
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -390,7 +482,7 @@ export function FormulaPanel({
                       }}
                     />
                     <span
-                      className="text-[10px] font-sans truncate"
+                      className="text-[9.5px] font-sans truncate"
                       style={{
                         fontWeight: isSelectedCoat ? 600 : 500,
                         opacity: isSelectedCoat ? 1 : 0.72,
@@ -437,7 +529,7 @@ export function FormulaPanel({
                 {dict.totalVolume}
               </span>
               <span className="font-serif text-[20px] leading-tight tabular-nums">
-                {totalAmount > 1000
+                {totalAmount >= 1000
                   ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
                   : `${totalAmount.toFixed(1)} ${dict.ml}`}
               </span>
@@ -534,7 +626,9 @@ export function FormulaPanel({
           <div className="flex flex-col gap-3">
             {paints.map((paint, idx) => {
               const currentAmount = parseFloat(paint.amount) || 0
-              const sliderMax = Math.max(20, Math.ceil(currentAmount * 1.5))
+              const sliderPos = mlToSliderPos(currentAmount)
+              const fillPct = sliderPos / 10
+              const isDragging = draggingId === paint.id
               const pct = totalAmount > 0 ? Math.round((currentAmount / totalAmount) * 100) : 0
               const selectedPigment = pigments.find((p) => p.id === paint.pigmentId)
               const lore = getPigmentLore(selectedPigment, lang)
@@ -542,10 +636,12 @@ export function FormulaPanel({
               return (
                 <div
                   key={paint.id}
-                  className="p-3 rounded-2xl border overflow-hidden"
+                  className="p-3 rounded-2xl border overflow-hidden transition-colors"
                   style={{
                     background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
-                    borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)',
+                    borderColor: isDragging
+                      ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 45%, transparent)'
+                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)',
                   }}
                 >
                   <div className="flex items-center gap-2 w-full">
@@ -585,57 +681,191 @@ export function FormulaPanel({
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2.5 pl-[26px] pr-0.5 mt-3 w-full">
-                    <input
-                      type="range"
-                      min="0"
-                      max={sliderMax}
-                      step="0.1"
-                      value={currentAmount}
-                      onChange={(e) => onUpdatePaint(paint.id, 'amount', e.target.value)}
-                      className="h-1.5 rounded-full appearance-none cursor-pointer flex-1 min-w-0 w-full"
-                      style={{
-                        background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
-                        accentColor: 'var(--color-accent, #C9A86A)',
-                      }}
-                    />
+                  {/* Дозирование: анимированная шкала 0–100 мл + микрошаг − / + */}
+                  <div className="pl-[26px] pr-0.5 mt-3 w-full">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleStep(paint.id, currentAmount, -1)}
+                          disabled={currentAmount <= 0}
+                          className="w-6 h-6 rounded-full border flex items-center justify-center text-[13px] leading-none font-mono transition-colors disabled:opacity-25 cursor-pointer"
+                          style={{
+                            borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
+                            color: 'var(--color-ink, #F4F0E8)',
+                          }}
+                          aria-label="Decrease"
+                        >
+                          −
+                        </button>
 
-                    <div className="flex items-baseline gap-1 shrink-0">
-                      <input
-                        ref={(el) => {
-                          if (el) amountRefs.current.set(paint.id, el)
-                          else amountRefs.current.delete(paint.id)
+                        <div className="flex items-baseline gap-1 px-1">
+                          <input
+                            ref={(el) => {
+                              if (el) amountRefs.current.set(paint.id, el)
+                              else amountRefs.current.delete(paint.id)
+                            }}
+                            type="text"
+                            inputMode="decimal"
+                            enterKeyHint="done"
+                            value={paint.amount}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(',', '.')
+                              if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                const num = parseFloat(val)
+                                if (!isNaN(num) && num > MAX_MANUAL_ML) val = String(MAX_MANUAL_ML)
+                                onUpdatePaint(paint.id, 'amount', val)
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const val = e.target.value.replace(',', '.')
+                              if (val === '.' || val === '') onUpdatePaint(paint.id, 'amount', '')
+                              else {
+                                const num = parseFloat(val)
+                                if (!isNaN(num)) {
+                                  const clamped = Math.max(0, Math.min(num, MAX_MANUAL_ML))
+                                  onUpdatePaint(paint.id, 'amount', formatMlValue(clamped))
+                                }
+                              }
+                            }}
+                            className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[15px] font-semibold focus:outline-none p-0 w-[48px] tabular-nums"
+                            placeholder="0.0"
+                            style={{ color: 'var(--color-ink, #F4F0E8)' }}
+                          />
+                          <span className="text-[11px] font-sans opacity-55">{dict.ml}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleStep(paint.id, currentAmount, 1)}
+                          disabled={currentAmount >= MAX_MANUAL_ML}
+                          className="w-6 h-6 rounded-full border flex items-center justify-center text-[13px] leading-none font-mono transition-colors disabled:opacity-25 cursor-pointer"
+                          style={{
+                            borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
+                            color: 'var(--color-ink, #F4F0E8)',
+                          }}
+                          aria-label="Increase"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <span
+                        className="font-mono text-[11.5px] font-semibold tabular-nums transition-colors"
+                        style={{
+                          color: isDragging ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
+                          opacity: isDragging ? 1 : 0.62,
                         }}
-                        type="text"
-                        inputMode="decimal"
-                        enterKeyHint="done"
-                        value={paint.amount}
-                        onChange={(e) => {
-                          let val = e.target.value.replace(',', '.')
-                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                            const num = parseFloat(val)
-                            if (!isNaN(num) && num > 5000) val = '5000'
-                            onUpdatePaint(paint.id, 'amount', val)
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const val = e.target.value.replace(',', '.')
-                          if (val === '.' || val === '') onUpdatePaint(paint.id, 'amount', '')
-                          else {
-                            const num = parseFloat(val)
-                            if (!isNaN(num)) onUpdatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                          }
-                        }}
-                        className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[15px] font-semibold focus:outline-none p-0 w-[46px]"
-                        placeholder="0.0"
-                        style={{ color: 'var(--color-ink, #F4F0E8)' }}
-                      />
-                      <span className="text-[11px] font-sans opacity-50">{dict.ml}</span>
+                      >
+                        {pct}%
+                      </span>
                     </div>
 
-                    <span className="font-mono text-[11px] opacity-60 text-right tabular-nums w-[32px] shrink-0">
-                      {pct}%
-                    </span>
+                    {/* Кастомная анимированная шкала */}
+                    <div className="relative h-7 flex items-center select-none touch-none">
+                      {/* Фон трека */}
+                      <div
+                        className="w-full h-1.5 rounded-full overflow-hidden relative"
+                        style={{
+                          background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
+                        }}
+                      >
+                        {/* Заполнение */}
+                        <div
+                          className="h-full rounded-full transition-[width] duration-75"
+                          style={{
+                            width: `${fillPct}%`,
+                            background: 'var(--color-accent, #C9A86A)',
+                          }}
+                        />
+                      </div>
+
+                      {/* Калибровочные риски на треке */}
+                      {SLIDER_TICKS.map((tick) => {
+                        const passed = fillPct >= tick.pct - 0.5
+                        return (
+                          <span
+                            key={tick.ml}
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-2.5 rounded-full pointer-events-none transition-colors duration-150"
+                            style={{
+                              left: `${tick.pct}%`,
+                              background: passed
+                                ? 'var(--color-accent, #C9A86A)'
+                                : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 24%, transparent)',
+                            }}
+                          />
+                        )
+                      })}
+
+                      {/* Анимированный бегунок */}
+                      <span
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full pointer-events-none transition-transform duration-150"
+                        style={{
+                          left: `${fillPct}%`,
+                          width: 18,
+                          height: 18,
+                          transform: `translate(-50%, -50%) scale(${isDragging ? 1.18 : 1})`,
+                          background: 'var(--color-accent, #C9A86A)',
+                          border: '2px solid var(--color-surface, #141416)',
+                          boxShadow: isDragging
+                            ? '0 0 0 6px color-mix(in srgb, var(--color-accent, #C9A86A) 24%, transparent)'
+                            : '0 1px 4px rgba(0,0,0,0.35)',
+                        }}
+                      />
+
+                      {/* Прозрачный нативный range поверх для идеального touch-ввода */}
+                      <input
+                        type="range"
+                        min={0}
+                        max={1000}
+                        step={1}
+                        value={sliderPos}
+                        onPointerDown={() => {
+                          setDraggingId(paint.id)
+                          hapticTap('light')
+                        }}
+                        onPointerUp={() => setDraggingId(null)}
+                        onPointerCancel={() => setDraggingId(null)}
+                        onBlur={() => setDraggingId(null)}
+                        onChange={(e) => handleSliderChange(paint.id, Number(e.target.value))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer m-0"
+                        aria-label={`${selectedPigment?.name?.[lang] || paint.pigmentId} ${dict.ml}`}
+                      />
+                    </div>
+
+                    {/* Подписи калибровки 0 / 5 / 30 / 100 */}
+                    <div className="relative h-3.5 mt-0.5 text-[9.5px] font-mono tabular-nums select-none">
+                      {SLIDER_TICKS.map((tick) => {
+                        const isNear =
+                          (tick.ml === 0 && currentAmount === 0) ||
+                          (tick.ml === 5 && currentAmount >= 4.5 && currentAmount <= 5.5) ||
+                          (tick.ml === 30 && currentAmount >= 28 && currentAmount <= 32) ||
+                          (tick.ml === 100 && currentAmount >= 98)
+                        const alignStyle =
+                          tick.pct === 0
+                            ? { left: '0%', transform: 'translateX(0%)' }
+                            : tick.pct === 100
+                            ? { left: '100%', transform: 'translateX(-100%)' }
+                            : { left: `${tick.pct}%`, transform: 'translateX(-50%)' }
+                        return (
+                          <span
+                            key={tick.ml}
+                            className="absolute top-0 transition-colors duration-150"
+                            style={{
+                              ...alignStyle,
+                              color: isNear
+                                ? 'var(--color-accent, #C9A86A)'
+                                : 'var(--color-ink, #F4F0E8)',
+                              opacity: isNear ? 1 : 0.42,
+                              fontWeight: isNear ? 600 : 400,
+                            }}
+                          >
+                            {tick.label}
+                            {tick.ml === 100 ? ` ${dict.ml}` : ''}
+                          </span>
+                        )
+                      })}
+                    </div>
                   </div>
 
                   <div
