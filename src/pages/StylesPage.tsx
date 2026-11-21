@@ -1,4 +1,3 @@
-
 import {
   useState,
   useRef,
@@ -206,7 +205,6 @@ export function StylesPage({
     []
   )
 
-  // Автопереход к фасону из URL (?style=...) или Telegram start_param
   useEffect(() => {
     if (!initialStyleId) return
     const styleIdx = STYLES_DATA.findIndex((s) => s.id === initialStyleId)
@@ -467,20 +465,20 @@ export function StylesPage({
         }
       `}</style>
 
-      {/* Единый верхний хедер */}
+      {/* Лёгкий верхний хедер с мягкой маской при скролле */}
       <header
         style={{
-          paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 10px)',
+          paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 14px) + 8px)',
         }}
-        className="fixed top-0 left-0 right-0 z-[200] px-5 md:px-8 pb-3 flex justify-between items-center pointer-events-none bg-gradient-to-b from-[#0B0B0A]/85 via-[#0B0B0A]/40 to-transparent"
+        className="fixed top-0 left-0 right-0 z-[200] px-5 md:px-8 pb-10 flex justify-between items-center pointer-events-none bg-gradient-to-b from-[#0B0B0A] via-[#0B0B0A]/75 to-transparent"
       >
         <button
           type="button"
           onClick={handleBackPress}
           style={{ touchAction: 'manipulation' }}
-          className="pointer-events-auto cursor-pointer min-h-[44px] px-4 rounded-[6px] bg-[#141312] border border-[#F4F0E8]/20 hover:border-[#C9A97E]/60 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-[#F4F0E8] active:scale-95 transition-colors"
+          className="pointer-events-auto cursor-pointer h-10 px-3.5 rounded-full bg-[#0B0B0A]/45 backdrop-blur-md border border-[#F4F0E8]/12 hover:border-[#C9A97E]/45 hover:bg-[#0B0B0A]/65 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-[#F4F0E8]/95 active:scale-95 transition-all"
         >
-          <span aria-hidden="true">←</span>
+          <span aria-hidden="true" className="text-sm leading-none">←</span>
           <span>{t.back}</span>
         </button>
 
@@ -488,19 +486,19 @@ export function StylesPage({
           type="button"
           onClick={handleSmartScroll}
           style={{ touchAction: 'manipulation' }}
-          className={`pointer-events-auto cursor-pointer min-h-[44px] px-4 rounded-[6px] bg-[#141312] border border-[#F4F0E8]/20 hover:border-[#C9A97E]/60 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-[#F4F0E8] transition-all duration-300 active:scale-95 ${
+          className={`pointer-events-auto cursor-pointer h-10 px-3.5 rounded-full bg-[#0B0B0A]/45 backdrop-blur-md border border-[#F4F0E8]/12 hover:border-[#C9A97E]/45 hover:bg-[#0B0B0A]/65 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-[#F4F0E8]/95 transition-all duration-300 active:scale-95 ${
             buttonMode !== 'hidden'
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 -translate-y-2 pointer-events-none'
           }`}
         >
           <svg
-            width="14"
-            height="14"
+            width="13"
+            height="13"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.6"
+            strokeWidth="1.8"
             className={`transition-transform duration-300 ${
               buttonMode === 'down' ? 'rotate-180' : 'rotate-0'
             }`}
@@ -515,13 +513,13 @@ export function StylesPage({
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -12 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+            exit={{ opacity: 0, y: -10 }}
             style={{
-              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 64px)',
+              top: 'calc(max(env(safe-area-inset-top, 0px), 14px) + 58px)',
             }}
-            className="fixed left-1/2 -translate-x-1/2 z-[220] px-4 py-2.5 rounded-[6px] bg-[#C9A97E] text-[#0B0B0A] text-xs font-medium tracking-[0.04em] pointer-events-none"
+            className="fixed left-1/2 -translate-x-1/2 z-[220] px-4 py-2 rounded-full bg-[#C9A97E] text-[#0B0B0A] text-xs font-medium tracking-[0.04em] pointer-events-none shadow-lg"
           >
             {toastMessage}
           </motion.div>
