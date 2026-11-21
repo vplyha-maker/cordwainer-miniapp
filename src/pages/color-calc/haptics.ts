@@ -9,6 +9,18 @@ interface TgHapticAPI {
   selectionChanged?: () => void
 }
 
+function detectIOS(): boolean {
+  if (typeof window === 'undefined') return false
+  const tgPlatform = window.Telegram?.WebApp?.platform as string | undefined
+  if (tgPlatform === 'ios') return true
+  if (typeof navigator !== 'undefined') {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  }
+  return false
+}
+
+const IS_IOS = detectIOS()
+
 export function isHapticsEnabled(): boolean {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -23,7 +35,7 @@ export function setHapticsEnabled(enabled: boolean): void {
   try {
     localStorage.setItem(STORAGE_KEY, enabled ? '1' : '0')
   } catch {
-    // ignore storage errors in private mode
+    // ignore storage errors
   }
 }
 
@@ -35,40 +47,41 @@ function getTgHaptic(): TgHapticAPI | null {
 
 /** Лёгкий отклик при переключении вкладок, слоёв, режимов и освещения */
 export function hapticSelect(): void {
-  const api = getTgHaptic()
-  if (api?.selectionChanged) {
-    api.selectionChanged()
-  }
+  try {
+    getTgHaptic()?.selectionChanged?.()
+  } catch {}
 }
 
-/** Мягкий тактильный клик на обычных кнопках */
+/** Мягкий клик: на iOS — selectionChanged, на Android — light impact */
 export function hapticTap(): void {
-  const api = getTgHaptic()
-  if (api?.impactOccurred) {
-    api.impactOccurred('light')
-  }
+  try {
+    const api = getTgHaptic()
+    if (!api) return
+    if (IS_IOS) api.selectionChanged?.()
+    else api.impactOccurred?.('light')
+  } catch {}
 }
 
-/** Выраженный отклик для ключевых действий (синтез рецепта, перенос в формулу) */
+/** Выраженный отклик для ключевых действий: на iOS — light impact, на Android — medium */
 export function hapticConfirm(): void {
-  const api = getTgHaptic()
-  if (api?.impactOccurred) {
-    api.impactOccurred('medium')
-  }
+  try {
+    const api = getTgHaptic()
+    if (!api) return
+    if (IS_IOS) api.impactOccurred?.('light')
+    else api.impactOccurred?.('medium')
+  } catch {}
 }
 
-/** Сигнал успешного завершения (копирование HEX, найден рецепт) */
+/** Сигнал успешного завершения (копирование HEX, синтез рецепта) */
 export function hapticSuccess(): void {
-  const api = getTgHaptic()
-  if (api?.notificationOccurred) {
-    api.notificationOccurred('success')
-  }
+  try {
+    getTgHaptic()?.notificationOccurred?.('success')
+  } catch {}
 }
 
 /** Сигнал ошибки или предупреждения */
 export function hapticError(): void {
-  const api = getTgHaptic()
-  if (api?.notificationOccurred) {
-    api.notificationOccurred('error')
-  }
+  try {
+    getTgHaptic()?.notificationOccurred?.('error')
+  } catch {}
 }
