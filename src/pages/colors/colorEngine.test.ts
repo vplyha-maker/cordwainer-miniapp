@@ -3,6 +3,7 @@ import {
   generateHarmonyPalette,
   getCircularAngleDiff,
   getContrastRatio,
+  getPaletteSwatchAngleLabels,
   getPerceptualPairContrast,
   getRelativeLuminance,
   getSchemeWheelAngles,
@@ -137,7 +138,7 @@ export function runColorEngineTests(): ColorEngineTestReport {
       },
     },
     {
-      name: '12. getSchemeWheelAngles: точное число углов и нормализация 0..359',
+      name: '12. getSchemeWheelAngles & getPaletteSwatchAngleLabels: углы и подписи',
       run: () => {
         const expectedCounts: Record<Scheme, number> = {
           monochromatic: 1,
@@ -153,6 +154,8 @@ export function runColorEngineTests(): ColorEngineTestReport {
           assert(angles.length === expectedCounts[scheme], scheme + ' count mismatch')
           angles.forEach((a) => assert(a >= 0 && a < 360, 'Angle out of range: ' + a))
         })
+        const compLabels = getPaletteSwatchAngleLabels(194, 'complementary')
+        assert(compLabels[0] === '194°' && compLabels[1] === 'TONE' && compLabels[2] === '14°', 'comp labels')
       },
     },
     {
@@ -188,7 +191,7 @@ export function runColorEngineTests(): ColorEngineTestReport {
       },
     },
     {
-      name: '15. mapPaletteToFootwear: все 13 зон заполнены валидным HEX во всех пресетах',
+      name: '15. mapPaletteToFootwear: во всех 4 пресетах Верх + Пятка всегда 60% (mainColor)',
       run: () => {
         const presets: FootwearMappingPreset[] = [
           'classic',
@@ -201,6 +204,7 @@ export function runColorEngineTests(): ColorEngineTestReport {
           const mapped = mapPaletteToFootwear(pal, 194, 0.05, 0.05, 0.85, 'ryb', preset, true)
           const keys = Object.keys(mapped) as (keyof typeof mapped)[]
           assert(keys.length === 13, 'Must map exactly 13 zones')
+          assert(mapped.vamp === pal[0] && mapped.heel === pal[0], preset + ' must keep vamp/heel = main')
           keys.forEach((k) => assert(HEX_RE.test(mapped[k]), preset + '.' + k + ' invalid HEX'))
         })
       },
@@ -217,13 +221,13 @@ export function runColorEngineTests(): ColorEngineTestReport {
       },
     },
     {
-      name: '17. mapPaletteToFootwear: toe-focus ставит main на toeBox/eyestays/encap, протектор нейтральный',
+      name: '17. mapPaletteToFootwear: toe-focus держит верх 60%, а мысок и штрихи — акцент 10%',
       run: () => {
         const pal = ['#112233', '#445566', '#CC3311']
         const mapped = mapPaletteToFootwear(pal, 194, 0.05, 0.05, 0.85, 'ryb', 'toe-focus', false)
-        assert(mapped.toeBox === '#112233' && mapped.eyestays === '#112233', 'toe-focus main')
-        assert(mapped.vamp === '#445566' && mapped.heel === '#445566', 'toe-focus secondary')
-        assert(mapped.swoosh === '#CC3311', 'toe-focus accent swoosh')
+        assert(mapped.vamp === '#112233' && mapped.heel === '#112233', 'toe-focus main upper')
+        assert(mapped.toeBox === '#CC3311' && mapped.swoosh === '#CC3311', 'toe-focus accent toe/swoosh')
+        assert(mapped.quarters === '#445566' && mapped.eyestays === '#445566', 'toe-focus 30%')
         assert(mapped.outsole === '#2C2825', 'toe-focus neutral outsole')
       },
     },
