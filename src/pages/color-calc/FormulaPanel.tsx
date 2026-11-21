@@ -7,6 +7,7 @@ import type { PaintPart } from '../../hooks/usePaintMix'
 import type { IlluminantType } from '../../utils/colorScience'
 import { PigmentSelector } from '../../components/PigmentSelector'
 import { SpectralSparkline } from './SpectralChart'
+import { LeatherSubstratePicker } from './LeatherSubstratePicker'
 import type { ColorCalcDict } from './i18n'
 import { SUBSTRATE_PRESETS, type SubstratePresetId } from './substrate'
 import { hapticConfirm, hapticSelect, hapticTap } from './haptics'
@@ -211,6 +212,7 @@ export function FormulaPanel({
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [showNotes, setShowNotes] = useState(false)
   const [showStickySwatch, setShowStickySwatch] = useState(false)
+  const [showCustomLeather, setShowCustomLeather] = useState(false)
   const [splitPct, setSplitPct] = useState(28)
   const [isDraggingSplit, setIsDraggingSplit] = useState(false)
   const [customBatchMl, setCustomBatchMl] = useState('')
@@ -241,7 +243,6 @@ export function FormulaPanel({
     setSplitPct(activeTarget ? 50 : 28)
   }, [activeTarget])
 
-  // Плавающая плашка появляется СРАЗУ, как только сам образец цвета (stageRef) скрывается сверху
   useEffect(() => {
     const el = stageRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return
@@ -331,7 +332,7 @@ export function FormulaPanel({
 
   return (
     <div className="flex flex-col gap-6 relative">
-      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА (лёгкая, без backdrop-blur — мгновенная на Android) */}
+      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА */}
       <AnimatePresence>
         {showStickySwatch && (
           <motion.div
@@ -498,7 +499,7 @@ export function FormulaPanel({
           </div>
         )}
 
-        {/* ГЛАВНАЯ ВЫКРАСКА (без тяжёлого CPU feTurbulence — 60fps на Android) */}
+        {/* ГЛАВНАЯ ВЫКРАСКА */}
         <div
           ref={stageRef}
           onPointerDown={(e) => {
@@ -532,7 +533,6 @@ export function FormulaPanel({
             />
           )}
 
-          {/* Лёгкая GPU-текстура кожи без CPU-тормозов */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -626,7 +626,7 @@ export function FormulaPanel({
           </div>
         </div>
 
-        {/* ГЛАВНЫЕ ЦИФРЫ (только цвет HEX + CIELAB + Скопировать рецепт, без лишнего объёма здесь) */}
+        {/* ГЛАВНЫЕ ЦИФРЫ */}
         <div
           className="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b"
           style={{ borderColor: hairline }}
@@ -713,7 +713,10 @@ export function FormulaPanel({
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => onSelectSubstrate(preset.id)}
+                      onClick={() => {
+                        setShowCustomLeather(false)
+                        onSelectSubstrate(preset.id)
+                      }}
                       className="inline-flex items-center gap-1.5 text-[12px] font-sans cursor-pointer bg-transparent border-none p-0"
                       style={{
                         color: active ? 'var(--color-ink, #F4F0E8)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 62%, transparent)',
@@ -734,11 +737,19 @@ export function FormulaPanel({
                   )
                 })}
 
-                <label
-                  className="relative inline-flex items-center gap-1.5 text-[12px] font-sans cursor-pointer"
+                <button
+                  type="button"
+                  onClick={() => {
+                    hapticTap()
+                    setShowCustomLeather((v) => !v)
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-sans cursor-pointer bg-transparent border-none p-0"
                   style={{
-                    color: substrateId === 'custom' ? 'var(--color-accent, #C9A86A)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 62%, transparent)',
-                    fontWeight: substrateId === 'custom' ? 600 : 400,
+                    color:
+                      substrateId === 'custom' || showCustomLeather
+                        ? 'var(--color-accent, #C9A86A)'
+                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 62%, transparent)',
+                    fontWeight: substrateId === 'custom' || showCustomLeather ? 600 : 400,
                   }}
                 >
                   <span
@@ -746,22 +757,26 @@ export function FormulaPanel({
                     style={{
                       backgroundColor: customSubstrateHex,
                       boxShadow:
-                        substrateId === 'custom'
+                        substrateId === 'custom' || showCustomLeather
                           ? '0 0 0 2px var(--color-surface, #141416), 0 0 0 3.5px var(--color-accent, #C9A86A)'
                           : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
                     }}
                   />
                   <span>+ {subCopy.custom}</span>
-                  <input
-                    type="color"
-                    value={customSubstrateHex}
-                    onChange={(e) => onCustomSubstrateChange(e.target.value.toUpperCase())}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    aria-label={subCopy.custom}
-                  />
-                </label>
+                </button>
               </div>
             </div>
+
+            {showCustomLeather && (
+              <div className="border-b" style={{ borderColor: hairline }}>
+                <LeatherSubstratePicker
+                  lang={lang}
+                  valueHex={customSubstrateHex}
+                  onChange={(hex) => onCustomSubstrateChange(hex)}
+                  onClose={() => setShowCustomLeather(false)}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-4 divide-x" style={{ borderColor: hairline }}>
               {layerSwatches.map((ls, idx) => {
@@ -833,7 +848,7 @@ export function FormulaPanel({
             )}
           </div>
 
-          {totalAmount > 0 && (
+          {(totalAmount > 0 || Boolean(activeTarget)) && (
             <button
               type="button"
               onClick={onClearAmounts}
@@ -1018,7 +1033,7 @@ export function FormulaPanel({
                     </button>
                   </div>
 
-                  {/* Дозирование: scroll-safe ползунок (touch-action: pan-y) */}
+                  {/* Дозирование: scroll-safe ползунок */}
                   <div className="pl-7 mt-3.5">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-1.5">
@@ -1093,7 +1108,6 @@ export function FormulaPanel({
                       </span>
                     </div>
 
-                    {/* Защищённый от вертикального скролла трек ползунка */}
                     <div
                       onPointerDown={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect()
@@ -1300,4 +1314,4 @@ export function FormulaPanel({
       </section>
     </div>
   )
-  }
+}
