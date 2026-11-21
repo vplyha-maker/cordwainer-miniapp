@@ -79,7 +79,6 @@ describe('SizeCalcPage — интеграционные тесты', () => {
 
     fireEvent.click(screen.getByRole('button', { name: I18N.ru.kids }))
 
-    // 270 мм зажимается в RANGES.kids.max = 230 мм (36.5 UA / 37 EU)
     expect(screen.getAllByText('230').length).toBeGreaterThan(0)
     expect(screen.getAllByText('36.5').length).toBeGreaterThan(0)
     expect(screen.getAllByText('37').length).toBeGreaterThan(0)
@@ -92,39 +91,34 @@ describe('SizeCalcPage — интеграционные тесты', () => {
   it('переключает режим «По стельке» и единицы измерения «см / мм»', () => {
     render(<SizeCalcPage onBack={vi.fn()} lang="ru" />)
 
-    // 270 мм + 10 мм (кроссовки) = 280 мм стелька
     fireEvent.click(screen.getByRole('button', { name: I18N.ru.modeInsole }))
-    expect(screen.getByText('280')).toBeTruthy()
+    expect(screen.getAllByText('280').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: I18N.ru.cmLabel }))
-    expect(screen.getByText('28,0')).toBeTruthy()
+    expect(screen.getAllByText('28,0').length).toBeGreaterThan(0)
   })
 
   it('поддерживает ручной ввод длины стопы и кнопки − / +', () => {
     render(<SizeCalcPage onBack={vi.fn()} lang="ru" />)
 
-    // Клик по отображаемому значению «270» открывает input
-    fireEvent.click(screen.getByText('270'))
+    fireEvent.click(screen.getAllByText('270')[0])
     const input = screen.getByDisplayValue('270')
     fireEvent.change(input, { target: { value: '280' } })
     fireEvent.keyDown(input, { key: 'Enter' })
 
-    // 280 мм -> 43.5 UA / 44 EU
-    expect(screen.getByText('280')).toBeTruthy()
+    expect(screen.getAllByText('280').length).toBeGreaterThan(0)
     expect(screen.getAllByText('43.5').length).toBeGreaterThan(0)
     expect(screen.getAllByText('44').length).toBeGreaterThan(0)
 
-    // Кнопка +1 мм
     const incBtn = screen.getByRole('button', { name: 'Increase' })
     fireEvent.pointerDown(incBtn)
     fireEvent.pointerUp(incBtn)
-    expect(screen.getByText('281')).toBeTruthy()
+    expect(screen.getAllByText('281').length).toBeGreaterThan(0)
 
-    // Кнопка -1 мм
     const decBtn = screen.getByRole('button', { name: 'Decrease' })
     fireEvent.pointerDown(decBtn)
     fireEvent.pointerUp(decBtn)
-    expect(screen.getByText('280')).toBeTruthy()
+    expect(screen.getAllByText('280').length).toBeGreaterThan(0)
   })
 
   it('переключает вкладки и применяет запас для стиля «Зима / Мех»', () => {
@@ -133,7 +127,6 @@ describe('SizeCalcPage — интеграционные тесты', () => {
     fireEvent.click(screen.getByRole('button', { name: I18N.ru.tabFit }))
     fireEvent.click(screen.getByRole('button', { name: new RegExp(I18N.ru.styleWinter) }))
 
-    // 270 мм + зимний запас -> 42.5 UA / 43 EU
     expect(screen.getAllByText('43').length).toBeGreaterThan(0)
     expect(screen.getByText(/С запасом · Зима \/ Мех/)).toBeTruthy()
 
@@ -211,4 +204,3 @@ describe('SizeCalcPage — интеграционные тесты', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 })
-
