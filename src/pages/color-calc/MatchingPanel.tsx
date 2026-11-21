@@ -14,25 +14,40 @@ import { hapticSelect, hapticTap } from './haptics'
 
 interface LeatherPreset {
   hex: string
+  group: 'classic' | 'accent'
   label: Record<Lang, string>
 }
 
 const LEATHER_PRESETS: LeatherPreset[] = [
-  { hex: '#8B4513', label: { ru: 'Коньяк', uk: 'Коньяк', de: 'Cognac' } },
-  { hex: '#5C1A1B', label: { ru: 'Оксблад', uk: 'Оксблад', de: 'Oxblood' } },
-  { hex: '#3B2314', label: { ru: 'Эспрессо', uk: 'Еспресо', de: 'Espresso' } },
-  { hex: '#B87333', label: { ru: 'Тан', uk: 'Тан', de: 'Tan' } },
-  { hex: '#1B2A4A', label: { ru: 'Нэви', uk: 'Неві', de: 'Navy' } },
-  { hex: '#3D4B3A', label: { ru: 'Олива', uk: 'Олива', de: 'Olive' } },
-  { hex: '#2B2B2B', label: { ru: 'Графит', uk: 'Графіт', de: 'Graphit' } },
-  { hex: '#D6C7B2', label: { ru: 'Краст', uk: 'Краст', de: 'Natur' } },
+  // Классическая база
+  { hex: '#3E2417', group: 'classic', label: { ru: 'Шоколад', uk: 'Шоколад', de: 'Espresso' } },
+  { hex: '#8B4513', group: 'classic', label: { ru: 'Коньяк', uk: 'Коньяк', de: 'Cognac' } },
+  { hex: '#B57236', group: 'classic', label: { ru: 'Тан', uk: 'Тан', de: 'Tan' } },
+  { hex: '#5A1E22', group: 'classic', label: { ru: 'Оксблад', uk: 'Оксблад', de: 'Oxblood' } },
+  { hex: '#1C1B1A', group: 'classic', label: { ru: 'Jet Black', uk: 'Jet Black', de: 'Jet Black' } },
+  { hex: '#D6C7B2', group: 'classic', label: { ru: 'Краст', uk: 'Краст', de: 'Natur' } },
+  // Сложные и акцентные оттенки
+  { hex: '#212D40', group: 'accent', label: { ru: 'Нэви', uk: 'Неві', de: 'Navy' } },
+  { hex: '#243A2C', group: 'accent', label: { ru: 'Хвойный', uk: 'Хвойний', de: 'Racing Green' } },
+  { hex: '#8C7D6E', group: 'accent', label: { ru: 'Тауп / Минк', uk: 'Тауп / Мінк', de: 'Taupe / Mink' } },
+  { hex: '#B68856', group: 'accent', label: { ru: 'Кэмел', uk: 'Кемел', de: 'Camel' } },
+  { hex: '#C9B292', group: 'accent', label: { ru: 'Песочный', uk: 'Пісочний', de: 'Sand' } },
+  { hex: '#3D4B3A', group: 'accent', label: { ru: 'Олива', uk: 'Олива', de: 'Olive' } },
 ]
+
+// Физические пределы реальных пигментов для кожи (исключают кислотный RGB-неон)
+const MAX_PIGMENT_S = 0.76
+const MIN_PIGMENT_V = 0.1
+const MAX_PIGMENT_V = 0.94
 
 const MATCH_COPY: Record<
   Lang,
   {
     customColorBtn: string
     hidePickerBtn: string
+    classicGroup: string
+    accentGroup: string
+    gamutNote: string
     hueLabel: string
     paletteSummary: string
     filterBtn: string
@@ -44,6 +59,9 @@ const MATCH_COPY: Record<
   ru: {
     customColorBtn: 'Свой цвет',
     hidePickerBtn: 'Скрыть',
+    classicGroup: 'Классическая база',
+    accentGroup: 'Сложные и акцентные',
+    gamutNote: 'Пигментный охват (без компьютерного неона)',
     hueLabel: 'Оттенок',
     paletteSummary: 'Палитра поиска',
     filterBtn: 'Фильтр',
@@ -54,6 +72,9 @@ const MATCH_COPY: Record<
   uk: {
     customColorBtn: 'Свій колір',
     hidePickerBtn: 'Сховати',
+    classicGroup: 'Класична база',
+    accentGroup: 'Складні та акцентні',
+    gamutNote: 'Пігментне охоплення (без компʼютерного неону)',
     hueLabel: 'Відтінок',
     paletteSummary: 'Палітра пошуку',
     filterBtn: 'Фільтр',
@@ -64,6 +85,9 @@ const MATCH_COPY: Record<
   de: {
     customColorBtn: 'Eigene Farbe',
     hidePickerBtn: 'Schließen',
+    classicGroup: 'Klassische Basis',
+    accentGroup: 'Komplexe Akzenttöne',
+    gamutNote: 'Pigment-Farbraum (ohne Computer-Neon)',
     hueLabel: 'Farbton',
     paletteSummary: 'Suchpalette',
     filterBtn: 'Filter',
@@ -79,9 +103,17 @@ interface HSV {
   v: number
 }
 
+function clampPigmentHsv(hsv: HSV): HSV {
+  return {
+    h: ((Math.round(hsv.h) % 360) + 360) % 360,
+    s: Math.max(0, Math.min(MAX_PIGMENT_S, hsv.s)),
+    v: Math.max(MIN_PIGMENT_V, Math.min(MAX_PIGMENT_V, hsv.v)),
+  }
+}
+
 function hexToHsv(hex: string): HSV {
   const clean = hex.replace(/^#/, '')
-  if (clean.length !== 6) return { h: 25, s: 0.86, v: 0.55 }
+  if (clean.length !== 6) return { h: 25, s: 0.72, v: 0.55 }
   const r = parseInt(clean.slice(0, 2), 16) / 255
   const g = parseInt(clean.slice(2, 4), 16) / 255
   const b = parseInt(clean.slice(4, 6), 16) / 255
@@ -99,9 +131,10 @@ function hexToHsv(hex: string): HSV {
 }
 
 function hsvToHex(h: number, s: number, v: number): string {
-  const safeH = ((h % 360) + 360) % 360
-  const safeS = Math.max(0, Math.min(1, s))
-  const safeV = Math.max(0, Math.min(1, v))
+  const clamped = clampPigmentHsv({ h, s, v })
+  const safeH = clamped.h
+  const safeS = clamped.s
+  const safeV = clamped.v
   const c = safeV * safeS
   const x = c * (1 - Math.abs(((safeH / 60) % 2) - 1))
   const m = safeV - c
@@ -180,7 +213,7 @@ export function MatchingPanel({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string>('ALL')
-  const [hsv, setHsv] = useState<HSV>(() => hexToHsv(validColorValue))
+  const [hsv, setHsv] = useState<HSV>(() => clampPigmentHsv(hexToHsv(validColorValue)))
   const [draggingSV, setDraggingSV] = useState(false)
   const [showFloatingBar, setShowFloatingBar] = useState(false)
 
@@ -190,7 +223,7 @@ export function MatchingPanel({
 
   useEffect(() => {
     if (/^#[0-9A-Fa-f]{6}$/.test(targetHex) && !draggingSV) {
-      setHsv(hexToHsv(targetHex))
+      setHsv(clampPigmentHsv(hexToHsv(targetHex)))
     }
   }, [targetHex, draggingSV])
 
@@ -219,8 +252,10 @@ export function MatchingPanel({
   const updateSVFromPointer = (clientX: number, clientY: number) => {
     const rect = svBoxRef.current?.getBoundingClientRect()
     if (!rect || rect.width <= 0 || rect.height <= 0) return
-    const s = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    const v = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height))
+    const normX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const normY = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height))
+    const s = normX * MAX_PIGMENT_S
+    const v = MIN_PIGMENT_V + normY * (MAX_PIGMENT_V - MIN_PIGMENT_V)
     const next: HSV = { h: hsv.h, s, v }
     setHsv(next)
     onTargetHexChange(hsvToHex(next.h, next.s, next.v))
@@ -267,9 +302,63 @@ export function MatchingPanel({
     return recipeResult.recipe.reduce((acc, item) => acc + item.ml, 0)
   }, [recipeResult])
 
+  const classicPresets = LEATHER_PRESETS.filter((p) => p.group === 'classic')
+  const accentPresets = LEATHER_PRESETS.filter((p) => p.group === 'accent')
+
+  const pointerX = Math.max(0, Math.min(100, (hsv.s / MAX_PIGMENT_S) * 100))
+  const pointerY = Math.max(
+    0,
+    Math.min(100, (1 - (hsv.v - MIN_PIGMENT_V) / (MAX_PIGMENT_V - MIN_PIGMENT_V)) * 100)
+  )
+
+  const hueEdgeHex = hsvToHex(hsv.h, MAX_PIGMENT_S, MAX_PIGMENT_V)
+  const neutralLightHex = hsvToHex(hsv.h, 0, MAX_PIGMENT_V)
+  const deepDarkHex = hsvToHex(hsv.h, MAX_PIGMENT_S * 0.4, MIN_PIGMENT_V)
+
+  const renderPresetRow = (title: string, list: LeatherPreset[]) => (
+    <div className="space-y-1.5">
+      <div className="text-[10.5px] font-sans uppercase tracking-[0.12em] opacity-55">
+        {title}
+      </div>
+      <div className="flex flex-wrap gap-x-3.5 gap-y-2">
+        {list.map((preset) => {
+          const active = targetHex.toUpperCase() === preset.hex
+          return (
+            <button
+              key={preset.hex}
+              type="button"
+              onClick={() => {
+                hapticSelect()
+                onTargetHexChange(preset.hex)
+              }}
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-sans cursor-pointer bg-transparent border-none p-0"
+              style={{
+                color: active
+                  ? 'var(--color-ink, #F4F0E8)'
+                  : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 68%, transparent)',
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              <span
+                className="w-4 h-4 rounded-full shrink-0"
+                style={{
+                  backgroundColor: preset.hex,
+                  boxShadow: active
+                    ? '0 0 0 2px var(--color-surface, #141416), 0 0 0 3.5px var(--color-accent, #C9A86A)'
+                    : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
+                }}
+              />
+              <span>{preset.label[lang]}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   return (
     <div className="flex flex-col gap-5 relative">
-      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА (без тяжёлого backdrop-blur) */}
+      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА */}
       <AnimatePresence>
         {showFloatingBar && (
           <motion.div
@@ -423,6 +512,11 @@ export function MatchingPanel({
                 className="overflow-hidden"
               >
                 <div className="pt-1 flex flex-col gap-3">
+                  <div className="text-[11px] font-sans font-medium" style={{ color: 'var(--color-accent, #C9A86A)' }}>
+                    {copy.gamutNote}
+                  </div>
+
+                  {/* Gamut-safe пигментный SV-квадрат (без кислотного неона) */}
                   <div
                     ref={svBoxRef}
                     onPointerDown={(e) => {
@@ -437,18 +531,17 @@ export function MatchingPanel({
                     }}
                     onPointerUp={() => setDraggingSV(false)}
                     onPointerCancel={() => setDraggingSV(false)}
-                    className="relative w-full h-48 rounded-xl overflow-hidden select-none touch-none cursor-crosshair border border-black/15"
+                    className="relative w-full h-44 rounded-xl overflow-hidden select-none touch-none cursor-crosshair border border-black/15"
                     style={{
-                      backgroundColor: `hsl(${hsv.h}, 100%, 50%)`,
-                      backgroundImage:
-                        'linear-gradient(to top, #000000, transparent), linear-gradient(to right, #FFFFFF, transparent)',
+                      backgroundColor: hueEdgeHex,
+                      backgroundImage: `linear-gradient(to top, ${deepDarkHex}, transparent), linear-gradient(to right, ${neutralLightHex}, transparent)`,
                     }}
                   >
                     <span
                       className="absolute w-5 h-5 rounded-full pointer-events-none border-2 border-white"
                       style={{
-                        left: `${hsv.s * 100}%`,
-                        top: `${(1 - hsv.v) * 100}%`,
+                        left: `${pointerX}%`,
+                        top: `${pointerY}%`,
                         transform: `translate(-50%, -50%) scale(${draggingSV ? 1.15 : 1})`,
                         backgroundColor: validColorValue,
                         boxShadow: '0 0 0 1.5px rgba(0,0,0,0.45)',
@@ -456,6 +549,7 @@ export function MatchingPanel({
                     />
                   </div>
 
+                  {/* Шкала оттенков в реальном пигментном спектре */}
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between text-[12px] font-sans opacity-65">
                       <span>{copy.hueLabel}</span>
@@ -466,14 +560,14 @@ export function MatchingPanel({
                         className="w-full h-2.5 rounded-full border border-black/15"
                         style={{
                           background:
-                            'linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)',
+                            'linear-gradient(to right, hsl(0,55%,48%) 0%, hsl(40,58%,50%) 14%, hsl(75,45%,48%) 26%, hsl(135,40%,42%) 40%, hsl(190,46%,44%) 54%, hsl(225,50%,45%) 67%, hsl(280,42%,45%) 80%, hsl(335,52%,48%) 92%, hsl(0,55%,48%) 100%)',
                         }}
                       />
                       <span
                         className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full pointer-events-none border-2 border-white"
                         style={{
                           left: `${(hsv.h / 360) * 100}%`,
-                          backgroundColor: `hsl(${hsv.h}, 100%, 50%)`,
+                          backgroundColor: hueEdgeHex,
                           boxShadow: '0 0 0 1px rgba(0,0,0,0.35)',
                         }}
                       />
@@ -494,36 +588,10 @@ export function MatchingPanel({
             )}
           </AnimatePresence>
 
-          <div className="flex flex-wrap gap-x-4 gap-y-2.5 pt-1">
-            {LEATHER_PRESETS.map((preset) => {
-              const active = targetHex.toUpperCase() === preset.hex
-              return (
-                <button
-                  key={preset.hex}
-                  type="button"
-                  onClick={() => {
-                    hapticSelect()
-                    onTargetHexChange(preset.hex)
-                  }}
-                  className="inline-flex items-center gap-2 text-[12.5px] font-sans cursor-pointer bg-transparent border-none p-0"
-                  style={{
-                    color: active ? 'var(--color-ink, #F4F0E8)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 68%, transparent)',
-                    fontWeight: active ? 600 : 400,
-                  }}
-                >
-                  <span
-                    className="w-4 h-4 rounded-full shrink-0"
-                    style={{
-                      backgroundColor: preset.hex,
-                      boxShadow: active
-                        ? '0 0 0 2px var(--color-surface, #141416), 0 0 0 3.5px var(--color-accent, #C9A86A)'
-                        : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
-                    }}
-                  />
-                  <span>{preset.label[lang]}</span>
-                </button>
-              )
-            })}
+          {/* Карта реальных обувных кож */}
+          <div className="space-y-3 pt-1">
+            {renderPresetRow(copy.classicGroup, classicPresets)}
+            {renderPresetRow(copy.accentGroup, accentPresets)}
           </div>
         </div>
 
