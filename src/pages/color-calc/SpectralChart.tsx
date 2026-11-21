@@ -206,12 +206,23 @@ export function sampleSeriesAtIndex(
   spectrum: SpectrumPoint[],
   index: number,
   mode: SpectralChartMode = 'reflectance'
-): number {
-  if (!spectrum.length) return 0
+): { wavelength: number; reflectance: number; ks: number; value: number } {
+  if (!spectrum.length) {
+    return { wavelength: WL_START, reflectance: 0, ks: 0, value: 0 }
+  }
   const clampedIdx = Math.max(0, Math.min(spectrum.length - 1, Math.round(index)))
-  const r = spectrum[clampedIdx]?.reflectance ?? 0
-  return mode === 'reflectance' ? r : reflectanceToKS(r)
+  const pt = spectrum[clampedIdx]
+  const wavelength = pt?.wavelength ?? WL_START + clampedIdx * WL_STEP
+  const reflectance = pt?.reflectance ?? 0
+  const ks = reflectanceToKS(reflectance)
+  return {
+    wavelength,
+    reflectance,
+    ks,
+    value: mode === 'ks' ? ks : reflectance,
+  }
 }
+
 
 interface SpectralChartProps {
   primarySpectrum: SpectrumPoint[] | null
