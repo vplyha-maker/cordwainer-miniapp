@@ -1,4 +1,13 @@
 import { getRelativeLuminance, normalizeHex } from './colorEngine'
+import {
+  hapticHarmony,
+  hapticReset,
+  hapticSave,
+  hapticSwatch,
+  hapticTap,
+  isHapticsEnabled,
+  setHapticsEnabled,
+} from './haptics'
 
 export type ThemeMode = 'day' | 'night' | 'auto'
 
@@ -94,7 +103,6 @@ export const NIGHT_TOKENS: ThemeTokens = {
 
 const THEME_KEY = 'cordwainer_theme_mode_v1'
 const STUDIO_BG_KEY = 'cordwainer_studio_bg_v2'
-const HAPTICS_KEY = 'cordwainer_haptics_v1'
 
 export function loadThemeMode(): ThemeMode {
   try {
@@ -104,7 +112,7 @@ export function loadThemeMode(): ThemeMode {
     if (legacy === 'light') return 'day'
     if (legacy === 'dark') return 'night'
   } catch {
-    // ignore storage errors
+    // ignore
   }
   return 'auto'
 }
@@ -116,7 +124,7 @@ export function saveThemeMode(mode: ThemeMode): void {
     else if (mode === 'night') localStorage.setItem('cordwainer_theme', 'dark')
     else localStorage.removeItem('cordwainer_theme')
   } catch {
-    // ignore storage errors
+    // ignore
   }
 }
 
@@ -153,7 +161,7 @@ export function loadStudioBg(): StudioBgConfig {
       }
     }
   } catch {
-    // ignore storage errors
+    // ignore
   }
   return DEFAULT_STUDIO_BG
 }
@@ -162,7 +170,7 @@ export function saveStudioBg(cfg: StudioBgConfig): void {
   try {
     localStorage.setItem(STUDIO_BG_KEY, JSON.stringify(cfg))
   } catch {
-    // ignore storage errors
+    // ignore
   }
 }
 
@@ -177,107 +185,20 @@ export function isStudioBgDark(hex: string): boolean {
 }
 
 export function loadHapticsEnabled(): boolean {
-  try {
-    const raw = localStorage.getItem(HAPTICS_KEY)
-    if (raw === '0' || raw === 'false') return false
-  } catch {
-    // ignore
-  }
-  return true
+  return isHapticsEnabled()
 }
 
 export function saveHapticsEnabled(enabled: boolean): void {
-  try {
-    localStorage.setItem(HAPTICS_KEY, enabled ? '1' : '0')
-  } catch {
-    // ignore
-  }
+  setHapticsEnabled(enabled)
 }
 
 export type HapticKind = 'tap' | 'select' | 'harmony' | 'save' | 'reset'
 
-let lastHapticAt = 0
-let sharedAudioCtx: AudioContext | null = null
-
-function playMicroPulse(freqStart: number, freqEnd: number, durationSec: number): void {
-  try {
-    const W = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
-    const Ctor = W.AudioContext || W.webkitAudioContext
-    if (!Ctor) return
-    if (!sharedAudioCtx) {
-      sharedAudioCtx = new Ctor()
-    }
-    if (sharedAudioCtx.state === 'suspended') {
-      void sharedAudioCtx.resume()
-    }
-    const now = sharedAudioCtx.currentTime
-    const osc = sharedAudioCtx.createOscillator()
-    const gain = sharedAudioCtx.createGain()
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(freqStart, now)
-    osc.frequency.exponentialRampToValueAtTime(freqEnd, now + durationSec)
-    gain.gain.setValueAtTime(0.035, now)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec)
-    osc.connect(gain)
-    gain.connect(sharedAudioCtx.destination)
-    osc.start(now)
-    osc.stop(now + durationSec)
-  } catch {
-    // ignore
-  }
-}
-
 export function triggerHaptic(kind: HapticKind, enabled = true): void {
-  if (!enabled || typeof window === 'undefined') return
-  const now = Date.now()
-  if (now - lastHapticAt < 45) return
-  lastHapticAt = now
-
-  try {
-    const tg = (
-      window as unknown as {
-        Telegram?: {
-          WebApp?: {
-            HapticFeedback?: {
-              impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
-              selectionChanged?: () => void
-              notificationOccurred?: (type: 'error' | 'success' | 'warning') => void
-            }
-          }
-        }
-        TelegramWebviewProxy?: { postEvent?: (eventType: string, eventData: string) => void }
-      }
-    )
-
-    const hf = tg.Telegram?.WebApp?.HapticFeedback
-    if (hf) {
-      if (kind === 'select') hf.selectionChanged?.()
-      else if (kind === 'save') hf.notificationOccurred?.('success')
-      else if (kind === 'reset') hf.notificationOccurred?.('warning')
-      else if (kind === 'harmony') hf.impactOccurred?.('medium')
-      else hf.impactOccurred?.('light')
-    }
-
-    if (tg.TelegramWebviewProxy?.postEvent) {
-      const style = kind === 'save' ? 'heavy' : kind === 'select' ? 'light' : 'medium'
-      tg.TelegramWebviewProxy.postEvent(
-        'web_app_trigger_haptic_feedback',
-        JSON.stringify({ type: 'impact', impact_style: style })
-      )
-    }
-
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      if (kind === 'select') navigator.vibrate(14)
-      else if (kind === 'tap') navigator.vibrate(18)
-      else if (kind === 'harmony') navigator.vibrate([18, 22, 18])
-      else if (kind === 'save') navigator.vibrate([22, 28, 32])
-      else if (kind === 'reset') navigator.vibrate([16, 20, 24])
-    }
-
-    if (kind === 'save') playMicroPulse(190, 62, 0.045)
-    else if (kind === 'reset') playMicroPulse(150, 44, 0.04)
-    else playMicroPulse(170, 48, 0.028)
-  } catch {
-    // ignore
-  }
+  if (!enabled) return
+  if (kind === 'select') hapticSwatch()
+  else if (kind === 'harmony') hapticHarmony()
+  else if (kind === 'save') hapticSave()
+  else if (kind === 'reset') hapticReset()
+  else hapticTap()
 }
