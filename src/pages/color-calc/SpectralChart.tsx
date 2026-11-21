@@ -141,7 +141,6 @@ function getWavelengthBandName(wl: number, lang: Lang): string {
   return bands[6]
 }
 
-// Normalized Planckian SPD (0..100%) for visual illuminant overlay
 function computeNormalizedSpd(kelvin: number): number[] {
   const c2 = 1.438776877e-2
   const raw: number[] = new Array(SPECTRUM_LEN)
@@ -165,7 +164,7 @@ export function reflectanceToKS(rPct: number): number {
   return Math.min(ks, 40)
 }
 
-export function analyzeSpectrum(spectrum: SpectrumPoint[]): SpectrumSummary {
+export function getSpectrumSummary(spectrum: SpectrumPoint[]): SpectrumSummary {
   if (!spectrum.length) {
     return {
       peakWl: 550,
@@ -201,6 +200,31 @@ export function analyzeSpectrum(spectrum: SpectrumPoint[]): SpectrumSummary {
     minReflectance: Math.round(minReflectance * 10) / 10,
     meanReflectance: Math.round((sum / spectrum.length) * 10) / 10,
   }
+}
+
+export function sampleSeriesAtIndex(
+  series: SpectralSeries[],
+  index: number,
+  mode: SpectralChartMode = 'reflectance'
+) {
+  const clampedIdx = Math.max(0, Math.min(SPECTRUM_LEN - 1, Math.round(index)))
+  const wavelength = WL_START + clampedIdx * WL_STEP
+  const values = series.map((s) => {
+    const pt = s.spectrum[clampedIdx]
+    const r = pt ? pt.reflectance : 0
+    const value =
+      mode === 'reflectance'
+        ? Math.round(r * 10) / 10
+        : Math.round(reflectanceToKS(r) * 100) / 100
+    return {
+      id: s.id,
+      label: s.label,
+      color: s.color,
+      value,
+      isPrimary: s.isPrimary,
+    }
+  })
+  return { wavelength, values }
 }
 
 interface SpectralChartProps {
@@ -241,7 +265,7 @@ export function SpectralChart({
   const illumMeta = ILLUMINANT_META[illuminant] || ILLUMINANT_META.D65
 
   const summary = useMemo(
-    () => (primarySpectrum && primarySpectrum.length ? analyzeSpectrum(primarySpectrum) : null),
+    () => (primarySpectrum && primarySpectrum.length ? getSpectrumSummary(primarySpectrum) : null),
     [primarySpectrum]
   )
 
@@ -721,7 +745,6 @@ export function SpectralChart({
       className="rounded-2xl border p-4 sm:p-5"
       style={{ backgroundColor: cardBg, borderColor: border, color: ink }}
     >
-      {/* Header + R(λ)/K/S(λ) Toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3.5">
         <div>
           <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em]">
@@ -787,7 +810,6 @@ export function SpectralChart({
         </div>
       </div>
 
-      {/* Reference Overlay Toggles */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <button
           type="button"
@@ -853,14 +875,12 @@ export function SpectralChart({
         )}
       </div>
 
-      {/* Chart Canvas */}
       <div
         ref={chartElRef}
         style={{ height: `${height}px`, width: '100%', touchAction: 'pan-y' }}
         className="select-none"
       />
 
-      {/* Calibrated Visible Spectrum Bar (380-780 nm) */}
       <div
         className="mt-0.5 mb-3"
         style={{
@@ -877,7 +897,6 @@ export function SpectralChart({
         />
       </div>
 
-      {/* Band Zoom Strip */}
       <div
         className="grid grid-cols-4 gap-1.5 p-1 rounded-xl border"
         style={{ backgroundColor: softBg, borderColor: border }}
@@ -912,7 +931,6 @@ export function SpectralChart({
         {primarySpectrum && primarySpectrum.length ? ui.hint : ui.empty}
       </p>
 
-      {/* Laboratory Readout Strip */}
       {summary && (
         <div
           className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-4 border-t"
@@ -1004,8 +1022,8 @@ export function SpectralChart({
 }
 
 interface SpectralSparklineProps {
-  spectrum: SpectrumPoint[]
-  color: string
+  spectrum?: SpectrumPoint[] | null
+  color?: string
   width?: number
   height?: number
   className?: string
@@ -1013,7 +1031,7 @@ interface SpectralSparklineProps {
 
 export function SpectralSparkline({
   spectrum,
-  color,
+  color = '#9a723c',
   width = 56,
   height = 22,
   className = '',
