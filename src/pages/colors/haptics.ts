@@ -74,12 +74,16 @@ export function isHapticsEnabled(): boolean {
 export function setHapticsEnabled(enabled: boolean): void {
   try {
     localStorage.setItem(HAPTICS_STORAGE_KEY, enabled ? '1' : '0')
-  } catch {}
+  } catch {
+    // ignore
+  }
   try {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(HAPTICS_EVENT, { detail: enabled }))
     }
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
 export function useHapticsSetting(): [boolean, (next: boolean) => void] {
@@ -106,16 +110,16 @@ export function useHapticsSetting(): [boolean, (next: boolean) => void] {
   return [enabled, update]
 }
 
-// Канал 1: navigator.vibrate() — длительности >= 14–18ms выше порога раскрутки мотора Android
 function fireNavigatorVibrate(pattern: number | number[]): void {
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate(pattern)
     }
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
-// Канал 2: TelegramWebviewProxy.postEvent для Android (One UI / HyperOS)
 function fireTelegramProxy(
   payload:
     | { type: 'impact'; impact_style: 'light' | 'medium' | 'heavy' }
@@ -127,11 +131,38 @@ function fireTelegramProxy(
     if (proxy && typeof proxy.postEvent === 'function') {
       proxy.postEvent('web_app_trigger_haptic_feedback', JSON.stringify(payload))
     }
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
-// Канал 3: Резервный Web Audio API микро-импульс (суббас 175 -> 46 Гц + короткий клик)
-function fireAudioMicroImpulse(strength: 'soft' | 'tap' | 'confirm'): void {
+function scheduleTick(
+  ctx: AudioContext,
+  startAt: number,
+  freqStart: number,
+  freqEnd: number,
+  durationSec: number,
+  peakGain: number,
+  type: OscillatorType
+): void {
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  osc.type = type
+  osc.frequency.setValueAtTime(freqStart, startAt)
+  osc.frequency.exponentialRampToValueAtTime(freqEnd, startAt + durationSec)
+
+  gain.gain.setValueAtTime(0.0001, startAt)
+  gain.gain.linearRampToValueAtTime(peakGain, startAt + 0.0018)
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + durationSec)
+
+  osc.connect(gain)
+  gain.connect(ctx.destination)
+  osc.start(startAt)
+  osc.stop(startAt + durationSec + 0.005)
+}
+
+// Слышимый на динамике Android тактильный механический щелчок (520–2200 Гц)
+function fireAudioClick(strength: 'soft' | 'tap' | 'confirm' | 'reset'): void {
   try {
     const ctx = ensureAudioUnlocked()
     if (!ctx) return
@@ -139,28 +170,21 @@ function fireAudioMicroImpulse(strength: 'soft' | 'tap' | 'confirm'): void {
     const play = () => {
       try {
         const now = ctx.currentTime
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-
-        const peakGain = strength === 'confirm' ? 0.09 : strength === 'tap' ? 0.065 : 0.042
-        const startFreq = strength === 'confirm' ? 210 : 175
-        const endFreq = 46
-        const duration = strength === 'confirm' ? 0.036 : 0.022
-
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(startFreq, now)
-        osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration)
-
-        gain.gain.setValueAtTime(0.0001, now)
-        gain.gain.linearRampToValueAtTime(peakGain, now + 0.0025)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
-
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-
-        osc.start(now)
-        osc.stop(now + duration + 0.006)
-      } catch {}
+        if (strength === 'soft') {
+          scheduleTick(ctx, now, 1450, 620, 0.012, 0.14, 'triangle')
+        } else if (strength === 'tap') {
+          scheduleTick(ctx, now, 1850, 540, 0.016, 0.22, 'triangle')
+          scheduleTick(ctx, now, 420, 180, 0.02, 0.14, 'sine')
+        } else if (strength === 'reset') {
+          scheduleTick(ctx, now, 1100, 390, 0.022, 0.18, 'triangle')
+        } else {
+          // confirm: двойной чёткий щелчок
+          scheduleTick(ctx, now, 1850, 620, 0.015, 0.22, 'triangle')
+          scheduleTick(ctx, now + 0.045, 2250, 860, 0.018, 0.24, 'triangle')
+        }
+      } catch {
+        // ignore
+      }
     }
 
     if (ctx.state === 'running') {
@@ -168,7 +192,9 @@ function fireAudioMicroImpulse(strength: 'soft' | 'tap' | 'confirm'): void {
     } else if (ctx.state === 'suspended') {
       void ctx.resume().then(play).catch(() => {})
     }
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
 export function triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'medium'): void {
@@ -177,10 +203,12 @@ export function triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'medium'): v
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     tgHaptic?.impactOccurred?.(tgStyle)
-  } catch {}
+  } catch {
+    // ignore
+  }
   fireTelegramProxy({ type: 'impact', impact_style: tgStyle })
   fireNavigatorVibrate(style === 'heavy' ? 26 : style === 'medium' ? 18 : 15)
-  fireAudioMicroImpulse(style === 'heavy' ? 'confirm' : 'tap')
+  fireAudioClick(style === 'heavy' ? 'confirm' : 'tap')
 }
 
 export function hapticTap(): void {
@@ -188,10 +216,12 @@ export function hapticTap(): void {
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     tgHaptic?.impactOccurred?.('medium')
-  } catch {}
+  } catch {
+    // ignore
+  }
   fireTelegramProxy({ type: 'impact', impact_style: 'medium' })
   fireNavigatorVibrate(18)
-  fireAudioMicroImpulse('tap')
+  fireAudioClick('tap')
 }
 
 export function hapticSwatch(): void {
@@ -204,10 +234,12 @@ export function hapticSwatch(): void {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     tgHaptic?.impactOccurred?.('light')
     tgHaptic?.selectionChanged?.()
-  } catch {}
+  } catch {
+    // ignore
+  }
   fireTelegramProxy({ type: 'impact', impact_style: 'light' })
   fireNavigatorVibrate(14)
-  fireAudioMicroImpulse('soft')
+  fireAudioClick('soft')
 }
 
 export function hapticHarmony(): void {
@@ -215,10 +247,12 @@ export function hapticHarmony(): void {
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     tgHaptic?.impactOccurred?.('heavy')
-  } catch {}
+  } catch {
+    // ignore
+  }
   fireTelegramProxy({ type: 'impact', impact_style: 'heavy' })
   fireNavigatorVibrate([18, 22, 18])
-  fireAudioMicroImpulse('confirm')
+  fireAudioClick('confirm')
 }
 
 export function hapticModel(): void {
@@ -226,10 +260,12 @@ export function hapticModel(): void {
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     tgHaptic?.impactOccurred?.('heavy')
-  } catch {}
+  } catch {
+    // ignore
+  }
   fireTelegramProxy({ type: 'impact', impact_style: 'heavy' })
   fireNavigatorVibrate([20, 20, 16])
-  fireAudioMicroImpulse('confirm')
+  fireAudioClick('confirm')
 }
 
 export function hapticSave(): void {
@@ -237,10 +273,12 @@ export function hapticSave(): void {
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     tgHaptic?.notificationOccurred?.('success')
-  } catch {}
+  } catch {
+    // ignore
+  }
   fireTelegramProxy({ type: 'notification', notification_type: 'success' })
   fireNavigatorVibrate([22, 28, 32])
-  fireAudioMicroImpulse('confirm')
+  fireAudioClick('confirm')
 }
 
 export function hapticReset(): void {
@@ -248,8 +286,10 @@ export function hapticReset(): void {
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     tgHaptic?.notificationOccurred?.('warning')
-  } catch {}
+  } catch {
+    // ignore
+  }
   fireTelegramProxy({ type: 'notification', notification_type: 'warning' })
   fireNavigatorVibrate([24, 24, 16])
-  fireAudioMicroImpulse('tap')
+  fireAudioClick('reset')
 }
