@@ -16,6 +16,11 @@ import {
   triggerHaptic,
 } from './themeSystem'
 
+function sanitizeHexDraft(raw: string): string {
+  const hexOnly = raw.replace(/[^0-9a-fA-F]/g, '').slice(0, 6).toUpperCase()
+  return '#' + hexOnly
+}
+
 type ToneControlCardProps = {
   t: ColorsTranslation
   tokens: ThemeTokens
@@ -217,13 +222,18 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
   }, [soleConfig.customHex])
 
   const handleCustomHex = (raw: string) => {
-    const cleaned = raw.startsWith('#') ? raw : '#' + raw
-    setHexDraft(cleaned.toUpperCase())
-    const normalized = normalizeHex(cleaned, '')
-    if (normalized) {
-      onChangeSole({ presetId: 'custom', customHex: normalized })
+    const cleaned = sanitizeHexDraft(raw)
+    setHexDraft(cleaned)
+    if (cleaned.length === 7) {
+      const normalized = normalizeHex(cleaned, '')
+      if (normalized) {
+        onChangeSole({ presetId: 'custom', customHex: normalized })
+      }
     }
   }
+
+  const inputBg = tokens.isDark ? '#1B1B1E' : '#FFFFFF'
+  const inputInk = tokens.isDark ? '#F4F0E8' : '#181613'
 
   return (
     <div className="space-y-4">
@@ -320,7 +330,7 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
                     setHexDraft(tone)
                     onChangeSole({ presetId: 'custom', customHex: tone })
                   }}
-                  className="w-6 h-6 rounded-full border transition-transform"
+                  className="w-6 h-6 rounded-full border"
                   style={{
                     backgroundColor: tone,
                     borderColor: active ? tokens.activeTintBorder : tokens.strongBorder,
@@ -342,15 +352,21 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
           />
           <input
             type="text"
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
             value={hexDraft}
             onChange={(e) => handleCustomHex(e.target.value)}
             maxLength={7}
             spellCheck={false}
-            className="w-[96px] px-3 py-1.5 rounded-lg border text-[13px] font-mono uppercase tracking-wider focus:outline-none"
+            placeholder="#FAF8F4"
+            className="w-[104px] px-3 py-2 rounded-lg border text-[13px] font-mono font-semibold uppercase tracking-wider focus:outline-none"
             style={{
-              backgroundColor: tokens.elevatedBg,
+              backgroundColor: inputBg,
               borderColor: soleConfig.presetId === 'custom' ? tokens.activeTintBorder : tokens.strongBorder,
-              color: tokens.ink,
+              color: inputInk,
+              WebkitTextFillColor: inputInk,
+              opacity: 1,
             }}
           />
         </div>
@@ -383,13 +399,18 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
   }, [studioBg.customHex])
 
   const handleCustomHex = (raw: string) => {
-    const cleaned = raw.startsWith('#') ? raw : '#' + raw
-    setHexDraft(cleaned.toUpperCase())
-    const normalized = normalizeHex(cleaned, '')
-    if (normalized) {
-      onChangeStudioBg({ ...studioBg, id: 'custom', customHex: normalized })
+    const cleaned = sanitizeHexDraft(raw)
+    setHexDraft(cleaned)
+    if (cleaned.length === 7) {
+      const normalized = normalizeHex(cleaned, '')
+      if (normalized) {
+        onChangeStudioBg({ ...studioBg, id: 'custom', customHex: normalized })
+      }
     }
   }
+
+  const inputBg = tokens.isDark ? '#1B1B1E' : '#FFFFFF'
+  const inputInk = tokens.isDark ? '#F4F0E8' : '#181613'
 
   return (
     <div className="space-y-4">
@@ -493,15 +514,21 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
           </div>
           <input
             type="text"
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
             value={hexDraft}
             onChange={(e) => handleCustomHex(e.target.value)}
             maxLength={7}
             spellCheck={false}
-            className="w-[96px] px-3 py-1.5 rounded-lg border text-[13px] font-mono uppercase tracking-wider focus:outline-none"
+            placeholder="#F4F1EA"
+            className="w-[104px] px-3 py-2 rounded-lg border text-[13px] font-mono font-semibold uppercase tracking-wider focus:outline-none"
             style={{
-              backgroundColor: tokens.elevatedBg,
+              backgroundColor: inputBg,
               borderColor: tokens.activeTintBorder,
-              color: tokens.ink,
+              color: inputInk,
+              WebkitTextFillColor: inputInk,
+              opacity: 1,
             }}
           />
         </div>
@@ -578,7 +605,7 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
   onOpenGuide,
 }) => {
   return (
-    <div className="space-y-7 pb-8">
+    <div className="space-y-7 pb-10">
       <section>
         <StudioBgCard
           t={t}
