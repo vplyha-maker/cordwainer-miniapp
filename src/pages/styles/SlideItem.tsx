@@ -379,12 +379,12 @@ export function SlideItem({
   }
 
   const actionButtons = (
-    <div className="flex items-center gap-2.5 shrink-0">
+    <div className="flex items-center gap-2 shrink-0">
       <button
         type="button"
         onClick={onToggleMute}
         aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
-        className="w-11 h-11 rounded-[6px] border border-[#F4F0E8]/20 bg-[#141312] flex items-center justify-center text-[#F4F0E8] hover:border-[#C9A97E]/60 active:scale-95 transition-colors cursor-pointer"
+        className="w-10 h-10 rounded-full border border-[#F4F0E8]/12 bg-[#0B0B0A]/45 backdrop-blur-md flex items-center justify-center text-[#F4F0E8]/95 hover:border-[#C9A97E]/50 hover:bg-[#0B0B0A]/65 active:scale-95 transition-all cursor-pointer"
       >
         {isMuted ? (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -405,22 +405,23 @@ export function SlideItem({
         onClick={() => void triggerLikeRequest(false)}
         aria-label="Нравится"
         className={`
-          h-11 px-3.5 min-w-[44px] rounded-[6px] border flex items-center justify-center gap-2
-          active:scale-95 transition-colors cursor-pointer
+          h-10 min-w-[40px] rounded-full border backdrop-blur-md flex items-center justify-center gap-1.5
+          active:scale-95 transition-all cursor-pointer
+          ${likesCount > 0 ? 'px-3.5' : 'px-0 w-10'}
           ${
             isLiked
               ? 'border-[#C9A97E] bg-[#C9A97E] text-[#0B0B0A]'
-              : 'border-[#F4F0E8]/20 bg-[#141312] text-[#F4F0E8] hover:border-[#C9A97E]/60'
+              : 'border-[#F4F0E8]/12 bg-[#0B0B0A]/45 text-[#F4F0E8]/95 hover:border-[#C9A97E]/50 hover:bg-[#0B0B0A]/65'
           }
         `}
       >
         <svg
-          width="16"
-          height="16"
+          width="15"
+          height="15"
           viewBox="0 0 24 24"
           fill={isLiked ? 'currentColor' : 'none'}
           stroke="currentColor"
-          strokeWidth="1.6"
+          strokeWidth="1.7"
         >
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
@@ -435,9 +436,9 @@ export function SlideItem({
         type="button"
         onClick={() => void handleShare()}
         aria-label="Поделиться"
-        className="w-11 h-11 rounded-[6px] border border-[#F4F0E8]/20 bg-[#141312] flex items-center justify-center text-[#F4F0E8] hover:border-[#C9A97E]/60 active:scale-95 transition-colors cursor-pointer"
+        className="w-10 h-10 rounded-full border border-[#F4F0E8]/12 bg-[#0B0B0A]/45 backdrop-blur-md flex items-center justify-center text-[#F4F0E8]/95 hover:border-[#C9A97E]/50 hover:bg-[#0B0B0A]/65 active:scale-95 transition-all cursor-pointer"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
           <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
           <polyline points="16 6 12 2 8 6" />
           <line x1="12" y1="2" x2="12" y2="15" />
@@ -449,7 +450,7 @@ export function SlideItem({
   return (
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always bg-[#0B0B0A] md:flex md:items-center md:justify-center md:px-8 md:pt-20 md:pb-8">
       <div className="relative h-full w-full md:h-auto md:max-h-[calc(100vh-112px)] md:max-w-[920px] md:grid md:grid-cols-[minmax(280px,390px)_1fr] md:gap-10 md:items-center">
-        <div className="relative h-full w-full md:h-[min(78vh,740px)] md:aspect-[9/16] md:mx-auto md:rounded-[8px] md:border md:border-[#F4F0E8]/12 overflow-hidden bg-[#141312]">
+        <div className="relative h-full w-full md:h-[min(78vh,740px)] md:aspect-[9/16] md:mx-auto md:rounded-[12px] md:border md:border-[#F4F0E8]/12 overflow-hidden bg-[#141312]">
           {!isVideoLoaded && (
             <div className="absolute inset-0 z-0 flex items-center justify-center bg-[#141312]">
               <div className="flex flex-col items-center gap-2.5">
@@ -523,7 +524,7 @@ export function SlideItem({
                 transition={{ duration: 0.18 }}
                 className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
               >
-                <div className="w-12 h-12 rounded-full bg-[#0B0B0A]/85 border border-[#F4F0E8]/25 flex items-center justify-center text-[#F4F0E8]">
+                <div className="w-12 h-12 rounded-full bg-[#0B0B0A]/65 backdrop-blur-md border border-[#F4F0E8]/20 flex items-center justify-center text-[#F4F0E8]">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5">
                     <polygon points="5 3 19 12 5 21 5 3" />
                   </svg>
@@ -532,27 +533,27 @@ export function SlideItem({
             )}
           </AnimatePresence>
 
-          <div className="md:hidden absolute top-0 left-0 right-0 h-[32%] bg-gradient-to-b from-[#0B0B0A]/85 via-[#0B0B0A]/45 to-transparent z-10 pointer-events-none" />
+          <div className="md:hidden absolute top-0 left-0 right-0 h-[30%] bg-gradient-to-b from-[#0B0B0A]/80 via-[#0B0B0A]/35 to-transparent z-10 pointer-events-none" />
           <div
             className={`md:hidden absolute bottom-0 left-0 right-0 bg-gradient-to-t z-10 pointer-events-none transition-all duration-300 ${
               isDescOpen
                 ? 'h-[48%] from-[#0B0B0A]/95 via-[#0B0B0A]/75 to-transparent'
-                : 'h-[26%] from-[#0B0B0A]/85 via-[#0B0B0A]/40 to-transparent'
+                : 'h-[26%] from-[#0B0B0A]/85 via-[#0B0B0A]/35 to-transparent'
             }`}
           />
 
-          {/* Заголовок и счётчик с безопасным отступом от верхней панели навигации */}
+          {/* Заголовок и счётчик */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
             transition={{ duration: 0.45, ease: editorialEase }}
             style={{
-              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 74px)',
+              top: 'calc(max(env(safe-area-inset-top, 0px), 14px) + 74px)',
             }}
             className="md:hidden absolute left-5 right-5 z-20 flex items-start justify-between gap-4 pointer-events-none"
           >
             <div>
-              <p className="text-xs uppercase tracking-[0.12em] text-[#C9A97E] mb-1.5">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-[#C9A97E] mb-1.5">
                 {slide.subtitle[lang]}
               </p>
               <h2 className="font-serif text-4xl leading-[1.05] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line">
@@ -569,6 +570,7 @@ export function SlideItem({
             </div>
           </motion.div>
 
+          {/* Нижняя стеклянная панель */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
@@ -586,40 +588,35 @@ export function SlideItem({
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ duration: 0.22, ease: editorialEase }}
                   onClick={toggleDesc}
-                  className="pointer-events-auto mb-3 p-4 rounded-[8px] bg-[#141312]/95 border border-[#F4F0E8]/15 cursor-pointer"
+                  className="pointer-events-auto mb-2.5 p-4 rounded-2xl bg-[#0B0B0A]/80 backdrop-blur-xl border border-[#F4F0E8]/12 cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs uppercase tracking-[0.08em] text-[#C9A97E]">
+                    <span className="text-[11px] uppercase tracking-[0.1em] text-[#C9A97E]">
                       {slide.subtitle[lang]}
                     </span>
                     <span className="text-xs text-[#A39E93]">
                       {t.hideDesc} ✕
                     </span>
                   </div>
-                  <p className="text-sm font-normal leading-[1.6] text-[#F4F0E8]">
+                  <p className="text-sm font-normal leading-[1.6] text-[#F4F0E8]/95">
                     {slide.desc[lang]}
                   </p>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <div className="flex items-center justify-between gap-3 pointer-events-auto">
+            <div className="flex items-center justify-between gap-2.5 pointer-events-auto">
               <button
                 type="button"
                 onClick={toggleDesc}
-                className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2 rounded-[6px] bg-[#141312]/90 border border-[#F4F0E8]/15 text-left active:scale-[0.99] transition-transform cursor-pointer"
+                className="flex-1 min-w-0 h-10 px-4 rounded-full bg-[#0B0B0A]/45 backdrop-blur-md border border-[#F4F0E8]/12 hover:border-[#C9A97E]/45 hover:bg-[#0B0B0A]/65 flex items-center justify-between gap-2.5 active:scale-[0.98] transition-all cursor-pointer"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs uppercase tracking-[0.08em] text-[#F4F0E8] font-medium">
-                    {t.aboutStyle}
-                  </span>
-                  <span className="text-xs text-[#C9A97E] font-medium">
-                    {isDescOpen ? '−' : '+'}
-                  </span>
-                </div>
-                <p className="text-xs text-[#A39E93] truncate mt-0.5">
-                  {slide.desc[lang]}
-                </p>
+                <span className="text-[11px] uppercase tracking-[0.1em] text-[#F4F0E8]/95 font-medium truncate">
+                  {t.aboutStyle}
+                </span>
+                <span className="text-sm text-[#C9A97E] font-light leading-none shrink-0">
+                  {isDescOpen ? '−' : '+'}
+                </span>
               </button>
 
               {actionButtons}
