@@ -3,20 +3,35 @@ export interface SpectrumPoint {
   reflectance: number
 }
 
-export interface RGB { r: number; g: number; b: number }
-export interface XYZ { x: number; y: number; z: number }
+export interface RGB {
+  r: number
+  g: number
+  b: number
+}
+
+export interface XYZ {
+  x: number
+  y: number
+  z: number
+}
+
 export type IlluminantType = 'D65' | 'A' | 'cool' | 'twilight'
 
 export interface MixComponent {
   spectrum: SpectrumPoint[]
   volume: number
   isBinder?: boolean
+  /** Опциональная измеренная красящая сила пигмента (если доступна) */
+  tintingStrength?: number
+  /** Опциональная измеренная спектральная кривая рассеяния S(λ) длиной 81 */
+  scattering?: ArrayLike<number>
 }
 
 export const SPECTRUM_LEN = 81
 export const WL_START = 380
 export const WL_STEP = 5
 
+// CIE 1931 2° Standard Observer (5 nm, 380–780 nm, CIE 15:2004)
 const CIE_CMF = [
   { wl: 380, x: 0.001368, y: 0.000039, z: 0.00645 },
   { wl: 385, x: 0.002236, y: 0.000064, z: 0.01055 },
@@ -99,21 +114,24 @@ const CIE_CMF = [
   { wl: 770, x: 0.000083, y: 0.00003, z: 0 },
   { wl: 775, x: 0.000059, y: 0.000021, z: 0 },
   { wl: 780, x: 0.000042, y: 0.000015, z: 0 },
-]
+] as const
 
 export const XBAR = new Float32Array(SPECTRUM_LEN)
 export const YBAR = new Float32Array(SPECTRUM_LEN)
 export const ZBAR = new Float32Array(SPECTRUM_LEN)
 export const WL = new Float32Array(SPECTRUM_LEN)
+const TRAP_WEIGHTS = new Float64Array(SPECTRUM_LEN)
 
 for (let i = 0; i < SPECTRUM_LEN; i++) {
   XBAR[i] = CIE_CMF[i].x
   YBAR[i] = CIE_CMF[i].y
   ZBAR[i] = CIE_CMF[i].z
   WL[i] = CIE_CMF[i].wl
+  TRAP_WEIGHTS[i] = i === 0 || i === SPECTRUM_LEN - 1 ? WL_STEP * 0.5 : WL_STEP
 }
 
-const D65 = new Float32Array([
+// CIE Standard Illuminant D65 (5 nm, 380–780 nm, CIE 15:2004)
+const RAW_D65 = new Float64Array([
   49.9755, 52.3118, 54.6482, 68.7015, 82.7549, 87.1204, 91.486, 92.4589, 93.4318,
   90.057, 86.6823, 95.7736, 104.865, 110.936, 117.008, 117.41, 117.812, 116.336,
   114.861, 115.392, 115.923, 112.367, 108.811, 109.082, 109.354, 108.578, 107.802,
@@ -125,26 +143,68 @@ const D65 = new Float32Array([
   75.0865, 69.3616, 63.6363, 64.8082, 65.9801, 65.023, 64.0659, 61.3633, 58.6608,
 ])
 
-// Генерируем реальные спектры освещения по формуле Планка для проверки метамеризма:
-// A (2856K — теплый свет бутика), cool (4200K — студийный нейтральный), twilight (9000K — синие сумерки)
-function buildPlanckIlluminant(tempK: number): Float32Array {
-  const arr = new Float32Array(SPECTRUM_LEN)
-  const c2 = 1.4388e7 // нм·К
-  const refWl = 560
-  const refVal = Math.pow(refWl, -5) / (Math.exp(c2 / (refWl * tempK)) - 1)
+/**
+ * Нормирует спектральное распределение мощности S(λ) так,
+ * чтобы трапецеидальный интеграл ∫ S(λ)·ȳ(λ)·dλ = 100.0.
+ */
+function normalizeIlluminantSPD(raw: ArrayLike<number>): Float64Array {
+  let ySum = 0
   for (let i = 0; i < SPECTRUM_LEN; i++) {
-    const wl = WL[i]
-    const val = Math.pow(wl, -5) / (Math.exp(c2 / (wl * tempK)) - 1)
-    arr[i] = (val / refVal) * 100
+    ySum += TRAP_WEIGHTS[i] * raw[i] * YBAR[i]
   }
-  return arr
+  const scale = ySum > 0 ? 100 / ySum : 0
+  const out = new Float64Array(SPECTRUM_LEN)
+  for (let i = 0; i < SPECTRUM_LEN; i++) {
+    out[i] = raw[i] * scale
+  }
+  return out
 }
 
-const ILLUMINANTS: Record<IlluminantType, Float32Array> = {
-  D65,
+/**
+ * Генерирует планковский спектр излучения для температуры tempK (в Кельвинах),
+ * строго нормированный на Y = 100 по 2° наблюдателю CIE 1931.
+ */
+export function buildPlanckIlluminant(tempK: number): Float64Array {
+  const safeT = Number.isFinite(tempK) && tempK > 500 ? tempK : 6504
+  const c2 = 1.4388e7 // Вторая радиационная постоянная CIE 15:2004 (нм·К)
+  const raw = new Float64Array(SPECTRUM_LEN)
+  for (let i = 0; i < SPECTRUM_LEN; i++) {
+    const wl = WL[i]
+    raw[i] = Math.pow(wl, -5) / (Math.exp(c2 / (wl * safeT)) - 1)
+  }
+  return normalizeIlluminantSPD(raw)
+}
+
+function computeWhitePoint(normalizedSPD: Float64Array): XYZ {
+  let x = 0
+  let y = 0
+  let z = 0
+  for (let i = 0; i < SPECTRUM_LEN; i++) {
+    const w = TRAP_WEIGHTS[i] * normalizedSPD[i]
+    x += w * XBAR[i]
+    y += w * YBAR[i]
+    z += w * ZBAR[i]
+  }
+  return { x, y, z }
+}
+
+export const ILLUMINANTS: Readonly<Record<IlluminantType, Float64Array>> = {
+  D65: normalizeIlluminantSPD(RAW_D65),
   A: buildPlanckIlluminant(2856),
   cool: buildPlanckIlluminant(4200),
   twilight: buildPlanckIlluminant(9000),
+}
+
+export const ILLUMINANT_WHITE_POINTS: Readonly<Record<IlluminantType, XYZ>> = {
+  D65: computeWhitePoint(ILLUMINANTS.D65),
+  A: computeWhitePoint(ILLUMINANTS.A),
+  cool: computeWhitePoint(ILLUMINANTS.cool),
+  twilight: computeWhitePoint(ILLUMINANTS.twilight),
+}
+
+export function getIlluminantWhitePoint(illuminant: IlluminantType = 'D65'): XYZ {
+  const wp = ILLUMINANT_WHITE_POINTS[illuminant] || ILLUMINANT_WHITE_POINTS.D65
+  return { x: wp.x, y: wp.y, z: wp.z }
 }
 
 export const WET_EMULSION_SPECTRUM: SpectrumPoint[] = Array.from({ length: SPECTRUM_LEN }, (_, i) => ({
@@ -152,42 +212,83 @@ export const WET_EMULSION_SPECTRUM: SpectrumPoint[] = Array.from({ length: SPECT
   reflectance: 78,
 }))
 
+function pctToUnit(pct: number): number {
+  if (!Number.isFinite(pct)) return 0
+  return Math.max(0, Math.min(1, pct * 0.01))
+}
+
+function unitToPct(unit: number): number {
+  if (!Number.isFinite(unit)) return 0
+  return Math.max(0, Math.min(100, unit * 100))
+}
+
 export function isCieAligned(spectrum: SpectrumPoint[]): boolean {
+  if (!Array.isArray(spectrum) || spectrum.length !== SPECTRUM_LEN) return false
   return (
-    spectrum.length === SPECTRUM_LEN &&
-    spectrum[0].wavelength === WL_START &&
-    spectrum[SPECTRUM_LEN - 1].wavelength === 780
+    spectrum[0]?.wavelength === WL_START &&
+    spectrum[1]?.wavelength === WL_START + WL_STEP &&
+    spectrum[SPECTRUM_LEN - 1]?.wavelength === WL_START + (SPECTRUM_LEN - 1) * WL_STEP
   )
 }
 
 export function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: number): number {
-  if (!spectrum || spectrum.length === 0) return 0
-  if (wavelength <= spectrum[0].wavelength) return spectrum[0].reflectance
-  if (wavelength >= spectrum[spectrum.length - 1].wavelength) return spectrum[spectrum.length - 1].reflectance
-  let low = 0, high = spectrum.length - 1
+  if (!Array.isArray(spectrum) || spectrum.length === 0 || !Number.isFinite(wavelength)) return 0
+  const first = spectrum[0]
+  const last = spectrum[spectrum.length - 1]
+  if (wavelength <= first.wavelength) {
+    return Number.isFinite(first.reflectance) ? Math.max(0, Math.min(100, first.reflectance)) : 0
+  }
+  if (wavelength >= last.wavelength) {
+    return Number.isFinite(last.reflectance) ? Math.max(0, Math.min(100, last.reflectance)) : 0
+  }
+
+  let low = 0
+  let high = spectrum.length - 1
   while (high - low > 1) {
     const mid = (low + high) >> 1
     if (spectrum[mid].wavelength < wavelength) low = mid
     else high = mid
   }
-  const p1 = spectrum[low], p2 = spectrum[high]
-  const t = (wavelength - p1.wavelength) / (p2.wavelength - p1.wavelength)
-  return p1.reflectance + t * (p2.reflectance - p1.reflectance)
+  const p1 = spectrum[low]
+  const p2 = spectrum[high]
+  const span = p2.wavelength - p1.wavelength
+  if (span <= 0) {
+    return Number.isFinite(p1.reflectance) ? Math.max(0, Math.min(100, p1.reflectance)) : 0
+  }
+  const t = (wavelength - p1.wavelength) / span
+  const r = p1.reflectance + t * (p2.reflectance - p1.reflectance)
+  return Number.isFinite(r) ? Math.max(0, Math.min(100, r)) : 0
+}
+
+function extractAlignedUnitReflectance(spectrum: SpectrumPoint[]): Float64Array {
+  const out = new Float64Array(SPECTRUM_LEN)
+  if (!Array.isArray(spectrum) || spectrum.length === 0) return out
+  if (isCieAligned(spectrum)) {
+    for (let i = 0; i < SPECTRUM_LEN; i++) {
+      out[i] = pctToUnit(spectrum[i].reflectance)
+    }
+  } else {
+    for (let i = 0; i < SPECTRUM_LEN; i++) {
+      out[i] = pctToUnit(interpolateReflectance(spectrum, WL[i]))
+    }
+  }
+  return out
 }
 
 export function normalizeSpectrumToCIE(rawSpectrum: SpectrumPoint[]): SpectrumPoint[] {
-  if (!rawSpectrum || rawSpectrum.length === 0) return []
+  if (!Array.isArray(rawSpectrum) || rawSpectrum.length === 0) return []
   const normalized: SpectrumPoint[] = new Array(SPECTRUM_LEN)
   for (let i = 0; i < SPECTRUM_LEN; i++) {
     normalized[i] = {
-      wavelength: CIE_CMF[i].wl,
-      reflectance: interpolateReflectance(rawSpectrum, CIE_CMF[i].wl),
+      wavelength: WL[i],
+      reflectance: interpolateReflectance(rawSpectrum, WL[i]),
     }
   }
   return normalized
 }
 
 export function parseSpectrum(text: string): SpectrumPoint[] {
+  if (!text) return []
   const lines = text.trim().split(/\r?\n/)
   const points: SpectrumPoint[] = []
   for (let li = 0; li < lines.length; li++) {
@@ -195,129 +296,236 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
     if (parts.length < 2) continue
     const wl = parseFloat(parts[0])
     const refl = parseFloat(parts[1])
-    if (!isNaN(wl) && !isNaN(refl)) points.push({ wavelength: wl, reflectance: refl })
+    if (Number.isFinite(wl) && Number.isFinite(refl)) {
+      points.push({ wavelength: wl, reflectance: Math.max(0, Math.min(100, refl)) })
+    }
   }
+  if (points.length === 0) return []
   points.sort((a, b) => a.wavelength - b.wavelength)
   return normalizeSpectrumToCIE(points)
 }
 
 /**
- * Поправка Саундерсона для перевода измеренного спектра FORS (где есть ~3.7% блик Френеля)
- * во внутреннее отражение Кубелки-Мунка R_int.
+ * Точная обратимая поправка Саундерсона (1942) для полимерной/акриловой плёнки (n ≈ 1.50).
+ * Все внутренние расчёты выполняются в относительных единицах отражения [0..1].
  */
-const K1_SURFACE = 0.0365
-const K2_INTERNAL = 0.42
+const K1_DRY = 0.015
+const K1_WET = 0.004
+const K2_INTERNAL = 0.4
+const R_INT_MIN = 0.0005
+const R_INT_MAX = 0.999
 
-function measuredToInternalR(rMeas: number): number {
-  const rClean = Math.max(0.0008, rMeas - K1_SURFACE * (1 - 0.5 * rMeas))
-  const denom = Math.max(0.05, 1 - K1_SURFACE - K2_INTERNAL * (1 - rClean))
-  return Math.max(0.0008, Math.min(0.996, rClean / denom))
+export function measuredToInternalR(rMeasUnit: number, k1 = K1_DRY): number {
+  const rM = Math.max(0, Math.min(1, Number.isFinite(rMeasUnit) ? rMeasUnit : 0))
+  const num = rM - k1
+  if (num <= 0) return R_INT_MIN
+  const denom = 1 - k1 - K2_INTERNAL + K2_INTERNAL * rM
+  if (denom <= 1e-6) return R_INT_MAX
+  return Math.max(R_INT_MIN, Math.min(R_INT_MAX, num / denom))
 }
 
-function internalToMeasuredR(rInt: number, isWet: boolean): number {
-  const rVal = Math.max(0.0008, Math.min(0.996, rInt))
-  // У сухой матовой краски остаточное диффузное рассеяние поверхности чуть выше, чем у мокрой глянцевой
-  const surfaceFloor = isWet ? 0.004 : 0.011
-  const out = surfaceFloor + ((1 - K1_SURFACE) * (1 - K2_INTERNAL) * rVal) / (1 - K2_INTERNAL * rVal)
-  return Math.max(0.001, Math.min(0.999, out))
+export function internalToMeasuredR(rIntUnit: number, isWet = false): number {
+  const rI = Math.max(R_INT_MIN, Math.min(R_INT_MAX, Number.isFinite(rIntUnit) ? rIntUnit : R_INT_MIN))
+  const k1 = isWet ? K1_WET : K1_DRY
+  const out = k1 + ((1 - k1) * (1 - K2_INTERNAL) * rI) / (1 - K2_INTERNAL * rI)
+  return Math.max(0, Math.min(1, out))
 }
 
 /**
- * Вычисляет единую (не зависящую от длины волны!) относительную красящую/рассеивающую
- * силу пигмента, чтобы не ломать субтрактивное смешивание (Жёлтый + Синий = Зелёный).
+ * Оценивает спектральную кривую относительного рассеяния S(λ) для двухконстантной
+ * модели Кубелки–Мунка при наличии только спектра полного укрытия R_∞(λ).
+ * Гладкая зависимость от светимости CIE Y, глубины поглощения и дисперсии Ми.
  */
-function getPigmentTintingStrength(spectrum: SpectrumPoint[], aligned: boolean): number {
-  let minR = 1.0
-  let maxR = 0.0
-  for (let i = 4; i < 65; i += 3) {
-    const r = (aligned ? spectrum[i].reflectance : interpolateReflectance(spectrum, WL[i])) * 0.01
-    if (r < minR) minR = r
-    if (r > maxR) maxR = r
+function estimateSpectralScattering(
+  rUnit: Float64Array,
+  explicitStrength?: number,
+  explicitScattering?: ArrayLike<number>
+): Float64Array {
+  const S = new Float64Array(SPECTRUM_LEN)
+  if (explicitScattering && explicitScattering.length === SPECTRUM_LEN) {
+    for (let i = 0; i < SPECTRUM_LEN; i++) {
+      const v = explicitScattering[i]
+      S[i] = Number.isFinite(v) && v > 1e-4 ? v : 1.0
+    }
+    return S
   }
-  // Темные и высокохроматичные пигменты (Фтало, Диоксазин, Сажа) имеют высокую тинтующую способность,
-  // а белила выступают базой.
-  if (minR > 0.72) return 1.0 // Белила и светлые наполнители
-  if (maxR < 0.08) return 2.4 // Чистые черные пигменты
-  return 1.65                 // Цветные хроматические пигменты
+
+  let lumY = 0
+  let minR = 1
+  let maxR = 0
+  const d65 = ILLUMINANTS.D65
+  for (let i = 0; i < SPECTRUM_LEN; i++) {
+    const r = rUnit[i]
+    lumY += TRAP_WEIGHTS[i] * d65[i] * YBAR[i] * r
+    if (i >= 4 && i <= 64) {
+      if (r < minR) minR = r
+      if (r > maxR) maxR = r
+    }
+  }
+  const yNorm = Math.max(0, Math.min(1, lumY / 100))
+  const contrast = Math.max(0, maxR - minR)
+
+  const baseWeight =
+    typeof explicitStrength === 'number' && Number.isFinite(explicitStrength) && explicitStrength > 0
+      ? explicitStrength
+      : 1.0 + 1.15 * Math.pow(1 - yNorm, 1.35) + 0.25 * contrast * (1 - minR)
+
+  const mieExp = 0.08 + 0.14 * (1 - yNorm)
+
+  for (let i = 0; i < SPECTRUM_LEN; i++) {
+    const dispersion = Math.pow(550 / WL[i], mieExp)
+    S[i] = baseWeight * dispersion
+  }
+  return S
 }
 
 export function mixSpectra(components: MixComponent[], isWet = false): SpectrumPoint[] {
-  const colorParts = components.filter((c) => !c.isBinder && c.volume > 0)
-  const binderParts = components.filter((c) => c.isBinder && c.volume > 0)
+  if (!Array.isArray(components) || components.length === 0) return []
+
+  const colorParts: MixComponent[] = []
+  let colorVol = 0
+  let binderVol = 0
+
+  for (let i = 0; i < components.length; i++) {
+    const c = components[i]
+    if (!c || !Number.isFinite(c.volume) || c.volume <= 0) continue
+    if (c.isBinder) {
+      binderVol += c.volume
+    } else if (Array.isArray(c.spectrum) && c.spectrum.length > 0) {
+      colorParts.push(c)
+      colorVol += c.volume
+    }
+  }
+
+  // Вырожденный случай: в формуле присутствует только биндер/эмульсия
+  if (colorParts.length === 0 || colorVol <= 0) {
+    if (binderVol > 0) {
+      const refl = isWet ? 78 : 85
+      return Array.from({ length: SPECTRUM_LEN }, (_, i) => ({
+        wavelength: WL[i],
+        reflectance: refl,
+      }))
+    }
+    return []
+  }
 
   const n = colorParts.length
-  if (n === 0) return []
+  const rBuffers: Float64Array[] = new Array(n)
+  const sBuffers: Float64Array[] = new Array(n)
+  const fractions = new Float64Array(n)
 
-  let colorVol = 0
-  for (let c = 0; c < n; c++) colorVol += colorParts[c].volume
-  if (colorVol <= 0) return []
+  for (let c = 0; c < n; c++) {
+    const rUnit = extractAlignedUnitReflectance(colorParts[c].spectrum)
+    rBuffers[c] = rUnit
+    sBuffers[c] = estimateSpectralScattering(
+      rUnit,
+      colorParts[c].tintingStrength,
+      colorParts[c].scattering
+    )
+    fractions[c] = colorParts[c].volume / colorVol
+  }
 
-  let binderVol = 0
-  for (let b = 0; b < binderParts.length; b++) binderVol += binderParts[b].volume
-
-  const alignedFlags = colorParts.map((c) => isCieAligned(c.spectrum))
-  const strengths = colorParts.map((c, idx) => getPigmentTintingStrength(c.spectrum, alignedFlags[idx]))
-
-  // Мягкое молочное рассеивание от мокрой акриловой эмульсии или большого объема биндера
   const binderRatio = binderVol / (colorVol + binderVol)
-  const wetEmulsionS = (isWet ? 0.045 : 0) + binderRatio * 0.035
+  const emulsionS = (isWet ? 0.025 : 0) + binderRatio * 0.03
 
   const result: SpectrumPoint[] = new Array(SPECTRUM_LEN)
 
   for (let i = 0; i < SPECTRUM_LEN; i++) {
-    const wl = WL[i]
     let totalK = 0
     let totalS = 0
 
     for (let c = 0; c < n; c++) {
-      const rawR = alignedFlags[c]
-        ? colorParts[c].spectrum[i].reflectance * 0.01
-        : interpolateReflectance(colorParts[c].spectrum, wl) * 0.01
-
-      const rInt = measuredToInternalR(rawR)
+      const rInt = measuredToInternalR(rBuffers[c][i], K1_DRY)
       const ks = ((1 - rInt) * (1 - rInt)) / (2 * rInt)
-
-      const weight = (colorParts[c].volume / colorVol) * strengths[c]
-      totalK += weight * ks
-      totalS += weight
+      const sLambda = fractions[c] * sBuffers[c][i]
+      totalK += sLambda * ks
+      totalS += sLambda
     }
 
-    if (wetEmulsionS > 0) {
-      totalS += wetEmulsionS
-      totalK += wetEmulsionS * 0.015
+    if (emulsionS > 0) {
+      totalS += emulsionS
+      totalK += emulsionS * 0.012
     }
 
-    const mixedKS = totalS > 1e-8 ? totalK / totalS : 0.0001
+    const mixedKS = totalS > 1e-10 ? totalK / totalS : 0.0001
     const rMixInt = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS)
-    const rMixFinal = internalToMeasuredR(rMixInt, isWet)
+    const rMixUnit = internalToMeasuredR(rMixInt, isWet)
 
-    result[i] = { wavelength: wl, reflectance: rMixFinal * 100 }
+    result[i] = {
+      wavelength: WL[i],
+      reflectance: unitToPct(rMixUnit),
+    }
   }
 
   return result
+}
+
+// Матрицы хроматической адаптации Брэдфорда (CIE / ICC)
+const M_BFD = [
+  0.8951, 0.2664, -0.1614,
+  -0.7502, 1.7135, 0.0367,
+  0.0389, -0.0685, 1.0296,
+] as const
+
+const M_BFD_INV = [
+  0.9869929, -0.1470543, 0.1599627,
+  0.4323053, 0.5183603, 0.0492912,
+  -0.0085287, 0.0400428, 0.9684867,
+] as const
+
+/**
+ * Преобразование хроматической адаптации Брэдфорда (Bradford CAT)
+ * из белой точки исходного осветителя srcWhite в целевую dstWhite (по умолчанию D65).
+ */
+export function adaptXYZBradford(
+  xyz: XYZ,
+  srcWhite: XYZ,
+  dstWhite: XYZ = ILLUMINANT_WHITE_POINTS.D65,
+  adaptationDegree = 1.0
+): XYZ {
+  const D = Math.max(0, Math.min(1, Number.isFinite(adaptationDegree) ? adaptationDegree : 1.0))
+
+  const sL = M_BFD[0] * srcWhite.x + M_BFD[1] * srcWhite.y + M_BFD[2] * srcWhite.z
+  const sM = M_BFD[3] * srcWhite.x + M_BFD[4] * srcWhite.y + M_BFD[5] * srcWhite.z
+  const sS = M_BFD[6] * srcWhite.x + M_BFD[7] * srcWhite.y + M_BFD[8] * srcWhite.z
+
+  const dL = M_BFD[0] * dstWhite.x + M_BFD[1] * dstWhite.y + M_BFD[2] * dstWhite.z
+  const dM = M_BFD[3] * dstWhite.x + M_BFD[4] * dstWhite.y + M_BFD[5] * dstWhite.z
+  const dS = M_BFD[6] * dstWhite.x + M_BFD[7] * dstWhite.y + M_BFD[8] * dstWhite.z
+
+  const gL = sL > 1e-8 ? (1 - D) + D * (dL / sL) : 1
+  const gM = sM > 1e-8 ? (1 - D) + D * (dM / sM) : 1
+  const gS = sS > 1e-8 ? (1 - D) + D * (dS / sS) : 1
+
+  const cL = (M_BFD[0] * xyz.x + M_BFD[1] * xyz.y + M_BFD[2] * xyz.z) * gL
+  const cM = (M_BFD[3] * xyz.x + M_BFD[4] * xyz.y + M_BFD[5] * xyz.z) * gM
+  const cS = (M_BFD[6] * xyz.x + M_BFD[7] * xyz.y + M_BFD[8] * xyz.z) * gS
+
+  return {
+    x: M_BFD_INV[0] * cL + M_BFD_INV[1] * cM + M_BFD_INV[2] * cS,
+    y: M_BFD_INV[3] * cL + M_BFD_INV[4] * cM + M_BFD_INV[5] * cS,
+    z: M_BFD_INV[6] * cL + M_BFD_INV[7] * cM + M_BFD_INV[8] * cS,
+  }
 }
 
 export function spectrumToXYZWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
 ): XYZ {
-  let X = 0, Y = 0, Z = 0, N = 0
-  const S = ILLUMINANTS[illuminant] || D65
-  const step = 5
-  const aligned = isCieAligned(spectrum)
+  if (!Array.isArray(spectrum) || spectrum.length === 0) return { x: 0, y: 0, z: 0 }
+  const S = ILLUMINANTS[illuminant] || ILLUMINANTS.D65
+  const rUnit = extractAlignedUnitReflectance(spectrum)
 
+  let x = 0
+  let y = 0
+  let z = 0
   for (let i = 0; i < SPECTRUM_LEN; i++) {
-    const refl = aligned
-      ? spectrum[i].reflectance * 0.01
-      : interpolateReflectance(spectrum, WL[i]) * 0.01
-    const s = S[i]
-    X += s * refl * XBAR[i] * step
-    Y += s * refl * YBAR[i] * step
-    Z += s * refl * ZBAR[i] * step
-    N += s * YBAR[i] * step
+    const w = TRAP_WEIGHTS[i] * S[i] * rUnit[i]
+    x += w * XBAR[i]
+    y += w * YBAR[i]
+    z += w * ZBAR[i]
   }
-  const k = N > 0 ? 100 / N : 0
-  return { x: X * k, y: Y * k, z: Z * k }
+  return { x, y, z }
 }
 
 export function spectrumToXYZ(spectrum: SpectrumPoint[]): XYZ {
@@ -325,90 +533,41 @@ export function spectrumToXYZ(spectrum: SpectrumPoint[]): XYZ {
 }
 
 function xyzToLinearRGB(xyz: XYZ): { r: number; g: number; b: number } {
-  const r = 3.2404542 * xyz.x - 1.5371385 * xyz.y - 0.4985314 * xyz.z
-  const g = -0.969266 * xyz.x + 1.8760108 * xyz.y + 0.041556 * xyz.z
-  const b = 0.0556434 * xyz.x - 0.2040259 * xyz.y + 1.0572252 * xyz.z
-  return { r: r / 100, g: g / 100, b: b / 100 }
+  const x = xyz.x * 0.01
+  const y = xyz.y * 0.01
+  const z = xyz.z * 0.01
+  return {
+    r: 3.2404542 * x - 1.5371385 * y - 0.4985314 * z,
+    g: -0.969266 * x + 1.8760108 * y + 0.041556 * z,
+    b: 0.0556434 * x - 0.2040259 * y + 1.0572252 * z,
+  }
 }
 
 function linearToSrgb(c: number): number {
+  if (!Number.isFinite(c)) return 0
   const clipped = Math.max(0, Math.min(1, c))
-  return Math.round(
-    (clipped <= 0.0031308 ? 12.92 * clipped : 1.055 * Math.pow(clipped, 1 / 2.4) - 0.055) * 255
-  )
-}
-
-// Матрица хроматической адаптации Брэдфорда (стандарт ICC / CIECAM02),
-// чтобы в свете бутика (2856K) белила оставались белыми (#FFF4E7), а не лимонно-жёлтыми (#FFDF80)
-const M_BFD: readonly [readonly number[], readonly number[], readonly number[]] = [
-  [0.8951, 0.2664, -0.1614],
-  [-0.7502, 1.7135, 0.0367],
-  [0.0389, -0.0685, 1.0296],
-]
-
-const M_BFD_INV: readonly [readonly number[], readonly number[], readonly number[]] = [
-  [0.9869929, -0.1470543, 0.1599627],
-  [0.4323053, 0.5183603, 0.0492912],
-  [-0.0085287, 0.0400428, 0.9684867],
-]
-
-function mulMat3(
-  m: readonly [readonly number[], readonly number[], readonly number[]],
-  v: [number, number, number]
-): [number, number, number] {
-  return [
-    m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
-    m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
-    m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
-  ]
-}
-
-const PERFECT_WHITE_SPECTRUM: SpectrumPoint[] = Array.from({ length: SPECTRUM_LEN }, (_, i) => ({
-  wavelength: WL_START + i * WL_STEP,
-  reflectance: 100,
-}))
-
-const ILLUMINANT_LMS: Record<IlluminantType, [number, number, number]> = {
-  D65: (() => {
-    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'D65')
-    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
-  })(),
-  A: (() => {
-    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'A')
-    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
-  })(),
-  cool: (() => {
-    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'cool')
-    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
-  })(),
-  twilight: (() => {
-    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'twilight')
-    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
-  })(),
-}
-
-function adaptXYZToD65(xyz: XYZ, illuminant: IlluminantType): XYZ {
-  if (illuminant === 'D65') return xyz
-  const D = 0.82
-  const srcLms = ILLUMINANT_LMS[illuminant]
-  const dstLms = ILLUMINANT_LMS.D65
-  const lms = mulMat3(M_BFD, [xyz.x, xyz.y, xyz.z])
-  const adapted: [number, number, number] = [
-    lms[0] * (1 - D + D * (dstLms[0] / srcLms[0])),
-    lms[1] * (1 - D + D * (dstLms[1] / srcLms[1])),
-    lms[2] * (1 - D + D * (dstLms[2] / srcLms[2])),
-  ]
-  const out = mulMat3(M_BFD_INV, adapted)
-  return { x: out[0], y: out[1], z: out[2] }
+  const srgb =
+    clipped <= 0.0031308
+      ? 12.92 * clipped
+      : 1.055 * Math.pow(clipped, 1 / 2.4) - 0.055
+  return Math.round(srgb * 255)
 }
 
 export function spectrumToRGBWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
 ): RGB {
-  const rawXyz = spectrumToXYZWithIlluminant(spectrum, illuminant)
-  const adaptedXyz = adaptXYZToD65(rawXyz, illuminant)
-  const linear = xyzToLinearRGB(adaptedXyz)
+  const xyz = spectrumToXYZWithIlluminant(spectrum, illuminant)
+  const adapted =
+    illuminant === 'D65'
+      ? xyz
+      : adaptXYZBradford(
+          xyz,
+          getIlluminantWhitePoint(illuminant),
+          ILLUMINANT_WHITE_POINTS.D65,
+          1.0
+        )
+  const linear = xyzToLinearRGB(adapted)
   return {
     r: linearToSrgb(linear.r),
     g: linearToSrgb(linear.g),
@@ -422,7 +581,8 @@ export function spectrumToRGB(spectrum: SpectrumPoint[]): RGB {
 
 export function rgbToHex(rgb: RGB): string {
   const toHex = (n: number) => {
-    const hex = Math.max(0, Math.min(255, Math.round(n))).toString(16)
+    const safe = Number.isFinite(n) ? Math.max(0, Math.min(255, Math.round(n))) : 0
+    const hex = safe.toString(16)
     return hex.length === 1 ? '0' + hex : hex
   }
   return '#' + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b)
