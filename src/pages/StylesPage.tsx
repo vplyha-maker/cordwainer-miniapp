@@ -40,6 +40,7 @@ export {
 type StylesPageProps = {
   onBack: () => void
   lang: AppLang
+  initialStyleId?: string | null
 }
 
 const pageVariants = {
@@ -48,7 +49,11 @@ const pageVariants = {
   exit: { opacity: 0, transition: { duration: 0.25 } },
 }
 
-export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) {
+export function StylesPage({
+  onBack,
+  lang = 'ru' as AppLang,
+  initialStyleId = null,
+}: StylesPageProps) {
   const currentLang = normalizeSupportedLang(lang)
   const totalStylesCount = STYLES_DATA.length
   const t = useMemo(() => getUiText(currentLang, totalStylesCount), [currentLang, totalStylesCount])
@@ -67,6 +72,7 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
   const returnSlideIndexRef = useRef<number | null>(null)
   const isJumpingRef = useRef(false)
   const prevActiveIndexRef = useRef(0)
+  const appliedInitialTargetRef = useRef<string | null>(null)
 
   const isProPurchased = paymentState === 'purchased'
   const isPaymentBusy =
@@ -163,35 +169,61 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
     [currentLang]
   )
 
-  const scrollToSlideIndex = useCallback((targetIdx: number) => {
-    const container = scrollRef.current
-    if (!container) return
+  const scrollToSlideIndex = useCallback(
+    (targetIdx: number, behavior: ScrollBehavior = 'smooth') => {
+      const container = scrollRef.current
+      if (!container) return
 
-    const clampedIdx = Math.max(0, Math.min(targetIdx, slideRefs.current.length - 1))
+      const clampedIdx = Math.max(0, Math.min(targetIdx, slideRefs.current.length - 1))
 
-    if (jumpTimerRef.current !== null) {
-      window.clearTimeout(jumpTimerRef.current)
-      jumpTimerRef.current = null
-    }
+      if (jumpTimerRef.current !== null) {
+        window.clearTimeout(jumpTimerRef.current)
+        jumpTimerRef.current = null
+      }
 
-    isJumpingRef.current = true
-    setActiveIndex(clampedIdx)
+      isJumpingRef.current = true
+      setActiveIndex(clampedIdx)
 
-    const targetEl = slideRefs.current[clampedIdx]
-    if (targetEl) {
-      targetEl.scrollIntoView({ behavior: 'smooth' })
-    } else {
-      container.scrollTo({
-        top: clampedIdx * container.clientHeight,
-        behavior: 'smooth',
-      })
-    }
+      const targetEl = slideRefs.current[clampedIdx]
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior })
+      } else {
+        container.scrollTo({
+          top: clampedIdx * container.clientHeight,
+          behavior,
+        })
+      }
 
-    jumpTimerRef.current = window.setTimeout(() => {
-      isJumpingRef.current = false
-      jumpTimerRef.current = null
-    }, 750)
-  }, [])
+      jumpTimerRef.current = window.setTimeout(
+        () => {
+          isJumpingRef.current = false
+          jumpTimerRef.current = null
+        },
+        behavior === 'auto' ? 120 : 750
+      )
+    },
+    []
+  )
+
+  // Автопереход к фасону из URL (?style=...) или Telegram start_param
+  useEffect(() => {
+    if (!initialStyleId) return
+    const styleIdx = STYLES_DATA.findIndex((s) => s.id === initialStyleId)
+    if (styleIdx === -1) return
+
+    const isUnlockedTarget = styleIdx < visibleStyles.length
+    const targetIdx = isUnlockedTarget ? styleIdx : visibleStyles.length
+    const targetKey = `${initialStyleId}:${isUnlockedTarget ? 'open' : 'locked'}`
+
+    if (appliedInitialTargetRef.current === targetKey) return
+    appliedInitialTargetRef.current = targetKey
+
+    const timer = window.setTimeout(() => {
+      scrollToSlideIndex(targetIdx, 'auto')
+    }, 60)
+
+    return () => window.clearTimeout(timer)
+  }, [initialStyleId, visibleStyles.length, scrollToSlideIndex])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -434,12 +466,12 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
         }
       `}</style>
 
-      {/* Единый верхний хедер для всех экранов */}
+      {/* Единый верхний хедер */}
       <header
         style={{
           paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 10px)',
         }}
-        className="fixed top-0 left-0 right-0 z-[200] px-5 md:px-8 pb-3 flex justify-between items-center pointer-events-none bg-gradient-to-b from-[#0B0B0A]/80 to-transparent"
+        className="fixed top-0 left-0 right-0 z-[200] px-5 md:px-8 pb-3 flex justify-between items-center pointer-events-none bg-gradient-to-b from-[#0B0B0A]/85 via-[#0B0B0A]/40 to-transparent"
       >
         <button
           type="button"
@@ -495,9 +527,7 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
         )}
       </AnimatePresence>
 
-      {/* Студийный контейнер:
-          - Mobile & Tablet: 1 колонка
-          - Desktop (xl >= 1280px): левый индекс фасонов + основная рабочая область */}
+      {/* Студийный контейнер */}
       <div className="h-full w-full xl:grid xl:grid-cols-[220px_1fr]">
         {/* Левый индекс фасонов для десктопа (xl+) */}
         <aside className="hidden xl:flex xl:flex-col xl:justify-center xl:border-r xl:border-[#F4F0E8]/10 xl:px-6 xl:pt-20 xl:pb-8 bg-[#141312]/50">
