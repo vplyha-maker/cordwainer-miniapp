@@ -338,12 +338,77 @@ function linearToSrgb(c: number): number {
   )
 }
 
+// Матрица хроматической адаптации Брэдфорда (стандарт ICC / CIECAM02),
+// чтобы в свете бутика (2856K) белила оставались белыми (#FFF4E7), а не лимонно-жёлтыми (#FFDF80)
+const M_BFD: readonly [readonly number[], readonly number[], readonly number[]] = [
+  [0.8951, 0.2664, -0.1614],
+  [-0.7502, 1.7135, 0.0367],
+  [0.0389, -0.0685, 1.0296],
+]
+
+const M_BFD_INV: readonly [readonly number[], readonly number[], readonly number[]] = [
+  [0.9869929, -0.1470543, 0.1599627],
+  [0.4323053, 0.5183603, 0.0492912],
+  [-0.0085287, 0.0400428, 0.9684867],
+]
+
+function mulMat3(
+  m: readonly [readonly number[], readonly number[], readonly number[]],
+  v: [number, number, number]
+): [number, number, number] {
+  return [
+    m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+    m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+    m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
+  ]
+}
+
+const PERFECT_WHITE_SPECTRUM: SpectrumPoint[] = Array.from({ length: SPECTRUM_LEN }, (_, i) => ({
+  wavelength: WL_START + i * WL_STEP,
+  reflectance: 100,
+}))
+
+const ILLUMINANT_LMS: Record<IlluminantType, [number, number, number]> = {
+  D65: (() => {
+    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'D65')
+    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
+  })(),
+  A: (() => {
+    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'A')
+    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
+  })(),
+  cool: (() => {
+    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'cool')
+    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
+  })(),
+  twilight: (() => {
+    const wp = spectrumToXYZWithIlluminant(PERFECT_WHITE_SPECTRUM, 'twilight')
+    return mulMat3(M_BFD, [wp.x, wp.y, wp.z])
+  })(),
+}
+
+function adaptXYZToD65(xyz: XYZ, illuminant: IlluminantType): XYZ {
+  if (illuminant === 'D65') return xyz
+  const D = 0.82
+  const srcLms = ILLUMINANT_LMS[illuminant]
+  const dstLms = ILLUMINANT_LMS.D65
+  const lms = mulMat3(M_BFD, [xyz.x, xyz.y, xyz.z])
+  const adapted: [number, number, number] = [
+    lms[0] * (1 - D + D * (dstLms[0] / srcLms[0])),
+    lms[1] * (1 - D + D * (dstLms[1] / srcLms[1])),
+    lms[2] * (1 - D + D * (dstLms[2] / srcLms[2])),
+  ]
+  const out = mulMat3(M_BFD_INV, adapted)
+  return { x: out[0], y: out[1], z: out[2] }
+}
+
 export function spectrumToRGBWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
 ): RGB {
-  const xyz = spectrumToXYZWithIlluminant(spectrum, illuminant)
-  const linear = xyzToLinearRGB(xyz)
+  const rawXyz = spectrumToXYZWithIlluminant(spectrum, illuminant)
+  const adaptedXyz = adaptXYZToD65(rawXyz, illuminant)
+  const linear = xyzToLinearRGB(adaptedXyz)
   return {
     r: linearToSrgb(linear.r),
     g: linearToSrgb(linear.g),
