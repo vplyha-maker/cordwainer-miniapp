@@ -29,8 +29,8 @@ import { MatchingPanel } from './MatchingPanel'
 import {
   PigmentArchive,
   PigmentDossierModal,
-  MasterGuideModal,
 } from './PigmentArchive'
+import { ScienceMethodologyModal } from './ScienceMethodologyModal'
 import { useAtelierTheme } from './themeTokens'
 import {
   hapticConfirm,
@@ -102,7 +102,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     addPaint,
     removePaint,
     updatePaint,
-    clearAllAmounts,
     applyRecipe,
   } = usePaintMix(pigments)
 
@@ -173,6 +172,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (!baseSpectrum) return undefined
     return rgbToHex(spectrumToRGBWithIlluminant(baseSpectrum, illuminant)).toUpperCase()
   }, [baseSpectrum, illuminant])
+
+  const substrateLabel = useMemo(() => {
+    const names: Record<string, { ru: string; uk: string; de: string }> = {
+      crust: { ru: 'Кожа: Краст', uk: 'Шкіра: Краст', de: 'Leder: Crust' },
+      white: { ru: 'Кожа: Белая', uk: 'Шкіра: Біла', de: 'Leder: Weiß' },
+      cognac: { ru: 'Кожа: Коньяк', uk: 'Шкіра: Коньяк', de: 'Leder: Cognac' },
+      espresso: { ru: 'Кожа: Эспрессо', uk: 'Шкіра: Еспресо', de: 'Leder: Espresso' },
+      black: { ru: 'Кожа: Чёрная', uk: 'Шкіра: Чорна', de: 'Leder: Schwarz' },
+      custom: { ru: 'Кожа: Своя', uk: 'Шкіра: Своя', de: 'Leder: Eigene' },
+    }
+    const entry = names[substrateId] || names.custom
+    return entry[lang]
+  }, [substrateId, lang])
 
   const layerSwatches = useMemo<LayerSwatchItem[] | null>(() => {
     if (!mixedColor?.spectrum || !baseSpectrum) return null
@@ -281,6 +293,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     },
     [totalAmount, setPaints]
   )
+
+  const handleFullReset = useCallback(() => {
+    hapticTap()
+    setPaints([
+      { id: '1', pigmentId: 'titanium_white', amount: '' },
+      { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
+    ])
+    setActiveTarget(null)
+    setSelectedCoatIdx(3)
+    setIsWet(false)
+    setIlluminant('D65')
+  }, [setPaints])
 
   const handleAddFromArchive = useCallback(
     (pigmentId: string) => {
@@ -608,10 +632,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         removePaint(id)
       }}
       onUpdatePaint={updatePaint}
-      onClearAmounts={() => {
-        hapticTap()
-        clearAllAmounts()
-      }}
+      onClearAmounts={handleFullReset}
       onScaleToVolume={scaleFormulaToVolume}
       isWet={isWet}
       onToggleWet={() => {
@@ -670,6 +691,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       primaryLabel={displayHex ? `${dict.mix} · ${displayHex}` : dict.mix}
       componentSeries={componentSeries}
       dict={dict}
+      lang={lang}
+      illuminant={illuminant}
+      substrateSpectrum={baseSpectrum}
+      substrateLabel={substrateLabel}
+      isDark={isDark}
     />
   )
 
@@ -1022,9 +1048,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         onClose={() => setInspectedPigmentId(null)}
       />
 
-      <MasterGuideModal
+      <ScienceMethodologyModal
         open={showGuideModal}
-        dict={dict}
+        lang={lang}
+        isDark={isDark}
+        initialTab="science"
         onClose={() => setShowGuideModal(false)}
       />
     </motion.div>
