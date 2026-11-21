@@ -339,7 +339,7 @@ export function simulateLayersKM(
   paintSpectrum: SpectrumPoint[],
   system: CoverageSystem
 ) {
-  let strength = system === 'aniline' ? 24 : 48
+  let strength = system === 'aniline' ? 28 : 48
 
   const baseRgb = spectrumToRGB(baseSpectrum)
   const paintRgb = spectrumToRGB(paintSpectrum)
@@ -348,40 +348,43 @@ export function simulateLayersKM(
   const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
   const deltaL = Math.abs(paintL - baseL)
 
-  if (deltaL > 0.45) strength *= 0.72
-  else if (deltaL > 0.3) strength *= 0.85
-  else if (deltaL < 0.12) strength *= 1.18
+  if (deltaL > 0.45) strength *= 0.85
+  else if (deltaL < 0.12) strength *= 1.12
 
-  strength = Math.max(16, Math.min(58, strength))
+  strength = Math.max(20, Math.min(55, strength))
 
-  // Кумулятивная укрывистость слоёв без многократного наложения поправки Саундерсона
   const p1 = strength / 100
-  const p2 = (strength * 0.94) / 100
-  const p3 = (strength * 0.91) / 100
+  const p2 = (strength * 0.95) / 100
+  const p3 = (strength * 0.92) / 100
 
   const cov1 = p1
   const cov2 = 1 - (1 - p1) * (1 - p2)
   const cov3 = 1 - (1 - p1) * (1 - p2) * (1 - p3)
 
-  const blendKM = (coverage: number): SpectrumPoint[] => {
+  const blendCoat = (c: number): SpectrumPoint[] => {
     const out: SpectrumPoint[] = new Array(SPECTRUM_LEN)
     for (let i = 0; i < SPECTRUM_LEN; i++) {
       const wl = WL_START + i * WL_STEP
-      const rBase = Math.max(0.001, Math.min(0.999, interpolateReflectance(baseSpectrum, wl) * 0.01))
-      const rPaint = Math.max(0.001, Math.min(0.999, interpolateReflectance(paintSpectrum, wl) * 0.01))
-      const ksBase = ((1 - rBase) * (1 - rBase)) / (2 * rBase)
-      const ksPaint = ((1 - rPaint) * (1 - rPaint)) / (2 * rPaint)
-      const ksMix = (1 - coverage) * ksBase + coverage * ksPaint
-      const rMix = 1 + ksMix - Math.sqrt(ksMix * ksMix + 2 * ksMix)
+      const rB = Math.max(0.001, Math.min(0.999, interpolateReflectance(baseSpectrum, wl) * 0.01))
+      const rP = Math.max(0.001, Math.min(0.999, interpolateReflectance(paintSpectrum, wl) * 0.01))
+      let rMix: number
+      if (system === 'acrylic') {
+        // Кроющий слой поверх подложки: верхняя плёнка отражает свет до прохождения к базе
+        rMix = (1 - c) * rB + c * rP
+      } else {
+        // Анилин (лессировка): полупрозрачный фильтр поверх исходной кожи
+        const rGlaze = Math.pow(rB, 1 - c) * Math.pow(rP, c)
+        rMix = 0.65 * rGlaze + 0.35 * ((1 - c) * rB + c * rP)
+      }
       out[i] = { wavelength: wl, reflectance: Math.max(0.1, Math.min(99.9, rMix * 100)) }
     }
     return out
   }
 
   return {
-    layer1: blendKM(cov1),
-    layer2: blendKM(cov2),
-    layer3: blendKM(cov3),
+    layer1: blendCoat(cov1),
+    layer2: blendCoat(cov2),
+    layer3: blendCoat(cov3),
     final: paintSpectrum,
     strength: Math.round(strength),
     deltaL,
