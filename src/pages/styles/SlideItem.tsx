@@ -20,7 +20,7 @@ export type SlideItemProps = {
   onActiveVideoReady: (index: number) => void
 }
 
-const smoothEase: [number, number, number, number] = [0.25, 1, 0.5, 1]
+const editorialEase: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
 export function SlideItem({
   slide,
@@ -243,7 +243,10 @@ export function SlideItem({
   const triggerLikeRequest = useCallback(
     async (forceLike = false) => {
       const currentLiked = isLikedRef.current
-      if (forceLike && currentLiked) return
+      if (forceLike && currentLiked) {
+        hapticSwatch()
+        return
+      }
       if (isLikeInFlightRef.current) return
 
       const next = forceLike ? true : !currentLiked
@@ -251,8 +254,10 @@ export function SlideItem({
       setIsLiked(next)
       setLikesCount((c) => (next ? c + 1 : Math.max(0, c - 1)))
 
-      if (tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred(next ? 'medium' : 'light')
+      if (next) {
+        triggerHaptic('medium')
+      } else {
+        hapticSwatch()
       }
 
       isLikeInFlightRef.current = true
@@ -300,7 +305,7 @@ export function SlideItem({
   const handleVideoTap = (e: MouseEvent<HTMLDivElement>) => {
     if (isDescOpen) {
       setIsDescOpen(false)
-      if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged()
+      hapticSwatch()
       return
     }
 
@@ -334,13 +339,13 @@ export function SlideItem({
           video.pause()
           setIsPaused(true)
         }
-        if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged()
+        hapticSwatch()
       }, 220)
     }
   }
 
   const handleShare = async () => {
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+    hapticTap()
 
     const title = slide.title[lang].replace('\n', ' ')
     const text =
@@ -369,251 +374,297 @@ export function SlideItem({
   }
 
   const toggleDesc = () => {
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+    hapticTap()
     setIsDescOpen((v) => !v)
   }
 
+  const actionButtons = (
+    <div className="flex items-center gap-2.5 shrink-0">
+      <button
+        type="button"
+        onClick={onToggleMute}
+        aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
+        className="w-11 h-11 rounded-[6px] border border-[#F4F0E8]/20 bg-[#141312] flex items-center justify-center text-[#F4F0E8] hover:border-[#C9A97E]/60 active:scale-95 transition-colors cursor-pointer"
+      >
+        {isMuted ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            <line x1="23" y1="9" x2="17" y2="15" />
+            <line x1="17" y1="9" x2="23" y2="15" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+          </svg>
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => void triggerLikeRequest(false)}
+        aria-label="Нравится"
+        className={`
+          h-11 px-3.5 min-w-[44px] rounded-[6px] border flex items-center justify-center gap-2
+          active:scale-95 transition-colors cursor-pointer
+          ${
+            isLiked
+              ? 'border-[#C9A97E] bg-[#C9A97E] text-[#0B0B0A]'
+              : 'border-[#F4F0E8]/20 bg-[#141312] text-[#F4F0E8] hover:border-[#C9A97E]/60'
+          }
+        `}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill={isLiked ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          strokeWidth="1.6"
+        >
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+        </svg>
+        {likesCount > 0 && (
+          <span className="text-xs font-medium tabular-nums">
+            {likesCount}
+          </span>
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => void handleShare()}
+        aria-label="Поделиться"
+        className="w-11 h-11 rounded-[6px] border border-[#F4F0E8]/20 bg-[#141312] flex items-center justify-center text-[#F4F0E8] hover:border-[#C9A97E]/60 active:scale-95 transition-colors cursor-pointer"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+          <polyline points="16 6 12 2 8 6" />
+          <line x1="12" y1="2" x2="12" y2="15" />
+        </svg>
+      </button>
+    </div>
+  )
+
   return (
-    <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#050505]">
-      {!isVideoLoaded && (
-        <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-b from-[#0d0d0d] via-[#151412] to-[#080808] animate-pulse">
-          <div className="flex flex-col items-center gap-2 opacity-40">
-            <div className="w-5 h-5 rounded-full border border-white/40 border-t-white animate-spin" />
-            <span className="text-[8px] font-sans uppercase tracking-[0.3em] text-white/70">
-              {hasVideoError ? t.videoErrorRetry : t.loadingVideo}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="absolute inset-0 bg-[#050505]">
-        {slide.video ? (
-          <video
-            ref={videoRef}
-            preload="none"
-            loop
-            playsInline
-            webkit-playsinline="true"
-            muted={isMuted}
-            poster={slide.poster}
-            onLoadedData={handleVideoReady}
-            onCanPlay={handleVideoReady}
-            onPlaying={handleVideoReady}
-            onError={handleVideoError}
-            className={`
-              w-full h-full object-cover
-              transition-opacity duration-300 ease-out
-              ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}
-              ${slide.hideWatermark ? 'scale-[1.08]' : ''}
-            `}
-          />
-        ) : slide.image ? (
-          <img
-            src={slide.image}
-            alt={slide.title[lang]}
-            className="w-full h-full object-cover"
-          />
-        ) : null}
-      </div>
-
-      <div
-        onClick={handleVideoTap}
-        className="absolute inset-0 z-10 cursor-pointer select-none"
-      />
-
-      <AnimatePresence>
-        {heartBurst && (
-          <motion.div
-            key={heartBurst.id}
-            initial={{ scale: 0.2, opacity: 0, rotate: -12 }}
-            animate={{ scale: [0.2, 1.25, 1], opacity: [0, 1, 0], y: -40 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.75, ease: 'easeOut' }}
-            style={{ left: heartBurst.x - 40, top: heartBurst.y - 40 }}
-            className="absolute z-30 pointer-events-none text-white drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
-          >
-            <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isPaused && isActive && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.85 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-          >
-            <div className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-md border border-white/25 flex items-center justify-center text-white">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="ml-1">
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="absolute top-0 left-0 right-0 h-[34%] bg-gradient-to-b from-black/75 via-black/25 to-transparent z-10 pointer-events-none" />
-      <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t z-10 pointer-events-none transition-all duration-500 ${
-          isDescOpen
-            ? 'h-[50%] from-black/90 via-black/60 to-transparent'
-            : 'h-[22%] from-black/65 via-black/25 to-transparent'
-        }`}
-      />
-
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
-        transition={{ duration: 0.7, ease: smoothEase, delay: 0.08 }}
-        style={{
-          top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 60px)',
-        }}
-        className="absolute left-6 right-6 z-20 flex items-start justify-between pointer-events-none"
-      >
-        <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.38em] text-white/75 mb-1.5 drop-shadow">
-            {slide.subtitle[lang]}
-          </p>
-          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.06] tracking-tight text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
-            {slide.title[lang]}
-          </h2>
-        </div>
-
-        <div className="text-[10px] font-sans tracking-[0.22em] text-white/65 mt-1 tabular-nums drop-shadow">
-          <span>{String(index + 1).padStart(2, '0')}</span>
-          <span className="text-white/35 mx-1">/</span>
-          <span className="text-white/40">{String(totalCount).padStart(2, '0')}</span>
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
-        transition={{ duration: 0.7, ease: smoothEase, delay: 0.15 }}
-        style={{
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
-        }}
-        className="absolute left-6 right-6 z-20 flex flex-col pointer-events-none"
-      >
-        <AnimatePresence>
-          {isDescOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              transition={{ duration: 0.28, ease: smoothEase }}
-              onClick={toggleDesc}
-              className="pointer-events-auto mb-3 p-4 rounded-2xl bg-black/65 backdrop-blur-xl border border-white/15 shadow-2xl cursor-pointer"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[8px] font-sans uppercase tracking-[0.3em] text-white/50">
-                  {slide.subtitle[lang]}
-                </span>
-                <span className="text-[8px] font-sans uppercase tracking-[0.2em] text-white/60">
-                  {t.hideDesc} ✕
+    <div className="relative h-full w-full flex-shrink-0 snap-start snap-always bg-[#0B0B0A] md:flex md:items-center md:justify-center md:px-8 md:pt-20 md:pb-8">
+      {/* Внутренний адаптивный контейнер:
+          - Mobile (<768px): полный экран 100%
+          - Tablet / Desktop (>=768px): двухколоночная журнальная композиция с кадром 9:16 и редакционной панелью */}
+      <div className="relative h-full w-full md:h-auto md:max-h-[calc(100vh-112px)] md:max-w-[920px] md:grid md:grid-cols-[minmax(280px,390px)_1fr] md:gap-10 md:items-center">
+        {/* Блок видео / изображения */}
+        <div className="relative h-full w-full md:h-[min(78vh,740px)] md:aspect-[9/16] md:mx-auto md:rounded-[8px] md:border md:border-[#F4F0E8]/12 overflow-hidden bg-[#141312]">
+          {!isVideoLoaded && (
+            <div className="absolute inset-0 z-0 flex items-center justify-center bg-[#141312]">
+              <div className="flex flex-col items-center gap-2.5">
+                <div className="w-5 h-5 rounded-full border border-[#C9A97E]/40 border-t-[#C9A97E] animate-spin" />
+                <span className="text-xs tracking-[0.08em] uppercase text-[#A39E93]">
+                  {hasVideoError ? t.videoErrorRetry : t.loadingVideo}
                 </span>
               </div>
-              <p className="text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.65] text-[#F4F0E8]/95">
-                {slide.desc[lang]}
-              </p>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
 
-        <div className="w-full h-px bg-white/20 mb-3" />
+          <div className="absolute inset-0 bg-[#141312]">
+            {slide.video ? (
+              <video
+                ref={videoRef}
+                preload="none"
+                loop
+                playsInline
+                webkit-playsinline="true"
+                muted={isMuted}
+                poster={slide.poster}
+                onLoadedData={handleVideoReady}
+                onCanPlay={handleVideoReady}
+                onPlaying={handleVideoReady}
+                onError={handleVideoError}
+                className={`
+                  w-full h-full object-cover
+                  transition-opacity duration-300 ease-out
+                  ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}
+                  ${slide.hideWatermark ? 'scale-[1.08]' : ''}
+                `}
+              />
+            ) : slide.image ? (
+              <img
+                src={slide.image}
+                alt={slide.title[lang]}
+                className="w-full h-full object-cover"
+              />
+            ) : null}
+          </div>
 
-        <div className="flex items-center justify-between gap-3 pointer-events-auto">
-          <button
-            type="button"
-            onClick={toggleDesc}
-            className="flex-1 min-w-0 text-left group py-0.5 pr-2 active:opacity-70 transition-opacity bg-transparent border-0 cursor-pointer"
+          <div
+            onClick={handleVideoTap}
+            className="absolute inset-0 z-10 cursor-pointer select-none"
+          />
+
+          <AnimatePresence>
+            {heartBurst && (
+              <motion.div
+                key={heartBurst.id}
+                initial={{ scale: 0.3, opacity: 0 }}
+                animate={{ scale: [0.3, 1.15, 1], opacity: [0, 1, 0], y: -32 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.65, ease: editorialEase }}
+                style={{ left: heartBurst.x - 36, top: heartBurst.y - 36 }}
+                className="absolute z-30 pointer-events-none text-[#C9A97E]"
+              >
+                <svg width="72" height="72" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {isPaused && isActive && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.18 }}
+                className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+              >
+                <div className="w-12 h-12 rounded-full bg-[#0B0B0A]/85 border border-[#F4F0E8]/25 flex items-center justify-center text-[#F4F0E8]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Градиенты для читаемости текста только на мобильном экране */}
+          <div className="md:hidden absolute top-0 left-0 right-0 h-[30%] bg-gradient-to-b from-[#0B0B0A]/80 to-transparent z-10 pointer-events-none" />
+          <div
+            className={`md:hidden absolute bottom-0 left-0 right-0 bg-gradient-to-t z-10 pointer-events-none transition-all duration-300 ${
+              isDescOpen
+                ? 'h-[48%] from-[#0B0B0A]/95 via-[#0B0B0A]/75 to-transparent'
+                : 'h-[26%] from-[#0B0B0A]/85 via-[#0B0B0A]/40 to-transparent'
+            }`}
+          />
+
+          {/* Заголовок и счётчик поверх кадра на мобильном экране */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
+            transition={{ duration: 0.45, ease: editorialEase }}
+            style={{
+              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 56px)',
+            }}
+            className="md:hidden absolute left-5 right-5 z-20 flex items-start justify-between gap-4 pointer-events-none"
           >
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="text-[8px] font-sans uppercase tracking-[0.28em] text-white/65">
-                {t.aboutStyle}
+            <div>
+              <p className="text-xs uppercase tracking-[0.12em] text-[#C9A97E] mb-1.5">
+                {slide.subtitle[lang]}
+              </p>
+              <h2 className="font-serif text-4xl leading-[1.05] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line">
+                {slide.title[lang]}
+              </h2>
+            </div>
+
+            <div className="text-xs tracking-[0.06em] text-[#A39E93] pt-1 tabular-nums shrink-0">
+              <span className="text-[#F4F0E8] font-medium">
+                {String(index + 1).padStart(2, '0')}
               </span>
-              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/30 text-[9px] leading-none text-white/80">
-                {isDescOpen ? '−' : '+'}
+              <span className="mx-1">/</span>
+              <span>{String(totalCount).padStart(2, '0')}</span>
+            </div>
+          </motion.div>
+
+          {/* Нижняя панель управления на мобильном экране */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
+            transition={{ duration: 0.45, ease: editorialEase, delay: 0.06 }}
+            style={{
+              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 18px)',
+            }}
+            className="md:hidden absolute left-5 right-5 z-20 flex flex-col pointer-events-none"
+          >
+            <AnimatePresence>
+              {isDescOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.22, ease: editorialEase }}
+                  onClick={toggleDesc}
+                  className="pointer-events-auto mb-3 p-4 rounded-[8px] bg-[#141312]/95 border border-[#F4F0E8]/15 cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs uppercase tracking-[0.08em] text-[#C9A97E]">
+                      {slide.subtitle[lang]}
+                    </span>
+                    <span className="text-xs text-[#A39E93]">
+                      {t.hideDesc} ✕
+                    </span>
+                  </div>
+                  <p className="text-sm font-normal leading-[1.6] text-[#F4F0E8]">
+                    {slide.desc[lang]}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex items-center justify-between gap-3 pointer-events-auto">
+              <button
+                type="button"
+                onClick={toggleDesc}
+                className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2 rounded-[6px] bg-[#141312]/90 border border-[#F4F0E8]/15 text-left active:scale-[0.99] transition-transform cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs uppercase tracking-[0.08em] text-[#F4F0E8] font-medium">
+                    {t.aboutStyle}
+                  </span>
+                  <span className="text-xs text-[#C9A97E] font-medium">
+                    {isDescOpen ? '−' : '+'}
+                  </span>
+                </div>
+                <p className="text-xs text-[#A39E93] truncate mt-0.5">
+                  {slide.desc[lang]}
+                </p>
+              </button>
+
+              {actionButtons}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Редакционная колонка для планшета и компьютера (>=768px) */}
+        <div className="hidden md:flex md:flex-col md:justify-between md:h-[min(78vh,740px)] md:py-4 md:pr-2">
+          <div>
+            <div className="flex items-center justify-between pb-4 border-b border-[#F4F0E8]/12 mb-6">
+              <span className="text-xs uppercase tracking-[0.1em] text-[#C9A97E]">
+                {slide.subtitle[lang]}
+              </span>
+              <span className="text-xs tracking-[0.06em] text-[#A39E93] tabular-nums">
+                <span className="text-[#F4F0E8] font-medium">
+                  {String(index + 1).padStart(2, '0')}
+                </span>{' '}
+                / {String(totalCount).padStart(2, '0')}
               </span>
             </div>
-            <p className="text-[11px] font-sans font-light text-white/85 truncate">
+
+            <h2 className="font-serif text-5xl xl:text-6xl leading-[1.03] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line mb-6">
+              {slide.title[lang]}
+            </h2>
+
+            <p className="text-[15px] leading-[1.65] text-[#F4F0E8]/85 max-w-[46ch]">
               {slide.desc[lang]}
             </p>
-          </button>
+          </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onToggleMute}
-              aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
-              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90 cursor-pointer"
-            >
-              {isMuted ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <line x1="23" y1="9" x2="17" y2="15" />
-                  <line x1="17" y1="9" x2="23" y2="15" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-                </svg>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void triggerLikeRequest(false)}
-              aria-label="Нравится"
-              className={`
-                h-9 px-2.5 min-w-[36px] rounded-full border flex items-center justify-center gap-1.5
-                transition-all duration-200 active:scale-90 cursor-pointer
-                ${
-                  isLiked
-                    ? 'border-white bg-white text-black shadow-[0_0_14px_rgba(255,255,255,0.35)]'
-                    : 'border-white/30 text-white bg-black/35 backdrop-blur-md'
-                }
-              `}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill={isLiked ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-              {likesCount > 0 && (
-                <span className="text-[9px] font-sans tracking-wider tabular-nums">
-                  {likesCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleShare()}
-              aria-label="Поделиться"
-              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90 cursor-pointer"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
-            </button>
+          <div className="pt-6 border-t border-[#F4F0E8]/12 flex items-center justify-between gap-4">
+            <span className="text-xs text-[#A39E93]">
+              Cordwainer — Lookbook
+            </span>
+            {actionButtons}
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
-
