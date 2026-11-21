@@ -76,6 +76,26 @@ type ColorsPageProps = {
   setLang: (lang: AppLang) => void
 }
 
+type StudioBgId = 'auto' | 'cream' | 'white' | 'gray' | 'graphite' | 'black'
+
+type StudioBgOption = {
+  id: StudioBgId
+  hex: string | null
+  swatchHex: string
+  isDarkStage: boolean | null
+  label: string
+}
+
+const STUDIO_BG_OPTIONS: readonly StudioBgOption[] = [
+  { id: 'cream', hex: '#F2EFE9', swatchHex: '#F2EFE9', isDarkStage: false, label: 'Cream' },
+  { id: 'white', hex: '#FFFFFF', swatchHex: '#FFFFFF', isDarkStage: false, label: 'White' },
+  { id: 'gray', hex: '#E3E3E6', swatchHex: '#D4D4D8', isDarkStage: false, label: 'Gray' },
+  { id: 'graphite', hex: '#1B1B1F', swatchHex: '#27272A', isDarkStage: true, label: 'Graphite' },
+  { id: 'black', hex: '#050505', swatchHex: '#050505', isDarkStage: true, label: 'Black' },
+]
+
+const VALID_BG_IDS: readonly StudioBgId[] = ['auto', 'cream', 'white', 'gray', 'graphite', 'black']
+
 type PersistedColorsState = {
   baseHue: number
   whiteAmount: number
@@ -85,6 +105,7 @@ type PersistedColorsState = {
   modelMode: ColorModelMode
   mappingPreset: FootwearMappingPreset
   modelId: SneakerModelId
+  studioBg: StudioBgId
 }
 
 const STORAGE_KEY = 'cordwainer_colors_state_v1'
@@ -119,6 +140,7 @@ const DEFAULT_STATE: PersistedColorsState = {
   modelMode: 'ryb',
   mappingPreset: 'classic',
   modelId: 'aerostrap',
+  studioBg: 'auto',
 }
 
 function loadSavedColorsState(): PersistedColorsState {
@@ -153,6 +175,12 @@ function loadSavedColorsState(): PersistedColorsState {
         ? (parsed.modelId as SneakerModelId)
         : DEFAULT_STATE.modelId
 
+    const studioBg: StudioBgId =
+      typeof parsed.studioBg === 'string' &&
+      VALID_BG_IDS.includes(parsed.studioBg as StudioBgId)
+        ? (parsed.studioBg as StudioBgId)
+        : DEFAULT_STATE.studioBg
+
     return {
       baseHue: Math.round(clamp(parsed.baseHue, 0, 359, DEFAULT_STATE.baseHue)),
       whiteAmount: clamp(parsed.whiteAmount, 0, 1, DEFAULT_STATE.whiteAmount),
@@ -162,6 +190,7 @@ function loadSavedColorsState(): PersistedColorsState {
       modelMode,
       mappingPreset,
       modelId,
+      studioBg,
     }
   } catch {
     return DEFAULT_STATE
@@ -200,6 +229,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     initialSaved.mappingPreset
   )
   const [modelId, setModelId] = useState<SneakerModelId>(initialSaved.modelId)
+  const [studioBg, setStudioBg] = useState<StudioBgId>(initialSaved.studioBg)
 
   const [baseHue, setBaseHue] = useState(initialSaved.baseHue)
   const [whiteAmount, setWhiteAmount] = useState(initialSaved.whiteAmount)
@@ -225,6 +255,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const t: TranslationDict = TRANSLATIONS[normalizeSupportedLang(localLang)] ?? TRANSLATIONS.ru
   const activeModel = getSneakerModelConfig(modelId)
+
+  const activeBgOption = useMemo(
+    () => STUDIO_BG_OPTIONS.find((opt) => opt.id === studioBg) ?? null,
+    [studioBg]
+  )
+  const stageIsDark = activeBgOption?.isDarkStage ?? isDark
+  const stageBgColor = activeBgOption?.hex ?? (isDark ? '#0A0A0A' : '#F2EFE9')
 
   const {
     paymentState,
@@ -258,6 +295,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         modelMode,
         mappingPreset,
         modelId,
+        studioBg,
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
     } catch {}
@@ -270,6 +308,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     modelMode,
     mappingPreset,
     modelId,
+    studioBg,
     isProPurchased,
   ])
 
@@ -331,6 +370,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     setBlackAmount(DEFAULT_STATE.blackAmount)
     setChromaAmount(DEFAULT_STATE.chromaAmount)
     setMappingPreset(DEFAULT_STATE.mappingPreset)
+    setStudioBg('auto')
   }, [])
 
   const copyToClipboard = useCallback(
@@ -749,17 +789,63 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* 2. 3D-МОДЕЛЬ (AEROSTRAP / NEXUS X1 / MONOLITH V) */}
-        <div className="my-0.5">
+        {/* 2. 3D-МОДЕЛЬ + ВЫБОР СТУДИЙНОГО ФОНА */}
+        <div
+          className={
+            'relative my-1 rounded-[4px] overflow-hidden transition-colors duration-300 ' +
+            (studioBg !== 'auto' ? 'border ' + cLine : '')
+          }
+          style={{ backgroundColor: stageBgColor }}
+        >
           <Sneaker3D
             sneakerColors={sneakerColors}
-            isDark={isDark}
+            isDark={stageIsDark}
             modelId={modelId}
             onResetAll={handleResetAll}
             resetLabel={t.resetBtn}
             loading3DLabel={'3D • ' + activeModel.name + '...'}
             webglFallbackLabel={t.webglFallback}
           />
+
+          {/* 5 студийных фонов в левом нижнем углу 3D-сцены */}
+          <div
+            className="absolute bottom-1.5 left-2 z-[5] flex items-center gap-1.5 px-1.5 py-1 rounded-full"
+            style={{
+              backgroundColor: stageIsDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.65)',
+            }}
+            aria-label="Studio background"
+          >
+            {STUDIO_BG_OPTIONS.map((opt) => {
+              const isSelected =
+                studioBg === opt.id ||
+                (studioBg === 'auto' && ((isDark && opt.id === 'black') || (!isDark && opt.id === 'cream')))
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light')
+                    setStudioBg(opt.id)
+                  }}
+                  aria-label={opt.label}
+                  title={opt.label}
+                  className={
+                    'w-3.5 h-3.5 rounded-full cursor-pointer transition-transform ' +
+                    (isSelected
+                      ? 'scale-110 ring-1 ring-offset-1 ' +
+                        (stageIsDark
+                          ? 'ring-white ring-offset-black'
+                          : 'ring-black ring-offset-white')
+                      : 'opacity-75 hover:opacity-100')
+                  }
+                  style={{
+                    backgroundColor: opt.swatchHex,
+                    border: '1px solid ' + (opt.isDarkStage ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'),
+                  }}
+                />
+              )
+            })}
+          </div>
         </div>
 
         {/* 3. КОМПАКТНЫЙ ПУЛЬТ: КРУГ ИТТЕНА СЛЕВА + 3 ПОЛЗУНКА СПРАВА */}
