@@ -7,6 +7,7 @@ import type { IlluminantType } from '../../utils/colorScience'
 import { PigmentSelector } from '../../components/PigmentSelector'
 import { SpectralSparkline } from './SpectralChart'
 import type { ColorCalcDict } from './i18n'
+import { SUBSTRATE_PRESETS, type SubstratePresetId } from './substrate'
 
 export interface LayerSwatchItem {
   short: string
@@ -35,6 +36,10 @@ interface FormulaPanelProps {
   onToggleWet: () => void
   illuminant: IlluminantType
   onIlluminantChange: (ill: IlluminantType) => void
+  substrateId: SubstratePresetId | 'custom'
+  customSubstrateHex: string
+  onSelectSubstrate: (id: SubstratePresetId) => void
+  onCustomSubstrateChange: (hex: string) => void
   layerSwatches: LayerSwatchItem[] | null
   selectedCoatIdx: number
   onSelectCoat: (idx: number) => void
@@ -52,6 +57,12 @@ interface FormulaPanelProps {
 }
 
 const ILLUMINANT_ORDER: IlluminantType[] = ['D65', 'A', 'cool', 'twilight']
+
+const SUBSTRATE_TITLES: Record<Lang, { title: string; custom: string }> = {
+  ru: { title: 'Исходная кожа (подложка)', custom: 'Своя' },
+  uk: { title: 'Вихідна шкіра (підкладка)', custom: 'Своя' },
+  de: { title: 'Grundleder (Untergrund)', custom: 'Eigene' },
+}
 
 export function FormulaPanel({
   lang,
@@ -71,6 +82,10 @@ export function FormulaPanel({
   onToggleWet,
   illuminant,
   onIlluminantChange,
+  substrateId,
+  customSubstrateHex,
+  onSelectSubstrate,
+  onCustomSubstrateChange,
   layerSwatches,
   selectedCoatIdx,
   onSelectCoat,
@@ -89,6 +104,7 @@ export function FormulaPanel({
   const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
   const squareColor = displayHex || '#1E1B19'
   const activeIllInfo = dict.illuminants[illuminant]
+  const subText = SUBSTRATE_TITLES[lang] || SUBSTRATE_TITLES.ru
 
   return (
     <div className="flex flex-col gap-4">
@@ -272,12 +288,82 @@ export function FormulaPanel({
           </div>
         </div>
 
-        {/* 4 слоя нанесения */}
+        {/* Выбор подложки (исходной кожи) + 4 слоя нанесения */}
         {layerSwatches && (
           <div
-            className="px-3 py-2.5 border-t flex flex-col gap-2"
+            className="px-3.5 py-3 border-t flex flex-col gap-2.5"
             style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
           >
+            {/* Подложка: 5 базовых кож + своя */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-sans uppercase tracking-[0.14em] opacity-60 font-semibold px-0.5">
+                {subText.title}
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {SUBSTRATE_PRESETS.map((preset) => {
+                  const active = substrateId === preset.id
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => onSelectSubstrate(preset.id)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-sans font-medium border transition-colors cursor-pointer"
+                      style={{
+                        borderColor: active
+                          ? 'var(--color-accent, #C9A86A)'
+                          : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
+                        background: active
+                          ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
+                          : 'transparent',
+                        color: active
+                          ? 'var(--color-accent, #C9A86A)'
+                          : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 75%, transparent)',
+                      }}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/25"
+                        style={{ backgroundColor: preset.fallbackHex }}
+                      />
+                      <span>{preset.label[lang]}</span>
+                    </button>
+                  )
+                })}
+
+                {/* Своя кожа (нативный выбор цвета) */}
+                <label
+                  className="relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-sans font-medium border transition-colors cursor-pointer overflow-hidden"
+                  style={{
+                    borderColor:
+                      substrateId === 'custom'
+                        ? 'var(--color-accent, #C9A86A)'
+                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 18%, transparent)',
+                    background:
+                      substrateId === 'custom'
+                        ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
+                        : 'transparent',
+                    color:
+                      substrateId === 'custom'
+                        ? 'var(--color-accent, #C9A86A)'
+                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 75%, transparent)',
+                  }}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/25"
+                    style={{ backgroundColor: customSubstrateHex }}
+                  />
+                  <span>+ {subText.custom}</span>
+                  <input
+                    type="color"
+                    value={customSubstrateHex}
+                    onChange={(e) => onCustomSubstrateChange(e.target.value.toUpperCase())}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    aria-label={subText.custom}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* 4 слоя нанесения */}
             <div className="grid grid-cols-4 gap-1.5">
               {layerSwatches.map((ls, idx) => {
                 const isSelectedCoat = selectedCoatIdx === idx
@@ -286,7 +372,7 @@ export function FormulaPanel({
                     key={ls.short}
                     type="button"
                     onClick={() => onSelectCoat(idx)}
-                    className="flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-2xl border transition-colors cursor-pointer"
+                    className="flex items-center justify-center gap-1 py-2 px-1 rounded-2xl border transition-colors cursor-pointer min-w-0"
                     style={{
                       borderColor: isSelectedCoat
                         ? 'var(--color-accent, #C9A86A)'
@@ -297,14 +383,14 @@ export function FormulaPanel({
                     }}
                   >
                     <span
-                      className="w-3 h-3 rounded-full shrink-0"
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{
                         backgroundColor: ls.hex,
-                        border: '1px solid rgba(0,0,0,0.22)',
+                        border: '1px solid rgba(0,0,0,0.25)',
                       }}
                     />
                     <span
-                      className="text-[10.5px] font-sans whitespace-nowrap"
+                      className="text-[10px] font-sans truncate"
                       style={{
                         fontWeight: isSelectedCoat ? 600 : 500,
                         opacity: isSelectedCoat ? 1 : 0.72,
@@ -318,7 +404,7 @@ export function FormulaPanel({
               })}
             </div>
 
-            <div className="px-1 text-[11px] font-sans opacity-70">
+            <div className="px-0.5 text-[11px] font-sans opacity-70">
               {dict.coatExplanations[selectedCoatIdx]}
             </div>
           </div>
@@ -482,7 +568,7 @@ export function FormulaPanel({
                         spectrum={selectedPigment?.spectrum}
                         strokeColor={selectedPigment?.hex || '#C9A86A'}
                         width={54}
-                        height={22}
+                        height={24}
                       />
                     </div>
 
