@@ -1,325 +1,283 @@
-import { useCallback, useEffect, useState } from 'react'
-import { getRelativeLuminance } from './colorEngine'
+import { getRelativeLuminance, normalizeHex } from './colorEngine'
 
 export type ThemeMode = 'day' | 'night' | 'auto'
 
-export type StudioBgPreset = 'cream' | 'white' | 'light-gray' | 'graphite' | 'black' | 'custom'
+export type StudioBgId = 'cream' | 'white' | 'light-gray' | 'graphite' | 'black' | 'custom'
 
-export type PerformanceMode = 'auto' | 'high' | 'eco'
-
-const THEME_STORAGE_KEY = 'cordwainer_theme_mode_v1'
-const STUDIO_SETTINGS_KEY = 'cordwainer_studio_settings_v2'
-
-export const STUDIO_BG_PRESET_HEX: Record<Exclude<StudioBgPreset, 'custom'>, string> = {
-  cream: '#F5F1EB',
-  white: '#FFFFFF',
-  'light-gray': '#E5E6EA',
-  graphite: '#2B2D32',
-  black: '#0D0D0F',
-}
-
-export type StudioDisplaySettings = {
-  bgPreset: StudioBgPreset
-  customBgHex: string
+export type StudioBgConfig = {
+  id: StudioBgId
+  customHex: string
   autoContrast: boolean
-  performanceMode: PerformanceMode
 }
 
-const DEFAULT_STUDIO_SETTINGS: StudioDisplaySettings = {
-  bgPreset: 'cream',
-  customBgHex: '#EAE4DA',
+export type StudioBgPreset = {
+  id: Exclude<StudioBgId, 'custom'>
+  hex: string
+}
+
+export const STUDIO_BG_PRESETS: readonly StudioBgPreset[] = [
+  { id: 'cream', hex: '#F5F1EB' },
+  { id: 'white', hex: '#FFFFFF' },
+  { id: 'light-gray', hex: '#E7E5E0' },
+  { id: 'graphite', hex: '#262523' },
+  { id: 'black', hex: '#111112' },
+]
+
+export const DEFAULT_STUDIO_BG: StudioBgConfig = {
+  id: 'cream',
+  customHex: '#F5F1EB',
   autoContrast: true,
-  performanceMode: 'auto',
 }
 
-export type CordwaineThemeTokens = {
+export type ThemeTokens = {
+  isDark: boolean
   pageBg: string
-  surface: string
-  surfaceElevated: string
-  surfaceSoft: string
-  sheetBg: string
-  backdrop: string
+  headerBg: string
+  cardBg: string
+  elevatedBg: string
+  trackBg: string
   ink: string
-  inkSecondary: string
-  inkMuted: string
+  muted: string
+  subtle: string
   border: string
-  borderStrong: string
-  divider: string
-  pillActiveBg: string
-  pillActiveText: string
-  pillIdleBg: string
-  pillIdleText: string
+  strongBorder: string
   activeTintBg: string
   activeTintBorder: string
-  activeTintText: string
-  cardShadow: string
-  buttonShadow: string
-  sheetShadow: string
-  accentGold: string
-  chromeBgHex: string
+  activeTintInk: string
+  primaryBtnBg: string
+  primaryBtnInk: string
+  shadowCard: string
+  shadowSoft: string
 }
 
-// Backward-compatible alias
-export type CordwainerThemeTokens = CordwaineThemeTokens
-
-export const DAY_THEME: CordwaineThemeTokens = {
+export const DAY_TOKENS: ThemeTokens = {
+  isDark: false,
   pageBg: '#F5F1EB',
-  surface: '#FCFBF8',
-  surfaceElevated: '#FFFFFF',
-  surfaceSoft: '#EFEAE1',
-  sheetBg: '#FBF9F5',
-  backdrop: 'rgba(24, 22, 20, 0.34)',
-  ink: '#181614',
-  inkSecondary: '#58534C',
-  inkMuted: '#8B857C',
-  border: 'rgba(24, 22, 20, 0.09)',
-  borderStrong: 'rgba(24, 22, 20, 0.16)',
-  divider: 'rgba(24, 22, 20, 0.08)',
-  pillActiveBg: '#181614',
-  pillActiveText: '#FAF8F4',
-  pillIdleBg: 'rgba(255, 255, 255, 0.78)',
-  pillIdleText: '#58524A',
+  headerBg: 'rgba(245, 241, 235, 0.92)',
+  cardBg: '#FFFFFF',
+  elevatedBg: '#F9F6F1',
+  trackBg: '#EAE4DA',
+  ink: '#1C1A17',
+  muted: '#6E685F',
+  subtle: '#968F85',
+  border: 'rgba(28, 26, 23, 0.09)',
+  strongBorder: 'rgba(28, 26, 23, 0.16)',
   activeTintBg: '#EAE1D2',
   activeTintBorder: '#9A8263',
-  activeTintText: '#181614',
-  cardShadow: '0 8px 24px -8px rgba(24, 22, 20, 0.08), 0 1px 3px rgba(24, 22, 20, 0.04)',
-  buttonShadow: '0 2px 6px -2px rgba(24, 22, 20, 0.08), 0 1px 2px rgba(24, 22, 20, 0.04)',
-  sheetShadow: '0 -10px 36px -8px rgba(24, 22, 20, 0.18), 0 -1px 0 rgba(24, 22, 20, 0.06)',
-  accentGold: '#B88940',
-  chromeBgHex: '#F5F1EB',
+  activeTintInk: '#1C1A17',
+  primaryBtnBg: '#1C1A17',
+  primaryBtnInk: '#FAF8F4',
+  shadowCard: '0 2px 12px rgba(28, 26, 23, 0.05)',
+  shadowSoft: '0 1px 4px rgba(28, 26, 23, 0.04)',
 }
 
-export const NIGHT_THEME: CordwaineThemeTokens = {
+export const NIGHT_TOKENS: ThemeTokens = {
+  isDark: true,
   pageBg: '#0E0E10',
-  surface: '#17171B',
-  surfaceElevated: '#202026',
-  surfaceSoft: '#27272E',
-  sheetBg: '#16161A',
-  backdrop: 'rgba(0, 0, 0, 0.56)',
-  ink: '#F5F2EB',
-  inkSecondary: '#B8B3AA',
-  inkMuted: '#817D75',
-  border: 'rgba(245, 242, 235, 0.11)',
-  borderStrong: 'rgba(245, 242, 235, 0.20)',
-  divider: 'rgba(245, 242, 235, 0.08)',
-  pillActiveBg: '#F5F2EB',
-  pillActiveText: '#121215',
-  pillIdleBg: 'rgba(39, 39, 46, 0.85)',
-  pillIdleText: '#A8A39A',
+  headerBg: 'rgba(14, 14, 16, 0.92)',
+  cardBg: '#18181B',
+  elevatedBg: '#202024',
+  trackBg: '#2A2A2F',
+  ink: '#F5F2EC',
+  muted: '#A09A91',
+  subtle: '#757068',
+  border: 'rgba(245, 242, 236, 0.1)',
+  strongBorder: 'rgba(245, 242, 236, 0.18)',
   activeTintBg: '#2C2721',
   activeTintBorder: '#C79B58',
-  activeTintText: '#F5F2EB',
-  cardShadow: '0 12px 30px -10px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
-  buttonShadow: '0 3px 10px -3px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-  sheetShadow: '0 -14px 44px -8px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.07)',
-  accentGold: '#D9A75A',
-  chromeBgHex: '#0E0E10',
+  activeTintInk: '#F5F2EC',
+  primaryBtnBg: '#F5F2EC',
+  primaryBtnInk: '#141312',
+  shadowCard: '0 4px 18px rgba(0, 0, 0, 0.32)',
+  shadowSoft: '0 1px 6px rgba(0, 0, 0, 0.24)',
 }
 
-export function getThemeTokens(isDark: boolean): CordwaineThemeTokens {
-  return isDark ? NIGHT_THEME : DAY_THEME
-}
+const THEME_KEY = 'cordwainer_theme_mode_v1'
+const STUDIO_BG_KEY = 'cordwainer_studio_bg_v2'
+const HAPTICS_KEY = 'cordwainer_haptics_v1'
 
-export function resolveStudioBgHex(settings: StudioDisplaySettings): string {
-  if (settings.bgPreset === 'custom') {
-    return /^#[0-9A-Fa-f]{6}$/.test(settings.customBgHex)
-      ? settings.customBgHex.toUpperCase()
-      : DEFAULT_STUDIO_SETTINGS.customBgHex
+export function loadThemeMode(): ThemeMode {
+  try {
+    const raw = localStorage.getItem(THEME_KEY)
+    if (raw === 'day' || raw === 'night' || raw === 'auto') return raw
+    const legacy = localStorage.getItem('cordwainer_theme')
+    if (legacy === 'light') return 'day'
+    if (legacy === 'dark') return 'night'
+  } catch {
+    // ignore storage errors
   }
-  return STUDIO_BG_PRESET_HEX[settings.bgPreset] ?? STUDIO_BG_PRESET_HEX.cream
+  return 'auto'
 }
 
-export type StudioStageContrastStyle = {
-  bgHex: string
-  isDarkStage: boolean
-  labelColor: string
-  dividerColor: string
-  btnBg: string
-  btnBorder: string
-  btnText: string
+export function saveThemeMode(mode: ThemeMode): void {
+  try {
+    localStorage.setItem(THEME_KEY, mode)
+    if (mode === 'day') localStorage.setItem('cordwainer_theme', 'light')
+    else if (mode === 'night') localStorage.setItem('cordwainer_theme', 'dark')
+    else localStorage.removeItem('cordwainer_theme')
+  } catch {
+    // ignore storage errors
+  }
 }
 
-export function resolveStudioStageStyle(
-  bgHex: string,
-  autoContrast: boolean,
-  uiTokens: CordwaineThemeTokens
-): StudioStageContrastStyle {
-  const lum = getRelativeLuminance(bgHex)
-  const isDarkStage = lum < 0.34
-
-  if (!autoContrast) {
-    return {
-      bgHex,
-      isDarkStage,
-      labelColor: uiTokens.inkSecondary,
-      dividerColor: uiTokens.divider,
-      btnBg: uiTokens.surface,
-      btnBorder: uiTokens.borderStrong,
-      btnText: uiTokens.ink,
+export function resolveIsDark(mode: ThemeMode): boolean {
+  if (mode === 'day') return false
+  if (mode === 'night') return true
+  if (typeof window !== 'undefined') {
+    const tg = (window as unknown as { Telegram?: { WebApp?: { colorScheme?: string; initData?: string } } }).Telegram?.WebApp
+    if (tg?.initData && tg.initData.trim().length > 0) {
+      return tg.colorScheme === 'dark'
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return true
     }
   }
+  return false
+}
 
-  return isDarkStage
-    ? {
-        bgHex,
-        isDarkStage: true,
-        labelColor: 'rgba(245, 242, 235, 0.78)',
-        dividerColor: 'rgba(245, 242, 235, 0.14)',
-        btnBg: 'rgba(32, 32, 38, 0.88)',
-        btnBorder: 'rgba(245, 242, 235, 0.22)',
-        btnText: '#F5F2EB',
+export function getThemeTokens(isDark: boolean): ThemeTokens {
+  return isDark ? NIGHT_TOKENS : DAY_TOKENS
+}
+
+export function loadStudioBg(): StudioBgConfig {
+  try {
+    const raw = localStorage.getItem(STUDIO_BG_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<StudioBgConfig>
+      const validIds: StudioBgId[] = ['cream', 'white', 'light-gray', 'graphite', 'black', 'custom']
+      const id = validIds.includes(parsed.id as StudioBgId) ? (parsed.id as StudioBgId) : 'cream'
+      return {
+        id,
+        customHex: normalizeHex(parsed.customHex ?? '#F5F1EB', '#F5F1EB'),
+        autoContrast: typeof parsed.autoContrast === 'boolean' ? parsed.autoContrast : true,
       }
-    : {
-        bgHex,
-        isDarkStage: false,
-        labelColor: 'rgba(24, 22, 20, 0.70)',
-        dividerColor: 'rgba(24, 22, 20, 0.12)',
-        btnBg: 'rgba(255, 255, 255, 0.88)',
-        btnBorder: 'rgba(24, 22, 20, 0.16)',
-        btnText: '#181614',
-      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return DEFAULT_STUDIO_BG
 }
 
-export function loadStudioSettings(): StudioDisplaySettings {
+export function saveStudioBg(cfg: StudioBgConfig): void {
   try {
-    const raw = localStorage.getItem(STUDIO_SETTINGS_KEY)
-    if (!raw) return DEFAULT_STUDIO_SETTINGS
-    const parsed = JSON.parse(raw) as Partial<StudioDisplaySettings>
-    const validPresets: StudioBgPreset[] = [
-      'cream',
-      'white',
-      'light-gray',
-      'graphite',
-      'black',
-      'custom',
-    ]
-    const bgPreset: StudioBgPreset =
-      typeof parsed.bgPreset === 'string' &&
-      validPresets.includes(parsed.bgPreset as StudioBgPreset)
-        ? (parsed.bgPreset as StudioBgPreset)
-        : DEFAULT_STUDIO_SETTINGS.bgPreset
-
-    const customBgHex =
-      typeof parsed.customBgHex === 'string' && /^#[0-9A-Fa-f]{6}$/.test(parsed.customBgHex)
-        ? parsed.customBgHex.toUpperCase()
-        : DEFAULT_STUDIO_SETTINGS.customBgHex
-
-    const autoContrast =
-      typeof parsed.autoContrast === 'boolean'
-        ? parsed.autoContrast
-        : DEFAULT_STUDIO_SETTINGS.autoContrast
-
-    const performanceMode: PerformanceMode =
-      parsed.performanceMode === 'auto' ||
-      parsed.performanceMode === 'high' ||
-      parsed.performanceMode === 'eco'
-        ? parsed.performanceMode
-        : DEFAULT_STUDIO_SETTINGS.performanceMode
-
-    return { bgPreset, customBgHex, autoContrast, performanceMode }
+    localStorage.setItem(STUDIO_BG_KEY, JSON.stringify(cfg))
   } catch {
-    return DEFAULT_STUDIO_SETTINGS
+    // ignore storage errors
   }
 }
 
-export function saveStudioSettings(settings: StudioDisplaySettings): void {
-  try {
-    localStorage.setItem(STUDIO_SETTINGS_KEY, JSON.stringify(settings))
-  } catch {}
+export function resolveStudioBgHex(cfg: StudioBgConfig): string {
+  if (cfg.id === 'custom') return normalizeHex(cfg.customHex, '#F5F1EB')
+  const found = STUDIO_BG_PRESETS.find((p) => p.id === cfg.id)
+  return found ? found.hex : '#F5F1EB'
 }
 
-function getSystemPrefersDark(): boolean {
+export function isStudioBgDark(hex: string): boolean {
+  return getRelativeLuminance(hex) < 0.28
+}
+
+export function loadHapticsEnabled(): boolean {
   try {
-    if (typeof window === 'undefined') return false
-    const tgScheme = (
-      window as unknown as { Telegram?: { WebApp?: { colorScheme?: string } } }
-    ).Telegram?.WebApp?.colorScheme
-    if (tgScheme === 'dark') return true
-    if (tgScheme === 'light') return false
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+    const raw = localStorage.getItem(HAPTICS_KEY)
+    if (raw === '0' || raw === 'false') return false
   } catch {
-    return false
+    // ignore
+  }
+  return true
+}
+
+export function saveHapticsEnabled(enabled: boolean): void {
+  try {
+    localStorage.setItem(HAPTICS_KEY, enabled ? '1' : '0')
+  } catch {
+    // ignore
   }
 }
 
-export function loadSavedThemeMode(): ThemeMode {
+export type HapticKind = 'tap' | 'select' | 'harmony' | 'save' | 'reset'
+
+let lastHapticAt = 0
+let sharedAudioCtx: AudioContext | null = null
+
+function playMicroPulse(freqStart: number, freqEnd: number, durationSec: number): void {
   try {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY)
-    if (saved === 'day' || saved === 'night' || saved === 'auto') {
-      return saved
+    const W = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
+    const Ctor = W.AudioContext || W.webkitAudioContext
+    if (!Ctor) return
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new Ctor()
     }
-    if (typeof document !== 'undefined') {
-      return document.documentElement.classList.contains('dark') ? 'night' : 'day'
+    if (sharedAudioCtx.state === 'suspended') {
+      void sharedAudioCtx.resume()
     }
-    return 'auto'
+    const now = sharedAudioCtx.currentTime
+    const osc = sharedAudioCtx.createOscillator()
+    const gain = sharedAudioCtx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(freqStart, now)
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, now + durationSec)
+    gain.gain.setValueAtTime(0.035, now)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec)
+    osc.connect(gain)
+    gain.connect(sharedAudioCtx.destination)
+    osc.start(now)
+    osc.stop(now + durationSec)
   } catch {
-    return 'auto'
+    // ignore
   }
 }
 
-function syncDocumentAndTelegramTheme(isDark: boolean): void {
-  try {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', isDark)
-    }
-  } catch {}
+export function triggerHaptic(kind: HapticKind, enabled = true): void {
+  if (!enabled || typeof window === 'undefined') return
+  const now = Date.now()
+  if (now - lastHapticAt < 45) return
+  lastHapticAt = now
+
   try {
     const tg = (
       window as unknown as {
         Telegram?: {
           WebApp?: {
-            setHeaderColor?: (color: string) => void
-            setBackgroundColor?: (color: string) => void
+            HapticFeedback?: {
+              impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
+              selectionChanged?: () => void
+              notificationOccurred?: (type: 'error' | 'success' | 'warning') => void
+            }
           }
         }
+        TelegramWebviewProxy?: { postEvent?: (eventType: string, eventData: string) => void }
       }
-    ).Telegram?.WebApp
-    const hex = isDark ? NIGHT_THEME.chromeBgHex : DAY_THEME.chromeBgHex
-    tg?.setHeaderColor?.(hex)
-    tg?.setBackgroundColor?.(hex)
-  } catch {}
-}
+    )
 
-export function useCordwainerTheme() {
-  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => loadSavedThemeMode())
-  const [systemDark, setSystemDark] = useState<boolean>(() => getSystemPrefersDark())
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches)
-    if (typeof mq.addEventListener === 'function') {
-      mq.addEventListener('change', onChange)
-      return () => mq.removeEventListener('change', onChange)
+    const hf = tg.Telegram?.WebApp?.HapticFeedback
+    if (hf) {
+      if (kind === 'select') hf.selectionChanged?.()
+      else if (kind === 'save') hf.notificationOccurred?.('success')
+      else if (kind === 'reset') hf.notificationOccurred?.('warning')
+      else if (kind === 'harmony') hf.impactOccurred?.('medium')
+      else hf.impactOccurred?.('light')
     }
-    return undefined
-  }, [])
 
-  const isDark = themeMode === 'auto' ? systemDark : themeMode === 'night'
+    if (tg.TelegramWebviewProxy?.postEvent) {
+      const style = kind === 'save' ? 'heavy' : kind === 'select' ? 'light' : 'medium'
+      tg.TelegramWebviewProxy.postEvent(
+        'web_app_trigger_haptic_feedback',
+        JSON.stringify({ type: 'impact', impact_style: style })
+      )
+    }
 
-  useEffect(() => {
-    syncDocumentAndTelegramTheme(isDark)
-  }, [isDark])
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      if (kind === 'select') navigator.vibrate(14)
+      else if (kind === 'tap') navigator.vibrate(18)
+      else if (kind === 'harmony') navigator.vibrate([18, 22, 18])
+      else if (kind === 'save') navigator.vibrate([22, 28, 32])
+      else if (kind === 'reset') navigator.vibrate([16, 20, 24])
+    }
 
-  const setThemeMode = useCallback((mode: ThemeMode) => {
-    setThemeModeState(mode)
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, mode)
-    } catch {}
-  }, [])
-
-  const toggleDayNight = useCallback(() => {
-    const next: ThemeMode = isDark ? 'day' : 'night'
-    setThemeMode(next)
-  }, [isDark, setThemeMode])
-
-  const tokens = isDark ? NIGHT_THEME : DAY_THEME
-
-  return {
-    themeMode,
-    isDark,
-    tokens,
-    setThemeMode,
-    toggleDayNight,
+    if (kind === 'save') playMicroPulse(190, 62, 0.045)
+    else if (kind === 'reset') playMicroPulse(150, 44, 0.04)
+    else playMicroPulse(170, 48, 0.028)
+  } catch {
+    // ignore
   }
 }
