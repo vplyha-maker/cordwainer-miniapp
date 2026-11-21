@@ -203,28 +203,14 @@ export function getSpectrumSummary(spectrum: SpectrumPoint[]): SpectrumSummary {
 }
 
 export function sampleSeriesAtIndex(
-  series: SpectralSeries[],
+  spectrum: SpectrumPoint[],
   index: number,
   mode: SpectralChartMode = 'reflectance'
-) {
-  const clampedIdx = Math.max(0, Math.min(SPECTRUM_LEN - 1, Math.round(index)))
-  const wavelength = WL_START + clampedIdx * WL_STEP
-  const values = series.map((s) => {
-    const pt = s.spectrum[clampedIdx]
-    const r = pt ? pt.reflectance : 0
-    const value =
-      mode === 'reflectance'
-        ? Math.round(r * 10) / 10
-        : Math.round(reflectanceToKS(r) * 100) / 100
-    return {
-      id: s.id,
-      label: s.label,
-      color: s.color,
-      value,
-      isPrimary: s.isPrimary,
-    }
-  })
-  return { wavelength, values }
+): number {
+  if (!spectrum.length) return 0
+  const clampedIdx = Math.max(0, Math.min(spectrum.length - 1, Math.round(index)))
+  const r = spectrum[clampedIdx]?.reflectance ?? 0
+  return mode === 'reflectance' ? r : reflectanceToKS(r)
 }
 
 interface SpectralChartProps {
@@ -1023,6 +1009,7 @@ export function SpectralChart({
 
 interface SpectralSparklineProps {
   spectrum?: SpectrumPoint[] | null
+  strokeColor?: string
   color?: string
   width?: number
   height?: number
@@ -1031,11 +1018,14 @@ interface SpectralSparklineProps {
 
 export function SpectralSparkline({
   spectrum,
-  color = '#9a723c',
+  strokeColor,
+  color,
   width = 56,
   height = 22,
   className = '',
 }: SpectralSparklineProps) {
+  const lineColor = strokeColor || color || '#9a723c'
+
   const path = useMemo(() => {
     if (!spectrum || spectrum.length < 2) return ''
     const step = Math.max(1, Math.floor(spectrum.length / 24))
@@ -1080,7 +1070,7 @@ export function SpectralSparkline({
       <path
         d={path}
         fill="none"
-        stroke={color}
+        stroke={lineColor}
         strokeWidth={1.6}
         strokeLinecap="round"
         strokeLinejoin="round"
