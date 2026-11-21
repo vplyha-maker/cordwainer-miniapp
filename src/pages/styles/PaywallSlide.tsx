@@ -15,12 +15,12 @@ type PaywallSlideProps = {
 
 const LockIcon = () => (
   <svg
-    width="14"
-    height="14"
+    width="16"
+    height="16"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.5"
+    strokeWidth="1.6"
     strokeLinecap="round"
     strokeLinejoin="round"
     aria-hidden="true"
@@ -46,90 +46,96 @@ export function PaywallSlide({
       ref={slideRef}
       data-index={index}
       style={{
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 36px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
       }}
-      className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6"
+      className="h-full w-full snap-start snap-always relative bg-[#0B0B0A] flex flex-col justify-end md:justify-center px-6 md:px-10 pt-24 md:pt-20"
     >
-      {/* Фоновое превью-видео монтируется ТОЛЬКО когда открыт сам Paywall-слайд */}
-      {previewVideo && isActive && (
-        <video
-          src={`${previewVideo}#t=0.001`}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          className="absolute inset-0 w-full h-full object-cover scale-105 blur-md opacity-30 pointer-events-none"
-        />
-      )}
-
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40 z-0 pointer-events-none" />
-
-      <div className="absolute top-24 left-4 pointer-events-none select-none z-0">
-        <h2 className="font-serif text-[22vw] leading-[0.8] text-white/[0.04] tracking-tighter">
-          FULL
-          <br />
-          VIDEO
-          <br />
-          LOOKBOOK
-        </h2>
-      </div>
-
-      <div className="relative z-10 w-full mb-2">
-        <div className="w-full h-px bg-white/20 mb-6" />
-
-        <p className="text-[9px] font-sans uppercase tracking-[0.35em] text-white/60 mb-3">
-          {t.paywall.tag}
-        </p>
-
-        <h3 className="font-serif text-4xl min-[390px]:text-5xl tracking-tight text-[#F4F0E8] whitespace-pre-line mb-4">
-          {t.paywall.title}
-        </h3>
-
-        <p className="text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.7] text-white/75 max-w-[320px] mb-5">
-          {t.paywall.desc}
-        </p>
-
-        <div className="flex flex-wrap gap-1.5 mb-6">
-          {lockedPreviewTitles.map((title) => (
-            <span
-              key={title}
-              className="px-2.5 py-1 text-[9px] font-sans uppercase tracking-[0.15em] text-white/75 bg-white/10 border border-white/15 backdrop-blur-sm"
-            >
-              {title}
-            </span>
-          ))}
-          <span className="px-2.5 py-1 text-[9px] font-sans uppercase tracking-[0.15em] text-white/50 border border-white/10">
-            {t.moreStyles}
-          </span>
+      <div className="w-full max-w-[920px] mx-auto md:grid md:grid-cols-[minmax(280px,390px)_1fr] md:gap-10 md:items-center">
+        {/* Превью-кадр (на планшете/десктопе — отдельная колонка 9:16, на мобильном — спокойный фон) */}
+        <div className="hidden md:block relative h-[min(78vh,740px)] aspect-[9/16] mx-auto rounded-[8px] border border-[#F4F0E8]/12 overflow-hidden bg-[#141312]">
+          {previewVideo && isActive && (
+            <video
+              src={`${previewVideo}#t=0.001`}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-cover opacity-55 pointer-events-none"
+            />
+          )}
+          <div className="absolute inset-0 bg-[#0B0B0A]/45 pointer-events-none" />
         </div>
 
-        <p className="text-[9px] font-sans uppercase tracking-[0.2em] text-white/50 mb-2.5">
-          {t.paywall.priceNote}
-        </p>
+        {previewVideo && isActive && (
+          <video
+            src={`${previewVideo}#t=0.001`}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            className="md:hidden absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none"
+          />
+        )}
+        <div className="md:hidden absolute inset-0 bg-gradient-to-t from-[#0B0B0A] via-[#0B0B0A]/90 to-[#0B0B0A]/60 pointer-events-none" />
 
-        <button
-          type="button"
-          onClick={onProClick}
-          disabled={isPaymentBusy}
-          style={{ touchAction: 'manipulation' }}
-          className="paywall-btn group relative flex items-center justify-between w-full h-[56px] px-6 border text-[#F4F0E8] hover:bg-white/10 active:scale-[0.98] transition-all outline-none bg-black/50 backdrop-blur-md cursor-pointer disabled:opacity-55"
-        >
-          {isPaymentBusy ? (
-            <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse mx-auto">
-              {paymentState === 'verifying_payment' ? t.paywall.verifying : t.paywall.loading}
-            </span>
-          ) : (
-            <>
-              <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
-                {t.paywall.btn}
+        {/* Редакционный блок доступа к коллекции */}
+        <div className="relative z-10 w-full max-w-[460px] md:py-4">
+          <div className="w-12 h-px bg-[#C9A97E] mb-5" />
+
+          <p className="text-xs uppercase tracking-[0.1em] text-[#C9A97E] mb-3">
+            {t.paywall.tag}
+          </p>
+
+          <h3 className="font-serif text-4xl md:text-5xl leading-[1.04] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line mb-4">
+            {t.paywall.title}
+          </h3>
+
+          <p className="text-sm md:text-[15px] leading-[1.6] text-[#F4F0E8]/80 max-w-[44ch] mb-6">
+            {t.paywall.desc}
+          </p>
+
+          <div className="flex flex-wrap gap-2 mb-6">
+            {lockedPreviewTitles.map((title) => (
+              <span
+                key={title}
+                className="px-3 py-1.5 rounded-[6px] text-xs text-[#F4F0E8]/85 bg-[#141312] border border-[#F4F0E8]/12"
+              >
+                {title}
               </span>
-              <LockIcon />
-            </>
-          )}
-        </button>
+            ))}
+            <span className="px-3 py-1.5 rounded-[6px] text-xs text-[#A39E93] bg-[#141312]/60 border border-[#F4F0E8]/10">
+              {t.moreStyles}
+            </span>
+          </div>
+
+          <p className="text-xs text-[#A39E93] mb-3">
+            {t.paywall.priceNote}
+          </p>
+
+          <button
+            type="button"
+            onClick={onProClick}
+            disabled={isPaymentBusy}
+            style={{ touchAction: 'manipulation' }}
+            className="w-full min-h-[48px] px-6 py-3 rounded-[6px] border border-[#C9A97E] bg-[#C9A97E] text-[#0B0B0A] hover:bg-[#d6b992] active:scale-[0.99] transition-colors flex items-center justify-between gap-4 cursor-pointer disabled:opacity-55"
+          >
+            {isPaymentBusy ? (
+              <span className="text-xs font-semibold uppercase tracking-[0.08em] mx-auto">
+                {paymentState === 'verifying_payment' ? t.paywall.verifying : t.paywall.loading}
+              </span>
+            ) : (
+              <>
+                <span className="text-xs font-semibold uppercase tracking-[0.08em]">
+                  {t.paywall.btn}
+                </span>
+                <LockIcon />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )
 }
-
