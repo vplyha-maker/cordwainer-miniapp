@@ -6,10 +6,14 @@ import {
   TooltipComponent,
   LegendComponent,
   DataZoomComponent,
+  MarkPointComponent,
+  MarkLineComponent,
   type GridComponentOption,
   type TooltipComponentOption,
   type LegendComponentOption,
   type DataZoomComponentOption,
+  type MarkPointComponentOption,
+  type MarkLineComponentOption,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { WL_START, WL_STEP, SPECTRUM_LEN, type SpectrumPoint } from '../../utils/colorScience'
@@ -22,6 +26,8 @@ echarts.use([
   TooltipComponent,
   LegendComponent,
   DataZoomComponent,
+  MarkPointComponent,
+  MarkLineComponent,
   CanvasRenderer,
 ])
 
@@ -31,6 +37,8 @@ type ECOption = echarts.ComposeOption<
   | TooltipComponentOption
   | LegendComponentOption
   | DataZoomComponentOption
+  | MarkPointComponentOption
+  | MarkLineComponentOption
 >
 
 export type SpectralChartMode = 'reflectance' | 'ks'
@@ -64,6 +72,41 @@ const BAND_ZOOM_RANGES: Record<BandZoomId, { label: string; min: number; max: nu
 }
 
 const ZOOM_ORDER: BandZoomId[] = ['full', 'blue', 'green', 'red']
+
+function parseHexRgb(hex: string): { r: number; g: number; b: number } | null {
+  const c = hex.replace(/^#/, '')
+  if (c.length !== 6) return null
+  const r = parseInt(c.slice(0, 2), 16)
+  const g = parseInt(c.slice(2, 4), 16)
+  const b = parseInt(c.slice(4, 6), 16)
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null
+  return { r, g, b }
+}
+
+function toHex(r: number, g: number, b: number): string {
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
+  return `#${clamp(r)}${clamp(g)}${clamp(b)}`
+}
+
+/**
+ * Автоматическая защита контрастности линий на графике:
+ * — в светлой теме белые/светлые пигменты (PW6, PW4, PW1...) затемняются, чтобы кривая была чётко видна;
+ * — в тёмной теме глубокие чёрные пигменты слегка осветляются.
+ */
+export function resolveVisibleStroke(hex: string, isDark: boolean): string {
+  const rgb = parseHexRgb(hex)
+  if (!rgb) return isDark ? '#C9A86A' : '#6B5A45'
+  const lum = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255
+
+  if (!isDark && lum > 0.72) {
+    const factor = 0.48
+    return toHex(rgb.r * factor, rgb.g * factor, rgb.b * factor)
+  }
+  if (isDark && lum < 0.16) {
+    return toHex(rgb.r + 115, rgb.g + 112, rgb.b + 108)
+  }
+  return hex
+}
 
 export function reflectanceToKS(reflectancePercent: number): number {
   const rMeas = Math.max(0.0008, Math.min(0.999, reflectancePercent * 0.01))
@@ -120,38 +163,47 @@ export function SpectralSparkline({
   spectrum,
   strokeColor = '#C9A86A',
   width = 64,
-  height = 24,
+  height = 26,
 }: SpectralSparklineProps) {
-  const path = useMemo(() => {
-    if (!spectrum || spectrum.length < 2) return ''
-    const padY = 2
+  const isDark =
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  const safeStroke = resolveVisibleStroke(strokeColor, isDark)
+
+  const { linePath, areaPath } = useMemo(() => {
+    if (!spectrum || spectrum.length < 2) return { linePath: '', areaPath: '' }
+    const padX = 3
+    const padY = 3
+    const innerW = width - padX * 2
     const innerH = height - padY * 2
     const step = Math.max(1, Math.floor(spectrum.length / 28))
     const coords: string[] = []
 
     for (let i = 0; i < spectrum.length; i += step) {
       const pt = spectrum[i]
-      const x = ((pt.wavelength - WL_START) / (WL_END - WL_START)) * width
+      const x = padX + ((pt.wavelength - WL_START) / (WL_END - WL_START)) * innerW
       const clampedR = Math.max(0, Math.min(100, pt.reflectance))
       const y = padY + innerH * (1 - clampedR / 100)
       coords.push(`${x.toFixed(1)},${y.toFixed(1)}`)
     }
     const last = spectrum[spectrum.length - 1]
-    const lastX = ((last.wavelength - WL_START) / (WL_END - WL_START)) * width
+    const lastX = padX + ((last.wavelength - WL_START) / (WL_END - WL_START)) * innerW
     const lastY = padY + innerH * (1 - Math.max(0, Math.min(100, last.reflectance)) / 100)
     coords.push(`${lastX.toFixed(1)},${lastY.toFixed(1)}`)
 
-    return 'M' + coords.join(' L')
+    const line = 'M' + coords.join(' L')
+    const baseY = (height - padY).toFixed(1)
+    const area = `${line} L${lastX.toFixed(1)},${baseY} L${padX.toFixed(1)},${baseY} Z`
+    return { linePath: line, areaPath: area }
   }, [spectrum, width, height])
 
-  if (!path) {
+  if (!linePath) {
     return (
       <div
+        className="rounded-lg shrink-0"
         style={{
           width,
           height,
-          opacity: 0.25,
-          borderBottom: '1px dashed currentColor',
+          backgroundColor: 'color-mix(in srgb, var(--color-ink, #181715) 5%, transparent)',
         }}
       />
     )
@@ -162,14 +214,28 @@ export function SpectralSparkline({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className="shrink-0 overflow-visible"
+      className="shrink-0 rounded-lg overflow-hidden"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--color-ink, #181715) 6%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--color-ink, #181715) 10%, transparent)',
+      }}
       aria-hidden="true"
     >
+      <line
+        x1={0}
+        y1={height * 0.5}
+        x2={width}
+        y2={height * 0.5}
+        stroke="currentColor"
+        strokeOpacity="0.14"
+        strokeDasharray="2 2"
+      />
+      <path d={areaPath} fill={safeStroke} fillOpacity="0.18" />
       <path
-        d={path}
+        d={linePath}
         fill="none"
-        stroke={strokeColor}
-        strokeWidth="1.6"
+        stroke={safeStroke}
+        strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -239,12 +305,14 @@ export function SpectralChart({
     if (!primarySpectrum || primarySpectrum.length === 0) return null
 
     const range = BAND_ZOOM_RANGES[zoom]
-    const inkMuted = isDark ? 'rgba(244, 240, 232, 0.56)' : 'rgba(24, 23, 21, 0.58)'
-    const gridLine = isDark ? 'rgba(244, 240, 232, 0.09)' : 'rgba(24, 23, 21, 0.09)'
-    const tooltipBg = isDark ? 'rgba(20, 20, 22, 0.96)' : 'rgba(247, 244, 238, 0.97)'
+    const inkMuted = isDark ? 'rgba(244, 240, 232, 0.58)' : 'rgba(24, 23, 21, 0.62)'
+    const gridLine = isDark ? 'rgba(244, 240, 232, 0.09)' : 'rgba(24, 23, 21, 0.11)'
+    const tooltipBg = isDark ? 'rgba(20, 20, 22, 0.96)' : 'rgba(247, 244, 238, 0.98)'
     const tooltipBorder = isDark ? 'rgba(201, 168, 106, 0.45)' : 'rgba(154, 107, 47, 0.45)'
     const tooltipInk = isDark ? '#F4F0E8' : '#181715'
     const accentHex = isDark ? '#C9A86A' : '#9A6B2F'
+
+    const visiblePrimaryColor = resolveVisibleStroke(primaryColor, isDark)
 
     const toXY = (spec: SpectrumPoint[]): [number, number][] =>
       spec.map((pt) => [
@@ -254,56 +322,118 @@ export function SpectralChart({
           : Number(reflectanceToKS(pt.reflectance).toFixed(3)),
       ])
 
+    const primaryData = toXY(primarySpectrum)
+    let peakPoint: [number, number] = primaryData[0]
+    let sumY = 0
+    for (let i = 0; i < primaryData.length; i++) {
+      sumY += primaryData[i][1]
+      if (primaryData[i][1] > peakPoint[1]) peakPoint = primaryData[i]
+    }
+    const meanY = Number((sumY / primaryData.length).toFixed(2))
+
     const series: LineSeriesOption[] = [
       {
         name: primaryLabel,
         type: 'line',
         showSymbol: false,
-        smooth: 0.12,
+        smooth: 0.14,
         z: 10,
         lineStyle: {
-          width: 2.5,
-          color: primaryColor,
+          width: 2.6,
+          color: visiblePrimaryColor,
+          shadowBlur: isDark ? 8 : 3,
+          shadowColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)',
         },
         itemStyle: {
-          color: primaryColor,
+          color: visiblePrimaryColor,
         },
         areaStyle: {
-          opacity: 0.16,
-          color: primaryColor,
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: isDark ? 'rgba(201, 168, 106, 0.28)' : 'rgba(154, 107, 47, 0.22)' },
+            { offset: 1, color: 'rgba(154, 107, 47, 0.01)' },
+          ]),
         },
-        data: toXY(primarySpectrum),
+        markPoint: {
+          symbol: 'circle',
+          symbolSize: 8,
+          itemStyle: {
+            color: accentHex,
+            borderColor: isDark ? '#0B0B0C' : '#F7F4EE',
+            borderWidth: 2,
+          },
+          label: {
+            show: true,
+            position: 'top',
+            distance: 6,
+            formatter: () =>
+              mode === 'reflectance'
+                ? `${Math.round(peakPoint[0])} nm · ${peakPoint[1].toFixed(0)}%`
+                : `${Math.round(peakPoint[0])} nm · ${peakPoint[1].toFixed(1)}`,
+            color: isDark ? '#F4F0E8' : '#181715',
+            backgroundColor: tooltipBg,
+            borderColor: tooltipBorder,
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: [3, 7],
+            fontSize: 9.5,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          },
+          data: [{ coord: peakPoint }],
+        },
+        markLine: {
+          silent: true,
+          symbol: ['none', 'none'],
+          lineStyle: {
+            type: 'dotted',
+            width: 1,
+            color: inkMuted,
+            opacity: 0.55,
+          },
+          label: {
+            show: true,
+            position: 'insideEndTop',
+            formatter: mode === 'reflectance' ? `Ø ${meanY.toFixed(0)}%` : `Ø ${meanY.toFixed(1)}`,
+            color: inkMuted,
+            fontSize: 9,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          },
+          data: [{ yAxis: meanY }],
+        },
+        data: primaryData,
       },
       ...componentSeries
         .filter((s) => s.spectrum.length > 1)
-        .map<LineSeriesOption>((s) => ({
-          name: s.label,
-          type: 'line',
-          showSymbol: false,
-          smooth: 0.12,
-          z: 5,
-          lineStyle: {
-            width: 1.5,
-            type: 'dashed',
-            color: s.color,
-            opacity: 0.78,
-          },
-          itemStyle: {
-            color: s.color,
-          },
-          data: toXY(s.spectrum),
-        })),
+        .map<LineSeriesOption>((s) => {
+          const safeCol = resolveVisibleStroke(s.color, isDark)
+          return {
+            name: s.label,
+            type: 'line',
+            showSymbol: false,
+            smooth: 0.14,
+            z: 5,
+            lineStyle: {
+              width: 1.6,
+              type: 'dashed',
+              color: safeCol,
+              opacity: 0.85,
+            },
+            itemStyle: {
+              color: safeCol,
+            },
+            data: toXY(s.spectrum),
+          }
+        }),
     ]
 
     return {
       animation: true,
       animationDuration: 220,
-      animationDurationUpdate: 160,
+      animationDurationUpdate: 150,
       backgroundColor: 'transparent',
       grid: {
         left: 44,
         right: 16,
-        top: 18,
+        top: 28,
         bottom: componentSeries.length > 0 ? 78 : 54,
       },
       tooltip: {
@@ -418,7 +548,6 @@ export function SpectralChart({
     }
   }, [primarySpectrum, primaryColor, primaryLabel, componentSeries, mode, zoom, isDark])
 
-  // Инициализация и обновление инстанса ECharts без лишних пересозданий
   useEffect(() => {
     const host = chartHostRef.current
     if (!host || !option) return
@@ -433,7 +562,6 @@ export function SpectralChart({
     chart.setOption(option, { notMerge: true, lazyUpdate: true })
   }, [option, isFullscreen])
 
-  // Адаптивный ресайз под смартфон, планшет, ПК и полноэкранный режим
   useEffect(() => {
     const host = chartHostRef.current
     if (!host) return
@@ -472,7 +600,6 @@ export function SpectralChart({
         borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
       }}
     >
-      {/* Шапка: R(λ) | K/S(λ) | Полный экран */}
       <div
         className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 border-b"
         style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
@@ -540,7 +667,6 @@ export function SpectralChart({
         </div>
       </div>
 
-      {/* Быстрый выбор диапазона длин волн */}
       <div
         className="px-4 py-2 flex items-center justify-between gap-2 border-b"
         style={{
@@ -594,7 +720,6 @@ export function SpectralChart({
         </div>
       </div>
 
-      {/* Контейнер Apache ECharts + шкала видимого спектра 380–780 нм */}
       <div className="p-3 sm:p-4">
         {!primarySpectrum || primarySpectrum.length === 0 ? (
           <div className="py-10 px-4 text-center text-[12px] font-sans opacity-60">
@@ -605,10 +730,9 @@ export function SpectralChart({
             <div
               ref={chartHostRef}
               className="w-full"
-              style={{ height: isFullscreen ? 'min(66vh, 460px)' : 265 }}
+              style={{ height: isFullscreen ? 'min(66vh, 460px)' : 275 }}
             />
 
-            {/* Визуальная шкала видимого спектра 380–780 нм */}
             <div className="mt-2 px-1">
               <div
                 className="w-full h-1.5 rounded-full opacity-90"
