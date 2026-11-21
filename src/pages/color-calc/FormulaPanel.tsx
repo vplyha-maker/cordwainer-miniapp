@@ -35,6 +35,7 @@ interface FormulaPanelProps {
   onRemovePaint: (id: string) => void
   onUpdatePaint: (id: string, field: keyof PaintPart, value: string) => void
   onClearAmounts: () => void
+  onScaleToVolume: (targetMl: number) => void
   isWet: boolean
   onToggleWet: () => void
   illuminant: IlluminantType
@@ -60,10 +61,20 @@ interface FormulaPanelProps {
 }
 
 const ILLUMINANT_ORDER: IlluminantType[] = ['D65', 'A', 'cool', 'twilight']
+const BATCH_PRESETS = [10, 20, 25, 50, 100] as const
 
 const SUBSTRATE_COPY: Record<
   Lang,
-  { title: string; custom: string; raw: string; dryShort: string; wetShort: string; fullShort: string }
+  {
+    title: string
+    custom: string
+    raw: string
+    dryShort: string
+    wetShort: string
+    fullShort: string
+    batchLabel: string
+    batchPlaceholder: string
+  }
 > = {
   ru: {
     title: 'Исходная кожа',
@@ -72,6 +83,8 @@ const SUBSTRATE_COPY: Record<
     dryShort: 'Сухая',
     wetShort: 'Мокрая',
     fullShort: 'Полн. ∞',
+    batchLabel: 'Объём партии',
+    batchPlaceholder: 'мл',
   },
   uk: {
     title: 'Вихідна шкіра',
@@ -80,6 +93,8 @@ const SUBSTRATE_COPY: Record<
     dryShort: 'Суха',
     wetShort: 'Мокра',
     fullShort: 'Повн. ∞',
+    batchLabel: 'Обʼєм партії',
+    batchPlaceholder: 'мл',
   },
   de: {
     title: 'Grundleder',
@@ -88,6 +103,8 @@ const SUBSTRATE_COPY: Record<
     dryShort: 'Trocken',
     wetShort: 'Nass',
     fullShort: 'Voll ∞',
+    batchLabel: 'Zielmenge',
+    batchPlaceholder: 'ml',
   },
 }
 
@@ -151,6 +168,7 @@ export function FormulaPanel({
   onRemovePaint,
   onUpdatePaint,
   onClearAmounts,
+  onScaleToVolume,
   isWet,
   onToggleWet,
   illuminant,
@@ -180,6 +198,7 @@ export function FormulaPanel({
   const [showStickySwatch, setShowStickySwatch] = useState(false)
   const [splitPct, setSplitPct] = useState(28)
   const [isDraggingSplit, setIsDraggingSplit] = useState(false)
+  const [customBatchMl, setCustomBatchMl] = useState('')
 
   const swatchAnchorRef = useRef<HTMLDivElement | null>(null)
   const stageRef = useRef<HTMLDivElement | null>(null)
@@ -205,7 +224,6 @@ export function FormulaPanel({
     setSplitPct(activeTarget ? 50 : 28)
   }, [activeTarget])
 
-  // Отслеживаем уход главной выкраски за верхнюю границу экрана
   useEffect(() => {
     const el = swatchAnchorRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return
@@ -274,6 +292,14 @@ export function FormulaPanel({
     hapticTap()
   }
 
+  const applyCustomBatch = () => {
+    const num = parseFloat(customBatchMl.replace(',', '.'))
+    if (!Number.isFinite(num) || num <= 0) return
+    const clamped = Math.max(1, Math.min(MAX_MANUAL_ML, num))
+    onScaleToVolume(clamped)
+    setCustomBatchMl('')
+  }
+
   const activeSegments = paints
     .map((p) => {
       const val = parseFloat(p.amount) || 0
@@ -307,7 +333,7 @@ export function FormulaPanel({
         </defs>
       </svg>
 
-      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА ОТТЕНКА (не зависит от overflow-hidden) */}
+      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА ОТТЕНКА */}
       <AnimatePresence>
         {showStickySwatch && (
           <motion.div
@@ -437,7 +463,6 @@ export function FormulaPanel({
             )}
           </div>
 
-          {/* Явный 2-позиционный тумблер: Сухая | Мокрая */}
           <div
             className="inline-flex p-0.5 rounded-full border"
             style={{
@@ -875,7 +900,7 @@ export function FormulaPanel({
 
         {/* Живая полоса пропорций («мерный стакан») */}
         <div
-          className="w-full h-2 rounded-full overflow-hidden flex mb-3.5 border"
+          className="w-full h-2 rounded-full overflow-hidden flex mb-3 border"
           style={{
             background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 8%, transparent)',
             borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
@@ -892,6 +917,90 @@ export function FormulaPanel({
             />
           ))}
         </div>
+
+        {/* МАСШТАБИРОВАНИЕ ПАРТИИ ПОД ТОЧНЫЙ ОБЪЁМ (10 / 20 / 25 / 50 / 100 / свой мл) */}
+        {totalAmount > 0 && (
+          <div
+            className="mb-3.5 p-2.5 rounded-2xl border flex flex-col gap-2"
+            style={{
+              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 2.5%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)',
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[9.5px] font-sans uppercase tracking-[0.14em] opacity-60 font-semibold">
+                {subCopy.batchLabel}
+              </span>
+              <span className="font-mono text-[10.5px] opacity-65 tabular-nums">
+                {totalAmount.toFixed(1)} {dict.ml}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {BATCH_PRESETS.map((vol) => {
+                const isCurrent = Math.abs(totalAmount - vol) < 0.2
+                return (
+                  <button
+                    key={vol}
+                    type="button"
+                    onClick={() => onScaleToVolume(vol)}
+                    className="px-2.5 py-1 rounded-full text-[10.5px] font-mono font-semibold border transition-colors cursor-pointer tabular-nums"
+                    style={{
+                      borderColor: isCurrent
+                        ? 'var(--color-accent, #C9A86A)'
+                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
+                      background: isCurrent
+                        ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 18%, transparent)'
+                        : 'transparent',
+                      color: isCurrent
+                        ? 'var(--color-accent, #C9A86A)'
+                        : 'var(--color-ink, #F4F0E8)',
+                    }}
+                  >
+                    {vol}
+                  </button>
+                )
+              })}
+
+              <div
+                className="inline-flex items-center rounded-full border pl-2.5 pr-1 py-0.5 ml-auto"
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
+                  background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
+                }}
+              >
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  enterKeyHint="done"
+                  value={customBatchMl}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(',', '.')
+                    if (v === '' || /^\d*\.?\d*$/.test(v)) setCustomBatchMl(v)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applyCustomBatch()
+                  }}
+                  placeholder={subCopy.batchPlaceholder}
+                  className="w-11 bg-transparent text-[11px] font-mono focus:outline-none tabular-nums"
+                  style={{ color: 'var(--color-ink, #F4F0E8)' }}
+                />
+                <button
+                  type="button"
+                  onClick={applyCustomBatch}
+                  disabled={!customBatchMl}
+                  className="px-2 py-0.5 rounded-full text-[9.5px] font-sans font-semibold uppercase tracking-[0.06em] cursor-pointer disabled:opacity-30"
+                  style={{
+                    background: 'var(--color-accent, #C9A86A)',
+                    color: 'var(--color-bg, #0B0B0C)',
+                  }}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="py-10 text-center text-[12px] font-sans uppercase tracking-[0.18em] opacity-45">
