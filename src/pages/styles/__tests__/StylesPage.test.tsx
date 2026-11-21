@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import {
   StylesPage,
   STYLES_DATA,
@@ -15,18 +15,10 @@ vi.mock('../haptics', () => ({
   triggerHaptic: vi.fn(),
 }))
 
-function setupDomMocks() {
-  class MockIntersectionObserver {
-    observe = vi.fn()
-    unobserve = vi.fn()
-    disconnect = vi.fn()
-  }
-  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
-
-  Element.prototype.scrollIntoView = vi.fn()
-  HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
-  HTMLMediaElement.prototype.pause = vi.fn()
-  HTMLMediaElement.prototype.load = vi.fn()
+class MockIntersectionObserver {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
 }
 
 function mockTelegramWebApp(overrides: Record<string, unknown> = {}) {
@@ -56,8 +48,20 @@ const PAYWALL_BTN_REGEX = new RegExp(`ОТКРЫТЬ ВЕСЬ ЛУКБУК.*${PR
 describe('StylesPage — интеграционные тесты', () => {
   const originalTelegram = (window as unknown as { Telegram?: unknown }).Telegram
 
+  beforeAll(() => {
+    Object.defineProperty(globalThis, 'IntersectionObserver', {
+      writable: true,
+      configurable: true,
+      value: MockIntersectionObserver,
+    })
+  })
+
   beforeEach(() => {
-    setupDomMocks()
+    Element.prototype.scrollIntoView = vi.fn()
+    HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+    HTMLMediaElement.prototype.pause = vi.fn()
+    HTMLMediaElement.prototype.load = vi.fn()
+
     localStorage.clear()
     delete (window as unknown as { Telegram?: unknown }).Telegram
     vi.stubGlobal(
@@ -71,12 +75,12 @@ describe('StylesPage — интеграционные тесты', () => {
   })
 
   afterEach(() => {
+    cleanup()
     if (originalTelegram !== undefined) {
       ;(window as unknown as { Telegram?: unknown }).Telegram = originalTelegram
     } else {
       delete (window as unknown as { Telegram?: unknown }).Telegram
     }
-    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
