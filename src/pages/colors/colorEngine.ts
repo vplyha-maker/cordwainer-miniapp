@@ -366,6 +366,19 @@ export function getSchemeWheelAngles(baseHue: number, scheme: Scheme): number[] 
   }
 }
 
+export function getPaletteSwatchAngleLabels(baseHue: number, scheme: Scheme): string[] {
+  const h = ((baseHue % 360) + 360) % 360
+  let angles: number[]
+  if (scheme === 'monochromatic') {
+    angles = [h, h, h]
+  } else if (scheme === 'complementary') {
+    angles = [h, h, (h + 180) % 360]
+  } else {
+    angles = getSchemeWheelAngles(h, scheme)
+  }
+  return angles.map((a) => Math.round(a) + '°')
+}
+
 export function generateHarmonyPalette(
   baseHue: number,
   tintWhite: number,
