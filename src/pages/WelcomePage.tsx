@@ -21,6 +21,7 @@ type TgHaptic = {
 }
 
 type TgWebApp = {
+  platform?: string
   initDataUnsafe?: { user?: { first_name?: string } }
   HapticFeedback?: TgHaptic
   setHeaderColor?: (color: string) => void
@@ -38,6 +39,29 @@ type ExtendedWindow = Window & {
 
 function getWin(): ExtendedWindow {
   return window as unknown as ExtendedWindow
+}
+
+function detectIOS(): boolean {
+  if (typeof window === 'undefined') return false
+  const tgPlatform = getWin().Telegram?.WebApp?.platform
+  if (tgPlatform === 'ios') return true
+  if (typeof navigator !== 'undefined') {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  }
+  return false
+}
+
+const IS_IOS = detectIOS()
+const HAPTICS_STORAGE_KEY = 'cordwainer_haptics_enabled_v1'
+
+function isHapticsEnabled(): boolean {
+  try {
+    const saved = localStorage.getItem(HAPTICS_STORAGE_KEY)
+    if (saved === null) return true
+    return saved === '1' || saved === 'true'
+  } catch {
+    return true
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +146,7 @@ function getCompiledPaths(): CompiledPaths | null {
 }
 
 // ---------------------------------------------------------------------------
-// 2. PROCEDURAL BESPOKE ATELIER SOUND ENGINE + MASTER COMPRESSOR
+// 2. PROCEDURAL BESPOKE ATELIER SOUND ENGINE (CLEAN HEADROOM, NO SPEAKER CLIP)
 // ---------------------------------------------------------------------------
 class SoundEngine {
   private ctx: AudioContext | null = null
@@ -143,7 +167,9 @@ class SoundEngine {
     } catch {}
     if (this.enabled) {
       this.unlock()
-      this.softTick(1.1)
+      if (IS_IOS) {
+        this.softTick(1.05)
+      }
     }
     return this.enabled
   }
@@ -167,19 +193,27 @@ class SoundEngine {
 
   private setupMasterChain(c: AudioContext): void {
     try {
+      // Срезаем саб-низ (< 140 Гц), чтобы динамики смартфонов Android не дребезжали
+      const highpass = c.createBiquadFilter()
+      highpass.type = 'highpass'
+      highpass.frequency.setValueAtTime(140, c.currentTime)
+      highpass.Q.setValueAtTime(0.7, c.currentTime)
+
+      // Мягкий защитный лимитер без перегрузки выхода
       const comp = c.createDynamicsCompressor()
-      comp.threshold.setValueAtTime(-18, c.currentTime)
-      comp.knee.setValueAtTime(10, c.currentTime)
-      comp.ratio.setValueAtTime(4.0, c.currentTime)
-      comp.attack.setValueAtTime(0.003, c.currentTime)
-      comp.release.setValueAtTime(0.18, c.currentTime)
+      comp.threshold.setValueAtTime(-14, c.currentTime)
+      comp.knee.setValueAtTime(12, c.currentTime)
+      comp.ratio.setValueAtTime(6.0, c.currentTime)
+      comp.attack.setValueAtTime(0.002, c.currentTime)
+      comp.release.setValueAtTime(0.15, c.currentTime)
 
-      const makeup = c.createGain()
-      makeup.gain.setValueAtTime(1.75, c.currentTime)
+      const masterGain = c.createGain()
+      masterGain.gain.setValueAtTime(0.82, c.currentTime)
 
-      comp.connect(makeup)
-      makeup.connect(c.destination)
-      this.masterOut = comp
+      highpass.connect(comp)
+      comp.connect(masterGain)
+      masterGain.connect(c.destination)
+      this.masterOut = highpass
     } catch {
       this.masterOut = c.destination
     }
@@ -208,7 +242,7 @@ class SoundEngine {
       const data = buf.getChannelData(0)
       for (let i = 0; i < len; i++) {
         const env = Math.sin((i / len) * Math.PI)
-        data[i] = (Math.random() * 2 - 1) * env * 0.55
+        data[i] = (Math.random() * 2 - 1) * env * 0.48
       }
       const src = c.createBufferSource()
       src.buffer = buf
@@ -219,7 +253,7 @@ class SoundEngine {
       filter.Q.setValueAtTime(2.6, t0)
 
       const gain = c.createGain()
-      const pk = 0.14 * intensity
+      const pk = 0.095 * intensity
       gain.gain.setValueAtTime(0.001, t0)
       gain.gain.linearRampToValueAtTime(pk, t0 + 0.018)
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
@@ -247,20 +281,20 @@ class SoundEngine {
         const p = i / len
         const cadence = 0.72 + 0.28 * Math.sin(p * Math.PI * 5.0)
         const env = Math.sin(p * Math.PI) * (1 - p * 0.22) * cadence
-        data[i] = (Math.random() * 2 - 1) * env * 0.52
+        data[i] = (Math.random() * 2 - 1) * env * 0.45
       }
       const src = c.createBufferSource()
       src.buffer = buf
 
       const filter = c.createBiquadFilter()
       filter.type = 'lowpass'
-      filter.frequency.setValueAtTime(320, t0)
-      filter.frequency.exponentialRampToValueAtTime(960, t0 + dur * 0.52)
-      filter.frequency.exponentialRampToValueAtTime(240, t0 + dur)
+      filter.frequency.setValueAtTime(340, t0)
+      filter.frequency.exponentialRampToValueAtTime(920, t0 + dur * 0.52)
+      filter.frequency.exponentialRampToValueAtTime(260, t0 + dur)
 
       const gain = c.createGain()
       gain.gain.setValueAtTime(0.001, t0)
-      gain.gain.linearRampToValueAtTime(0.17, t0 + dur * 0.45)
+      gain.gain.linearRampToValueAtTime(0.115, t0 + dur * 0.45)
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
 
       src.connect(filter)
@@ -279,7 +313,7 @@ class SoundEngine {
     try {
       const t0 = c.currentTime
       const freqs = [220.0, 293.66, 369.99, 440.0, 659.25]
-      const amps = [0.18, 0.16, 0.14, 0.11, 0.08]
+      const amps = [0.115, 0.105, 0.09, 0.072, 0.052]
       freqs.forEach((f, idx) => {
         const osc = c.createOscillator()
         const filter = c.createBiquadFilter()
@@ -289,7 +323,7 @@ class SoundEngine {
         osc.frequency.setValueAtTime(f, t0)
 
         filter.type = 'lowpass'
-        filter.frequency.setValueAtTime(1150 - idx * 90, t0)
+        filter.frequency.setValueAtTime(1080 - idx * 80, t0)
         filter.frequency.exponentialRampToValueAtTime(360, t0 + 2.2)
 
         const onset = t0 + idx * 0.032
@@ -322,7 +356,7 @@ class SoundEngine {
         osc.frequency.setValueAtTime(freq, start)
 
         gain.gain.setValueAtTime(0.0001, start)
-        gain.gain.linearRampToValueAtTime(0.15 - idx * 0.025, start + 0.04)
+        gain.gain.linearRampToValueAtTime(0.098 - idx * 0.016, start + 0.04)
         gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.95)
 
         osc.connect(gain)
@@ -344,31 +378,97 @@ class SoundEngine {
       const gain = c.createGain()
       osc.type = 'sine'
       osc.frequency.setValueAtTime(520 * pitch, t0)
-      osc.frequency.exponentialRampToValueAtTime(150 * pitch, t0 + 0.028)
+      osc.frequency.exponentialRampToValueAtTime(180 * pitch, t0 + 0.024)
 
-      gain.gain.setValueAtTime(0.2, t0)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.028)
+      gain.gain.setValueAtTime(0.09, t0)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.024)
 
       osc.connect(gain)
       gain.connect(dest)
       osc.start(t0)
-      osc.stop(t0 + 0.032)
+      osc.stop(t0 + 0.028)
     } catch {}
+  }
+
+  private scheduleClick(
+    c: AudioContext,
+    dest: AudioNode,
+    startAt: number,
+    freqStart: number,
+    freqEnd: number,
+    durationSec: number,
+    peakGain: number
+  ): void {
+    const osc = c.createOscillator()
+    const gain = c.createGain()
+    osc.type = 'triangle'
+    osc.frequency.setValueAtTime(freqStart, startAt)
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, startAt + durationSec)
+
+    gain.gain.setValueAtTime(0.0001, startAt)
+    gain.gain.linearRampToValueAtTime(peakGain, startAt + 0.0018)
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + durationSec)
+
+    osc.connect(gain)
+    gain.connect(dest)
+    osc.start(startAt)
+    osc.stop(startAt + durationSec + 0.005)
+  }
+
+  // Чистый тактильный механический щелчок для Android без перегрузки динамика
+  public tactileClick(strength: 'soft' | 'tap' | 'confirm'): void {
+    if (IS_IOS || !this.enabled) return
+    const c = this.getContext()
+    const dest = this.getDestination()
+    if (!c || !dest) return
+
+    const play = () => {
+      try {
+        const now = c.currentTime
+        if (strength === 'soft') {
+          this.scheduleClick(c, dest, now, 1450, 620, 0.012, 0.11)
+        } else if (strength === 'tap') {
+          this.scheduleClick(c, dest, now, 1850, 560, 0.015, 0.15)
+        } else {
+          this.scheduleClick(c, dest, now, 1850, 620, 0.014, 0.15)
+          this.scheduleClick(c, dest, now + 0.045, 2250, 860, 0.016, 0.16)
+        }
+      } catch {}
+    }
+
+    if (c.state === 'running') {
+      play()
+    } else if (c.state === 'suspended') {
+      void c.resume().then(play).catch(() => {})
+    }
   }
 }
 
 const sound = new SoundEngine()
 
 // ---------------------------------------------------------------------------
-// 3. GENTLE HAPTIC ENGINE
+// 3. 3-CHANNEL ANDROID + QUIET iOS TAPTIC ENGINE
 // ---------------------------------------------------------------------------
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
-  const tgStyle: 'light' | 'medium' =
-    style === 'heavy' ? 'medium' : style === 'medium' ? 'light' : 'light'
+  if (!isHapticsEnabled()) return
 
+  const hf = getWin().Telegram?.WebApp?.HapticFeedback
+
+  // iPhone: только тихий нативный Taptic Engine без дублирования и громкого щелчка
+  if (IS_IOS) {
+    try {
+      if (style === 'heavy') {
+        hf?.impactOccurred?.('light')
+      } else {
+        hf?.selectionChanged?.()
+      }
+    } catch {}
+    return
+  }
+
+  // Android: 3 канала вибрации + чистый механический щелчок
   try {
-    const hf = getWin().Telegram?.WebApp?.HapticFeedback
-    hf?.impactOccurred?.(tgStyle)
+    hf?.impactOccurred?.(style)
   } catch {}
 
   try {
@@ -376,17 +476,19 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
     if (post) {
       post(
         'web_app_trigger_haptic_feedback',
-        JSON.stringify({ type: 'impact', impact_style: tgStyle })
+        JSON.stringify({ type: 'impact', impact_style: style })
       )
     }
   } catch {}
 
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      const ms = style === 'heavy' ? 16 : style === 'medium' ? 11 : 7
+      const ms = style === 'heavy' ? 22 : style === 'medium' ? 16 : 11
       navigator.vibrate(ms)
     }
   } catch {}
+
+  sound.tactileClick(style === 'heavy' ? 'confirm' : style === 'medium' ? 'tap' : 'soft')
 }
 
 // ---------------------------------------------------------------------------
@@ -933,6 +1035,7 @@ export function WelcomePage({
 
   const handleReplayOrSkip = useCallback(() => {
     sound.unlock()
+    haptic('light')
     if (phase !== 'complete') {
       skipRequestedRef.current = true
       setPhase('complete')
@@ -952,7 +1055,9 @@ export function WelcomePage({
       sound.unlock()
       if (code === lang) return
       haptic('light')
-      sound.softTick(code === 'ru' ? 0.95 : code === 'uk' ? 1.08 : 1.2)
+      if (IS_IOS) {
+        sound.softTick(code === 'ru' ? 0.95 : code === 'uk' ? 1.08 : 1.2)
+      }
       setLang(code)
       try {
         localStorage.setItem('app_lang', code)
@@ -965,7 +1070,9 @@ export function WelcomePage({
   const handleAction = useCallback((cb?: () => void, isPrimary = false) => {
     sound.unlock()
     haptic(isPrimary ? 'heavy' : 'medium')
-    sound.softTick(isPrimary ? 1.25 : 1.05)
+    if (IS_IOS) {
+      sound.softTick(isPrimary ? 1.2 : 1.02)
+    }
     cb?.()
   }, [])
 
