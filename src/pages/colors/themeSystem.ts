@@ -38,6 +38,12 @@ export const DEFAULT_STUDIO_BG: StudioBgConfig = {
   autoContrast: true,
 }
 
+let activeStudioBgOverride: StudioBgConfig | null = null
+
+export function setActiveStudioBg(cfg: StudioBgConfig): void {
+  activeStudioBgOverride = cfg
+}
+
 export type ThemeTokens = {
   isDark: boolean
   pageBg: string
@@ -167,6 +173,7 @@ export function loadStudioBg(): StudioBgConfig {
 }
 
 export function saveStudioBg(cfg: StudioBgConfig): void {
+  activeStudioBgOverride = cfg
   try {
     localStorage.setItem(STUDIO_BG_KEY, JSON.stringify(cfg))
   } catch {
@@ -216,7 +223,10 @@ export function resolveStudioStageStyle(
   let hex = '#F4F1EA'
   let useAuto = autoContrast
 
-  if (typeof studioBg === 'string') {
+  if (activeStudioBgOverride) {
+    hex = resolveStudioBgHex(activeStudioBgOverride)
+    useAuto = activeStudioBgOverride.autoContrast
+  } else if (typeof studioBg === 'string') {
     const preset = STUDIO_BG_PRESETS.find((p) => p.id === studioBg)
     hex = preset ? preset.hex : normalizeHex(studioBg, '#F4F1EA')
   } else if (studioBg && typeof studioBg === 'object') {
