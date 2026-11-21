@@ -176,6 +176,14 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
   const [toastText, setToastText] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
+  const inspectorScrollRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (inspectorScrollRef.current) {
+      inspectorScrollRef.current.scrollTop = 0
+    }
+  }, [activeTab, subTool, showSettings])
+
   const isTelegram = useMemo(() => {
     const tg = getTg()
     return Boolean(tg?.initData && tg.initData.trim().length > 0)
@@ -668,30 +676,43 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
 
   const swatchStrip = (
     <div
-      className="flex h-12 w-full overflow-hidden border-t"
-      style={{ borderColor: tokens.border }}
+      className="shrink-0 px-4 py-2.5 border-t"
+      style={{
+        backgroundColor: tokens.pageBg,
+        borderColor: tokens.border,
+      }}
     >
-      {[
-        { key: 'primary', hex: slotPrimary, share: '60%', angle: wheelAngles[0], flex: 'flex-[6]' },
-        { key: 'secondary', hex: slotSecondary, share: '30%', angle: wheelAngles[1] ?? wheelAngles[0], flex: 'flex-[3.4]' },
-        { key: 'accent', hex: slotAccent, share: '10%', angle: wheelAngles[wheelAngles.length - 1] ?? wheelAngles[0], flex: 'flex-[2.4]' },
-      ].map((slot) => (
-        <button
-          key={slot.key}
-          type="button"
-          onClick={() => copyText(slot.key, slot.hex)}
-          className={`${slot.flex} relative h-full flex items-end justify-between px-2.5 py-1.5 text-left transition-opacity active:opacity-85`}
-          style={{ backgroundColor: slot.hex }}
-          title={t.copyHex}
-        >
-          <span className="px-1.5 py-0.5 rounded bg-black/50 text-white text-[11px] font-mono font-medium leading-none">
-            {copiedKey === slot.key ? t.copied : slot.hex}
-          </span>
-          <span className="hidden sm:inline-block px-1 py-0.5 rounded bg-black/35 text-white/90 text-[10px] font-mono leading-none">
-            {slot.share} · {Math.round(slot.angle)}°
-          </span>
-        </button>
-      ))}
+      <div className="flex items-stretch gap-1.5">
+        {[
+          { key: 'primary', hex: slotPrimary, share: '60%', angle: wheelAngles[0], flex: 'flex-[5.5]' },
+          { key: 'secondary', hex: slotSecondary, share: '30%', angle: wheelAngles[1] ?? wheelAngles[0], flex: 'flex-[3.3]' },
+          { key: 'accent', hex: slotAccent, share: '10%', angle: wheelAngles[wheelAngles.length - 1] ?? wheelAngles[0], flex: 'flex-[2.4]' },
+        ].map((slot) => (
+          <button
+            key={slot.key}
+            type="button"
+            onClick={() => copyText(slot.key, slot.hex)}
+            className={`${slot.flex} min-w-0 text-left`}
+            title={t.copyHex}
+          >
+            <div
+              className="h-5 w-full rounded-md border"
+              style={{
+                backgroundColor: slot.hex,
+                borderColor: tokens.strongBorder,
+              }}
+            />
+            <div className="mt-1 flex items-center justify-between gap-1 text-[11px] font-mono tabular-nums">
+              <span className="truncate font-medium" style={{ color: tokens.ink }}>
+                {copiedKey === slot.key ? t.copied : slot.hex}
+              </span>
+              <span className="shrink-0" style={{ color: tokens.subtle }}>
+                {slot.share}
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   )
 
@@ -724,7 +745,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
     <>
       {activeTab === 'colors' && (
         <div className="space-y-5">
-          <div className="flex items-center justify-between gap-2 border-b pb-0" style={{ borderColor: tokens.border }}>
+          <div className="flex items-center justify-between gap-2 border-b" style={{ borderColor: tokens.border }}>
             <div className="flex items-center gap-5">
               {(
                 [
@@ -755,13 +776,13 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
             </div>
 
             <span className="pb-2.5 text-[12px] font-mono tabular-nums" style={{ color: tokens.muted }}>
-              {modelMode.toUpperCase()} {Math.round(baseHue)}° · Δ {contrast.ratioText}
+              {modelMode.toUpperCase()} {Math.round(baseHue)}°
             </span>
           </div>
 
           {subTool === 'tone' && (
             <div className="space-y-6">
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
                   {ALL_SCHEMES.map((sc) => {
                     const active = scheme === sc
@@ -796,7 +817,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                           triggerHaptic('select', hapticsEnabled)
                           setPreset(pr)
                         }}
-                        className="px-3 py-1 rounded-md text-[12px] font-medium whitespace-nowrap shrink-0 transition-colors"
+                        className="px-2.5 py-1 rounded-md text-[12px] font-medium whitespace-nowrap shrink-0 transition-colors"
                         style={{
                           backgroundColor: active ? tokens.elevatedBg : 'transparent',
                           color: active ? tokens.ink : tokens.subtle,
@@ -809,93 +830,105 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-5">
-                <div
-                  ref={wheelRef}
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId)
-                    updateHueFromPointer(e.clientX, e.clientY)
-                  }}
-                  onPointerMove={(e) => {
-                    if (e.buttons === 1 || e.pointerType === 'touch') {
-                      updateHueFromPointer(e.clientX, e.clientY)
-                    }
-                  }}
-                  className="relative w-32 h-32 rounded-full touch-none select-none cursor-crosshair shrink-0 border"
-                  style={{
-                    background: wheelGradient,
-                    borderColor: tokens.strongBorder,
-                  }}
-                >
+              <div className="space-y-3.5">
+                <div className="flex items-center gap-5">
                   <div
-                    className="absolute inset-7 rounded-full border"
-                    style={{
-                      backgroundColor: slotPrimary,
-                      borderColor: 'rgba(255,255,255,0.45)',
+                    ref={wheelRef}
+                    onPointerDown={(e) => {
+                      e.currentTarget.setPointerCapture(e.pointerId)
+                      updateHueFromPointer(e.clientX, e.clientY)
                     }}
-                  />
-                  {wheelAngles.map((ang, idx) => {
-                    const rad = ((ang - 90) * Math.PI) / 180
-                    const r = 50
-                    const cx = 64 + Math.cos(rad) * r
-                    const cy = 64 + Math.sin(rad) * r
-                    const isPrimaryMarker = idx === 0
-                    return (
-                      <span
-                        key={idx}
-                        className="absolute rounded-full border-2 border-white shadow pointer-events-none"
-                        style={{
-                          width: isPrimaryMarker ? 16 : 11,
-                          height: isPrimaryMarker ? 16 : 11,
-                          left: cx - (isPrimaryMarker ? 8 : 5.5),
-                          top: cy - (isPrimaryMarker ? 8 : 5.5),
-                          backgroundColor:
-                            idx === 0
-                              ? slotPrimary
-                              : idx === 1
-                                ? slotSecondary
-                                : slotAccent,
-                        }}
-                      />
-                    )
-                  })}
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-2.5">
-                  <div>
-                    <div className="text-[14px] font-medium truncate" style={{ color: tokens.ink }}>
-                      {t.schemes[scheme].name}
-                    </div>
-                    <div className="text-[12px] mt-0.5" style={{ color: tokens.muted }}>
-                      {t.contrastLabel}: {contrast.ratioText} · {t.contrastLevels[contrast.level]}
-                    </div>
+                    onPointerMove={(e) => {
+                      if (e.buttons === 1 || e.pointerType === 'touch') {
+                        updateHueFromPointer(e.clientX, e.clientY)
+                      }
+                    }}
+                    className="relative w-32 h-32 rounded-full touch-none select-none cursor-crosshair shrink-0 border"
+                    style={{
+                      background: wheelGradient,
+                      borderColor: tokens.strongBorder,
+                    }}
+                  >
+                    <div
+                      className="absolute inset-7 rounded-full border"
+                      style={{
+                        backgroundColor: slotPrimary,
+                        borderColor: 'rgba(255,255,255,0.45)',
+                      }}
+                    />
+                    {wheelAngles.map((ang, idx) => {
+                      const rad = ((ang - 90) * Math.PI) / 180
+                      const r = 50
+                      const cx = 64 + Math.cos(rad) * r
+                      const cy = 64 + Math.sin(rad) * r
+                      const isPrimaryMarker = idx === 0
+                      return (
+                        <span
+                          key={idx}
+                          className="absolute rounded-full border-2 border-white shadow pointer-events-none"
+                          style={{
+                            width: isPrimaryMarker ? 16 : 11,
+                            height: isPrimaryMarker ? 16 : 11,
+                            left: cx - (isPrimaryMarker ? 8 : 5.5),
+                            top: cy - (isPrimaryMarker ? 8 : 5.5),
+                            backgroundColor:
+                              idx === 0
+                                ? slotPrimary
+                                : idx === 1
+                                  ? slotSecondary
+                                  : slotAccent,
+                          }}
+                        />
+                      )
+                    })}
                   </div>
 
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div
+                      className="text-[18px] font-medium leading-tight"
+                      style={{ fontFamily: "'Playfair Display', Georgia, serif", color: tokens.ink }}
+                    >
+                      {t.schemes[scheme].name}
+                    </div>
+                    <p className="text-[12px] leading-relaxed" style={{ color: tokens.muted }}>
+                      {t.schemes[scheme].desc}
+                    </p>
+                    <div className="pt-1 text-[12px] font-mono tabular-nums" style={{ color: tokens.ink }}>
+                      {t.contrastLabel} {contrast.ratioText} · {t.contrastLevels[contrast.level]}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={handleSavePalette}
-                    className="w-full py-2.5 px-3.5 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                    className="py-2.5 px-3 rounded-xl text-[13px] font-medium flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
                     style={{
                       backgroundColor: tokens.primaryBtnBg,
                       color: tokens.primaryBtnInk,
                     }}
                   >
-                    <Bookmark className="w-3.5 h-3.5" />
-                    {t.savePalette}
+                    <Bookmark className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{t.savePalette}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleCopySpec}
-                    className="w-full py-2 px-3.5 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                    className="py-2.5 px-3 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
                     style={{
                       backgroundColor: tokens.cardBg,
                       borderColor: tokens.border,
                       color: tokens.ink,
                     }}
                   >
-                    {copiedKey === 'spec' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedKey === 'spec' ? t.copied : t.copySpec}
+                    {copiedKey === 'spec' ? (
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    <span className="truncate">{copiedKey === 'spec' ? t.copied : t.copySpec}</span>
                   </button>
                 </div>
               </div>
@@ -916,7 +949,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
               />
 
               <div className="xl:hidden pt-5 border-t" style={{ borderColor: tokens.border }}>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-2">
                   <span className="text-[13px] font-medium" style={{ color: tokens.ink }}>
                     {t.specTitle}
                   </span>
@@ -924,28 +957,25 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                     {t.honestBadge}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="divide-y" style={{ borderColor: tokens.border }}>
                   {SPEC_ZONES.map((z) => (
                     <button
                       key={z}
                       type="button"
                       onClick={() => copyText(z, sneakerColors[z])}
-                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-colors min-w-0"
-                      style={{
-                        backgroundColor: tokens.cardBg,
-                        borderColor: tokens.border,
-                      }}
+                      className="w-full flex items-center justify-between gap-3 py-2.5 text-left transition-opacity active:opacity-75"
+                      style={{ borderColor: tokens.border }}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <span
                           className="w-4 h-4 rounded shrink-0 border"
                           style={{ backgroundColor: sneakerColors[z], borderColor: tokens.strongBorder }}
                         />
-                        <span className="text-[12px] truncate" style={{ color: tokens.ink }}>
+                        <span className="text-[13px]" style={{ color: tokens.ink }}>
                           {t.zones[z]}
                         </span>
                       </div>
-                      <span className="text-[11px] font-mono shrink-0" style={{ color: tokens.muted }}>
+                      <span className="text-[12px] font-mono tabular-nums shrink-0" style={{ color: tokens.muted }}>
                         {copiedKey === z ? t.copied : sneakerColors[z]}
                       </span>
                     </button>
@@ -1403,52 +1433,54 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
         </aside>
 
         <section
-          className="shrink-0 md:flex-1 flex flex-col border-b md:border-b-0 md:border-r overflow-hidden"
+          className="shrink-0 md:flex-1 flex flex-col border-b md:border-b-0 md:border-r"
           style={{
             borderColor: tokens.border,
             backgroundColor: studioBgHex,
           }}
         >
-          <div
-            className="shrink-0 px-4 py-2 flex items-center justify-between gap-2 border-b"
-            style={{
-              backgroundColor: tokens.pageBg,
-              borderColor: tokens.border,
-            }}
-          >
-            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
-              {MODEL_OPTIONS.map((m) => {
-                const active = modelId === m.id
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('harmony', hapticsEnabled)
-                      setModelId(m.id)
-                    }}
-                    className="text-[12px] font-medium tracking-wider whitespace-nowrap transition-colors"
-                    style={{
-                      color: active ? tokens.ink : tokens.subtle,
-                      borderBottom: active ? `1.5px solid ${tokens.activeTintBorder}` : '1.5px solid transparent',
-                      paddingBottom: '2px',
-                    }}
-                  >
-                    {m.shortName}
-                  </button>
-                )
-              })}
+          {!showSettings && (
+            <div
+              className="shrink-0 px-4 py-2 flex items-center justify-between gap-2 border-b"
+              style={{
+                backgroundColor: tokens.pageBg,
+                borderColor: tokens.border,
+              }}
+            >
+              <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
+                {MODEL_OPTIONS.map((m) => {
+                  const active = modelId === m.id
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('harmony', hapticsEnabled)
+                        setModelId(m.id)
+                      }}
+                      className="text-[12px] font-medium tracking-wider whitespace-nowrap transition-colors"
+                      style={{
+                        color: active ? tokens.ink : tokens.subtle,
+                        borderBottom: active ? `1.5px solid ${tokens.activeTintBorder}` : '1.5px solid transparent',
+                        paddingBottom: '2px',
+                      }}
+                    >
+                      {m.shortName}
+                    </button>
+                  )
+                })}
+              </div>
+              <span className="text-[11px] font-mono shrink-0" style={{ color: tokens.muted }}>
+                60 / 30 / 10
+              </span>
             </div>
-            <span className="text-[11px] font-mono shrink-0 hidden sm:inline" style={{ color: tokens.muted }}>
-              60 / 30 / 10
-            </span>
-          </div>
+          )}
 
           <div
-            className="relative w-full h-[215px] sm:h-[250px] md:flex-1 md:h-auto flex items-center justify-center overflow-hidden"
+            className="w-full md:flex-1 flex items-center justify-center"
             style={{ backgroundColor: studioBgHex }}
           >
-            <div className="w-full h-full">
+            <div className="w-full">
               <Sneaker3D
                 sneakerColors={sneakerColors}
                 modelId={modelId}
@@ -1458,7 +1490,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
             </div>
           </div>
 
-          {swatchStrip}
+          {!showSettings && swatchStrip}
         </section>
 
         <section
@@ -1494,8 +1526,9 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
           )}
 
           <div
+            ref={inspectorScrollRef}
             className="flex-1 overflow-y-auto px-4 md:px-5 py-4"
-            style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+            style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 0px))' }}
           >
             {inspectorContent}
           </div>
