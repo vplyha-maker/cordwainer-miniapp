@@ -7,7 +7,7 @@ export type Scheme =
   | 'split-complementary'
   | 'monochromatic'
 
-export type ColorModelMode = 'ryb' | 'hsl'
+export type ColorModelMode = 'ryb' | 'oklch' | 'hsl'
 
 export type FootwearMappingPreset =
   | 'classic'
@@ -39,6 +39,39 @@ export type HarmonyContrastResult = {
   maxContrast: number
   ratioText: string
   level: ContrastLevel
+}
+
+export type OklchColor = {
+  l: number
+  c: number
+  h: number
+}
+
+export type SolePresetId = 'white' | 'cream' | 'stone' | 'graphite' | 'black' | 'gum' | 'custom'
+
+export type SolePreset = {
+  id: Exclude<SolePresetId, 'custom'>
+  midsole: string
+  outsole: string
+}
+
+export type SoleColorConfig = {
+  presetId: SolePresetId
+  customHex: string
+}
+
+export const SOLE_PRESETS: readonly SolePreset[] = [
+  { id: 'white', midsole: '#FAF8F4', outsole: '#2C2825' },
+  { id: 'cream', midsole: '#EDE5D6', outsole: '#3A332C' },
+  { id: 'stone', midsole: '#B8B3AA', outsole: '#2E2C2A' },
+  { id: 'graphite', midsole: '#3A3836', outsole: '#1F1E1D' },
+  { id: 'black', midsole: '#181615', outsole: '#111010' },
+  { id: 'gum', midsole: '#C29563', outsole: '#8F6438' },
+]
+
+export const DEFAULT_SOLE_CONFIG: SoleColorConfig = {
+  presetId: 'white',
+  customHex: '#FAF8F4',
 }
 
 export function getCircularAngleDiff(angleA: number, angleB: number): number {
@@ -113,6 +146,129 @@ function srgbChannelToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
 }
 
+function linearToSrgbChannel(c: number): number {
+  const clamped = Math.max(0, Math.min(1, c))
+  return clamped <= 0.0031308
+    ? 12.92 * clamped
+    : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055
+}
+
+export function normalizeHex(input: string, fallback = '#FAF8F4'): string {
+  const raw = input.trim().replace(/^#/, '')
+  if (/^[0-9a-fA-F]{3}$/.test(raw)) {
+    const expanded = raw
+      .split('')
+      .map((ch) => ch + ch)
+      .join('')
+      .toUpperCase()
+    return '#' + expanded
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+    return '#' + raw.toUpperCase()
+  }
+  return fallback
+}
+
+function parseHexToRgb01(hex: string): [number, number, number] {
+  const clean = normalizeHex(hex, '#808080').slice(1)
+  return [
+    parseInt(clean.slice(0, 2), 16) / 255,
+    parseInt(clean.slice(2, 4), 16) / 255,
+    parseInt(clean.slice(4, 6), 16) / 255,
+  ]
+}
+
+function hexToOklab(hex: string): [number, number, number] {
+  const [sr, sg, sb] = parseHexToRgb01(hex)
+  const r = srgbChannelToLinear(sr)
+  const g = srgbChannelToLinear(sg)
+  const b = srgbChannelToLinear(sb)
+
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ]
+}
+
+export function hexToOklch(hex: string): OklchColor {
+  const [L, a, b] = hexToOklab(hex)
+  const C = Math.hypot(a, b)
+  let H = (Math.atan2(b, a) * 180) / Math.PI
+  if (H < 0) H += 360
+  return {
+    l: Math.max(0, Math.min(1, L)),
+    c: Math.max(0, C),
+    h: C < 1e-4 ? 0 : H,
+  }
+}
+
+function oklabToLinearRgb(L: number, a: number, b: number): [number, number, number] {
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b
+
+  const l = l_ * l_ * l_
+  const m = m_ * m_ * m_
+  const s = s_ * s_ * s_
+
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ]
+}
+
+function isInLinearSrgbGamut(r: number, g: number, b: number): boolean {
+  const eps = 1e-5
+  return r >= -eps && r <= 1 + eps && g >= -eps && g <= 1 + eps && b >= -eps && b <= 1 + eps
+}
+
+export function oklchToHex(l: number, c: number, h: number): string {
+  const L = Math.max(0, Math.min(1, l))
+  const C = Math.max(0, c)
+  const rad = ((((h % 360) + 360) % 360) * Math.PI) / 180
+  const cosH = Math.cos(rad)
+  const sinH = Math.sin(rad)
+
+  const [r0, g0, b0] = oklabToLinearRgb(L, C * cosH, C * sinH)
+  if (isInLinearSrgbGamut(r0, g0, b0)) {
+    return rgb01ToHex(
+      linearToSrgbChannel(r0),
+      linearToSrgbChannel(g0),
+      linearToSrgbChannel(b0)
+    )
+  }
+
+  let lo = 0
+  let hi = C
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) * 0.5
+    const [rm, gm, bm] = oklabToLinearRgb(L, mid * cosH, mid * sinH)
+    if (isInLinearSrgbGamut(rm, gm, bm)) {
+      lo = mid
+    } else {
+      hi = mid
+    }
+  }
+
+  const [rf, gf, bf] = oklabToLinearRgb(L, lo * cosH, lo * sinH)
+  return rgb01ToHex(
+    linearToSrgbChannel(rf),
+    linearToSrgbChannel(gf),
+    linearToSrgbChannel(bf)
+  )
+}
+
+export function formatOklch(hex: string): string {
+  const { l, c, h } = hexToOklch(hex)
+  return 'OKLCH ' + Math.round(l * 100) + '% · ' + c.toFixed(2) + ' · ' + Math.round(h) + '°'
+}
+
 export function synthesizePigmentHex(
   wheelHue: number,
   tintWhite: number,
@@ -120,13 +276,22 @@ export function synthesizePigmentHex(
   chromaScale = 0.85,
   modelMode: ColorModelMode = 'ryb'
 ): string {
-  const effectiveHue =
-    modelMode === 'ryb' ? rybHueToRgbHue(wheelHue) : ((wheelHue % 360) + 360) % 360
   const w = Math.max(0, Math.min(1, tintWhite))
   const b = Math.max(0, Math.min(1, shadeBlack))
-  const sat = Math.max(8, Math.min(96, chromaScale * 100))
 
-  const [rP, gP, bP] = hslToRgb01(effectiveHue, sat, 50)
+  let rP: number
+  let gP: number
+  let bP: number
+
+  if (modelMode === 'oklch') {
+    const pureHex = oklchToHex(0.62, Math.max(0.02, Math.min(0.26, chromaScale * 0.24)), wheelHue)
+    ;[rP, gP, bP] = parseHexToRgb01(pureHex)
+  } else {
+    const effectiveHue =
+      modelMode === 'ryb' ? rybHueToRgbHue(wheelHue) : ((wheelHue % 360) + 360) % 360
+    const sat = Math.max(8, Math.min(96, chromaScale * 100))
+    ;[rP, gP, bP] = hslToRgb01(effectiveHue, sat, 50)
+  }
 
   const rW = 0.968 + 0.008 * rP
   const gW = 0.968 + 0.008 * gP
@@ -145,21 +310,11 @@ export function synthesizePigmentHex(
   const wK = (1 - w) * b
   const wG = w * b
 
-  const rOut = wP * rP + wW * rW + wK * rK + wG * rG
-  const gOut = wP * gP + wW * gW + wK * gK + wG * gG
-  const bOut = wP * bP + wW * bW + wK * bK + wG * bG
-
-  return rgb01ToHex(rOut, gOut, bOut)
-}
-
-function parseHexToRgb01(hex: string): [number, number, number] {
-  const clean = hex.replace('#', '')
-  if (clean.length !== 6) return [0.5, 0.5, 0.5]
-  return [
-    parseInt(clean.slice(0, 2), 16) / 255,
-    parseInt(clean.slice(2, 4), 16) / 255,
-    parseInt(clean.slice(4, 6), 16) / 255,
-  ]
+  return rgb01ToHex(
+    wP * rP + wW * rW + wK * rK + wG * rG,
+    wP * gP + wW * gW + wK * gK + wG * gG,
+    wP * bP + wW * bW + wK * bK + wG * bG
+  )
 }
 
 export function getRelativeLuminance(hex: string): number {
@@ -177,23 +332,6 @@ export function getContrastRatio(hexA: string, hexB: string): number {
   const brightest = Math.max(l1, l2)
   const darkest = Math.min(l1, l2)
   return (brightest + 0.05) / (darkest + 0.05)
-}
-
-function hexToOklab(hex: string): [number, number, number] {
-  const [sr, sg, sb] = parseHexToRgb01(hex)
-  const r = srgbChannelToLinear(sr)
-  const g = srgbChannelToLinear(sg)
-  const b = srgbChannelToLinear(sb)
-
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
-
-  return [
-    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
-  ]
 }
 
 export function getPerceptualPairContrast(hexA: string, hexB: string): number {
@@ -225,33 +363,6 @@ export function getSchemeWheelAngles(baseHue: number, scheme: Scheme): number[] 
       return [h, (h + 60) % 360, (h + 180) % 360, (h + 240) % 360]
     default:
       return [h, (h + 180) % 360]
-  }
-}
-
-/**
- * Честная подпись происхождения каждого свотча на круге Иттена (угол или тональная градация).
- */
-export function getPaletteSwatchAngleLabels(baseHue: number, scheme: Scheme): string[] {
-  const h = Math.round(((baseHue % 360) + 360) % 360)
-  const deg = (offset: number) => ((h + offset + 360) % 360) + '°'
-
-  switch (scheme) {
-    case 'monochromatic':
-      return [deg(0), '+TINT', '+SHADE']
-    case 'complementary':
-      return [deg(0), 'TONE', deg(180)]
-    case 'analogous':
-      return [deg(0), deg(30), deg(330)]
-    case 'triadic':
-      return [deg(0), deg(120), deg(240)]
-    case 'split-complementary':
-      return [deg(0), deg(150), deg(210)]
-    case 'tetradic':
-      return [deg(0), deg(90), deg(180), deg(270)]
-    case 'rectangular':
-      return [deg(0), deg(60), deg(180), deg(240)]
-    default:
-      return [deg(0), 'TONE', deg(180)]
   }
 }
 
@@ -314,16 +425,12 @@ export function generateHarmonyPalette(
       return [
         synthesizePigmentHex(h, tintWhite, shadeBlack, c, modelMode),
         synthesizePigmentHex((h + 60) % 360, Math.min(1, tintWhite * 0.8 + 0.1), shadeBlack * 0.8, c * 0.86, modelMode),
-        synthesizePigmentHex((h + 180) % 360, Math.min(1, tintWhite * 0.75 + 0.15), shadeBlack * 0.75, c * 0.80, modelMode),
+        synthesizePigmentHex((h + 180) % 360, Math.min(1, tintWhite * 0.75 + 0.15), shadeBlack * 0.75, c * 0.8, modelMode),
         synthesizePigmentHex((h + 240) % 360, tintWhite * 0.4, shadeBlack * 0.4, Math.min(0.96, c * 1.06), modelMode),
       ]
   }
 }
 
-/**
- * Честная матрица 60/30/10: Верх + Пятка ВСЕГДА остаются основным цветом (60%) с круга Иттена.
- * Пресеты меняют только распределение поддерживающего (30%) и акцента (10%).
- */
 export function mapPaletteToFootwear(
   colors: string[],
   baseHue: number,
@@ -332,8 +439,9 @@ export function mapPaletteToFootwear(
   chromaScale: number,
   modelMode: ColorModelMode,
   preset: FootwearMappingPreset,
-  isDark: boolean
+  _isDark = false
 ): SneakerColors {
+  void _isDark
   const mainColor = colors[0]
   const secondaryColor = colors[1] ?? colors[0]
   const tertiaryColor =
@@ -348,21 +456,21 @@ export function mapPaletteToFootwear(
         )
   const accentColor = colors[colors.length - 1] ?? mainColor
 
-  const neutralMidsole = isDark ? '#2B2926' : '#FAF8F4'
-  const neutralEncap = isDark ? '#3D3A36' : '#E5E0D6'
-  const neutralLaces = isDark ? '#F4F0E8' : '#FFFFFF'
-  const neutralOutsole = isDark ? '#181615' : '#2C2825'
+  const neutralMidsole = '#FAF8F4'
+  const neutralEncap = '#E5E0D6'
+  const neutralLaces = '#FFFFFF'
+  const neutralOutsole = '#2C2825'
 
   switch (preset) {
     case 'toe-focus':
       return {
         vamp: mainColor,
         heel: mainColor,
-        toeBox: accentColor,
         quarters: secondaryColor,
         eyestays: secondaryColor,
-        collar: tertiaryColor,
         tongue: secondaryColor,
+        toeBox: accentColor,
+        collar: tertiaryColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
@@ -375,11 +483,11 @@ export function mapPaletteToFootwear(
         vamp: mainColor,
         heel: mainColor,
         toeBox: secondaryColor,
+        tongue: secondaryColor,
         quarters: accentColor,
         eyestays: accentColor,
         collar: tertiaryColor,
-        tongue: secondaryColor,
-        lining: tertiaryColor,
+        lining: colors.length > 3 ? tertiaryColor : mainColor,
         swoosh: mainColor,
         midsole: neutralMidsole,
         encap: secondaryColor,
@@ -394,7 +502,7 @@ export function mapPaletteToFootwear(
         quarters: secondaryColor,
         toeBox: secondaryColor,
         tongue: secondaryColor,
-        collar: tertiaryColor,
+        collar: colors.length > 3 ? colors[2] : tertiaryColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
@@ -411,7 +519,7 @@ export function mapPaletteToFootwear(
         quarters: secondaryColor,
         toeBox: secondaryColor,
         tongue: secondaryColor,
-        collar: tertiaryColor,
+        collar: colors.length > 3 ? colors[2] : tertiaryColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
@@ -419,6 +527,29 @@ export function mapPaletteToFootwear(
         outsole: neutralOutsole,
         laces: neutralLaces,
       }
+  }
+}
+
+export function applySoleColorToFootwear(
+  base: SneakerColors,
+  sole: SoleColorConfig
+): SneakerColors {
+  if (sole.presetId === 'custom') {
+    const custom = normalizeHex(sole.customHex, '#FAF8F4')
+    const lum = getRelativeLuminance(custom)
+    const outsole = lum < 0.08 ? '#111010' : lum > 0.65 ? '#2C2825' : custom
+    return {
+      ...base,
+      midsole: custom,
+      outsole,
+    }
+  }
+
+  const found = SOLE_PRESETS.find((p) => p.id === sole.presetId) ?? SOLE_PRESETS[0]
+  return {
+    ...base,
+    midsole: found.midsole,
+    outsole: found.outsole,
   }
 }
 
