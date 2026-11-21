@@ -26,6 +26,7 @@ export function PigmentArchive({
 }: PigmentArchiveProps) {
   const [query, setQuery] = useState('')
   const [selectedCat, setSelectedCat] = useState<string>('ALL')
+  const hairline = 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)'
 
   const getLocalizedName = (p: Pigment) => {
     if (lang === 'uk') return p.name.uk || p.name.ru
@@ -70,82 +71,84 @@ export function PigmentArchive({
 
   return (
     <section
-      className="rounded-3xl border p-4 flex flex-col gap-3"
+      className="rounded-2xl border overflow-hidden flex flex-col"
       style={{
         background: 'var(--color-surface, #141416)',
-        borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
+        borderColor: hairline,
       }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-sans uppercase tracking-[0.18em] font-semibold opacity-80">
-          {dict.archiveTitle} ({filtered.length})
-        </h2>
-      </div>
-
-      {/* Поиск */}
+      {/* Шапка + поиск + категории */}
       <div
-        className="flex items-center gap-2 px-3.5 py-2.5 rounded-full border"
-        style={{
-          background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)',
-        }}
+        className="px-4 sm:px-5 pt-4 pb-3.5 border-b flex flex-col gap-3"
+        style={{ borderColor: hairline }}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-55 shrink-0">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-          <path d="M20 20L16.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={dict.searchPlaceholder}
-          className="w-full bg-transparent border-none outline-none text-[13px] font-sans"
-          style={{ color: 'var(--color-ink, #F4F0E8)' }}
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => setQuery('')}
-            className="text-[12px] opacity-65 hover:opacity-100 cursor-pointer bg-transparent border-none"
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-[12px] font-sans uppercase tracking-[0.12em] font-semibold opacity-85">
+            {dict.archiveTitle}
+          </h2>
+          <span className="font-mono text-[12px] opacity-55 tabular-nums">
+            {filtered.length}
+          </span>
+        </div>
+
+        <div
+          className="flex items-center gap-2.5 h-10 px-3 rounded-xl border"
+          style={{
+            background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
+            borderColor: hairline,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="opacity-55 shrink-0">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M20 20L16.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={dict.searchPlaceholder}
+            className="w-full bg-transparent border-none outline-none text-[14px] font-sans"
             style={{ color: 'var(--color-ink, #F4F0E8)' }}
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
-      {/* Категории */}
-      <div
-        className="flex gap-1.5 overflow-x-auto pb-2 border-b"
-        style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
-      >
-        {categories.map((cat) => {
-          const active = selectedCat === cat
-          return (
+          />
+          {query && (
             <button
-              key={cat}
               type="button"
-              onClick={() => setSelectedCat(cat)}
-              className="px-3 py-1 rounded-full text-[10.5px] font-sans font-medium whitespace-nowrap border transition-colors cursor-pointer"
-              style={{
-                borderColor: active
-                  ? 'var(--color-ink, #F4F0E8)'
-                  : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)',
-                background: active ? 'var(--color-ink, #F4F0E8)' : 'transparent',
-                color: active ? 'var(--color-bg, #0B0B0C)' : 'var(--color-ink, #F4F0E8)',
-              }}
+              onClick={() => setQuery('')}
+              className="text-[13px] opacity-65 hover:opacity-100 cursor-pointer bg-transparent border-none"
+              style={{ color: 'var(--color-ink, #F4F0E8)' }}
             >
-              {cat === 'ALL' ? dict.all : cat}
+              ✕
             </button>
-          )
-        })}
+          )}
+        </div>
+
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          {categories.map((cat) => {
+            const active = selectedCat === cat
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCat(cat)}
+                className="h-8 px-3 rounded-lg text-[12px] font-sans font-medium whitespace-nowrap border transition-colors cursor-pointer"
+                style={{
+                  borderColor: active ? 'var(--color-ink, #F4F0E8)' : hairline,
+                  background: active ? 'var(--color-ink, #F4F0E8)' : 'transparent',
+                  color: active ? 'var(--color-bg, #0B0B0C)' : 'var(--color-ink, #F4F0E8)',
+                }}
+              >
+                {cat === 'ALL' ? dict.all : cat}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Сетка пигментов */}
+      {/* Список пигментов без вложенных карточек */}
       {filtered.length === 0 ? (
-        <div className="py-10 text-center text-[12px] opacity-55">{dict.archiveEmpty}</div>
+        <div className="py-12 text-center text-[13px] opacity-55">{dict.archiveEmpty}</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[62vh] overflow-y-auto pr-1">
+        <div className="divide-y max-h-[65vh] overflow-y-auto" style={{ borderColor: hairline }}>
           {filtered.map((p) => {
             const lore = getPigmentLore(p, lang)
             const ciShort = lore.code.split('·')[0].trim()
@@ -154,67 +157,61 @@ export function PigmentArchive({
             return (
               <div
                 key={p.id}
-                className="p-3 rounded-2xl border flex flex-col gap-2.5"
+                className="px-4 sm:px-5 py-3.5 flex flex-col gap-2.5 transition-colors"
                 style={{
-                  background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
-                  borderColor: inFormula
-                    ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 50%, transparent)'
-                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)',
+                  borderColor: hairline,
+                  background: inFormula
+                    ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 6%, transparent)'
+                    : 'transparent',
                 }}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <span
-                    className="w-9 h-9 rounded-xl shrink-0 border border-black/20"
-                    style={{
-                      backgroundColor: p.hex || '#444',
-                      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)',
-                    }}
+                    className="w-9 h-9 rounded-lg shrink-0 border border-black/20"
+                    style={{ backgroundColor: p.hex || '#444' }}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-sans font-semibold truncate">
+                    <div className="text-[14px] font-sans font-semibold leading-tight truncate">
                       {getLocalizedName(p)}
                     </div>
-                    <div className="text-[10px] font-mono opacity-60 truncate">
+                    <div className="text-[12px] font-mono opacity-60 mt-0.5 truncate">
                       {(p.hex || '#------').toUpperCase()} · {ciShort}
                     </div>
                   </div>
                   <SpectralSparkline
                     spectrum={p.spectrum}
                     strokeColor={p.hex || '#C9A86A'}
-                    width={52}
-                    height={22}
+                    width={54}
+                    height={24}
                   />
                 </div>
 
-                <div
-                  className="flex items-center justify-between gap-2 pt-2 border-t text-[10.5px]"
-                  style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 8%, transparent)' }}
-                >
+                <div className="flex items-center justify-between gap-2 pl-12 text-[12px]">
                   <span className="opacity-65 truncate">
                     {dict.opacityLabels[lore.opacity]}
                   </span>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0">
                     <button
                       type="button"
                       onClick={() => onInspectPigment(p.id)}
-                      className="underline bg-transparent border-none p-0 cursor-pointer font-medium"
+                      className="underline underline-offset-4 bg-transparent border-none p-0 cursor-pointer font-medium"
                       style={{ color: 'var(--color-accent, #C9A86A)' }}
                     >
-                      ⓘ {dict.pigmentInfoBtn}
+                      {dict.pigmentInfoBtn}
                     </button>
                     <button
                       type="button"
                       onClick={() => onAddToFormula(p.id)}
-                      className="px-2.5 py-0.5 rounded-full border font-semibold transition-colors cursor-pointer"
+                      className="h-8 px-3 rounded-lg border text-[12px] font-sans font-medium transition-colors cursor-pointer"
                       style={{
-                        borderColor: inFormula
-                          ? 'var(--color-accent, #C9A86A)'
-                          : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 20%, transparent)',
+                        borderColor: inFormula ? 'var(--color-accent, #C9A86A)' : hairline,
                         background: inFormula
-                          ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
+                          ? 'var(--color-accent, #C9A86A)'
                           : 'transparent',
-                        color: inFormula ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
+                        color: inFormula
+                          ? 'var(--color-bg, #0B0B0C)'
+                          : 'var(--color-ink, #F4F0E8)',
                       }}
                     >
                       {inFormula ? dict.addedToFormula : dict.addToFormula}
@@ -244,6 +241,7 @@ export function PigmentDossierModal({
   onClose,
 }: PigmentDossierModalProps) {
   const lore = useMemo(() => (pigment ? getPigmentLore(pigment, lang) : null), [pigment, lang])
+  const hairline = 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)'
 
   const localizedName = pigment
     ? pigment.id === 'acrylic_binder'
@@ -263,39 +261,35 @@ export function PigmentDossierModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(11, 11, 12, 0.72)' }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(10, 10, 11, 0.76)' }}
         >
           <motion.div
-            initial={{ y: 16, opacity: 0 }}
+            initial={{ y: 14, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 16, opacity: 0 }}
+            exit={{ y: 14, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[480px] max-h-[85vh] overflow-y-auto p-5 rounded-3xl border"
+            className="w-full max-w-[500px] max-h-[86vh] overflow-y-auto rounded-2xl border shadow-2xl"
             style={{
-              backgroundColor: '#F7F4EE',
-              color: '#181715',
-              borderColor: 'rgba(24,23,21,0.14)',
-              boxShadow: '0 24px 60px rgba(0,0,0,0.42)',
+              backgroundColor: 'var(--color-surface, #141416)',
+              color: 'var(--color-ink, #F4F0E8)',
+              borderColor: hairline,
             }}
           >
             <div
-              className="flex items-center justify-between gap-3 pb-3.5 mb-3.5 border-b"
-              style={{ borderColor: 'rgba(24,23,21,0.1)' }}
+              className="px-5 py-4 flex items-center justify-between gap-3 border-b"
+              style={{ borderColor: hairline }}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div
-                  className="w-10 h-10 rounded-xl shrink-0 border"
-                  style={{
-                    backgroundColor: pigment.hex || '#2c2623',
-                    borderColor: 'rgba(0,0,0,0.2)',
-                  }}
+                  className="w-11 h-11 rounded-xl shrink-0 border border-black/20"
+                  style={{ backgroundColor: pigment.hex || '#2c2623' }}
                 />
                 <div className="min-w-0">
-                  <span className="text-[9.5px] font-mono uppercase tracking-[0.14em] block text-[#68635B]">
+                  <span className="text-[11px] font-mono uppercase tracking-[0.12em] block opacity-60">
                     {dict.dossierTitle} · {lore.code}
                   </span>
-                  <h3 className="text-[18px] font-serif font-bold text-[#181715] truncate">
+                  <h3 className="text-[20px] font-serif font-semibold leading-tight truncate mt-0.5">
                     {localizedName}
                   </h3>
                 </div>
@@ -304,77 +298,107 @@ export function PigmentDossierModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center border text-[#181715] shrink-0 cursor-pointer"
-                style={{ borderColor: 'rgba(24,23,21,0.16)', backgroundColor: '#EFEAE1' }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 cursor-pointer"
+                style={{ borderColor: hairline, color: 'var(--color-ink, #F4F0E8)' }}
+                aria-label={dict.dossierClose}
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex flex-col gap-3.5 text-[13px] font-sans leading-relaxed">
+            <div className="p-5 flex flex-col gap-4 text-[13.5px] font-sans leading-relaxed">
               {pigment.spectrum && pigment.spectrum.length > 1 && (
                 <div
-                  className="p-3.5 rounded-2xl flex items-center justify-between gap-3"
-                  style={{ backgroundColor: '#141416', color: '#F4F0E8' }}
+                  className="p-3.5 rounded-xl border flex items-center justify-between gap-3"
+                  style={{
+                    backgroundColor: 'var(--color-bg, #0B0B0C)',
+                    borderColor: hairline,
+                  }}
                 >
-                  <div className="text-[10px] font-mono opacity-80">
+                  <div className="text-[12px] font-mono opacity-75">
                     <div>R(λ) 380–780 nm</div>
-                    <div className="text-[#C9A86A] mt-0.5">{(pigment.hex || '').toUpperCase()}</div>
+                    <div className="mt-0.5 font-semibold" style={{ color: 'var(--color-accent, #C9A86A)' }}>
+                      {(pigment.hex || '').toUpperCase()}
+                    </div>
                   </div>
                   <SpectralSparkline
                     spectrum={pigment.spectrum}
                     strokeColor={pigment.hex || '#C9A86A'}
-                    width={180}
-                    height={40}
+                    width={170}
+                    height={42}
                   />
                 </div>
               )}
 
-              <div className="p-3.5 rounded-2xl" style={{ backgroundColor: '#EFEAE1' }}>
-                <div className="text-[9.5px] uppercase tracking-[0.14em] text-[#68635B]">
+              <div
+                className="p-4 rounded-xl border flex flex-col gap-1.5"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
+                  borderColor: hairline,
+                }}
+              >
+                <div className="text-[11px] uppercase tracking-[0.12em] opacity-60">
                   {dict.dossierChem}
                 </div>
-                <div className="font-semibold text-[#181715] mt-0.5">{lore.chemicalFamily[lang]}</div>
-                <div className="text-[12px] text-[#524E47] mt-1">
+                <div className="font-semibold">{lore.chemicalFamily[lang]}</div>
+                <div className="text-[12.5px] opacity-75">
                   {lore.lightfastness} · {lore.tintingStrength[lang]}
                 </div>
                 <div
-                  className="mt-2 pt-2 border-t text-[12px] text-[#181715]"
-                  style={{ borderColor: 'rgba(24,23,21,0.1)' }}
+                  className="mt-2 pt-2.5 border-t text-[12.5px] opacity-90"
+                  style={{ borderColor: hairline }}
                 >
                   <strong>{dict.dossierOpacityMeaning}:</strong> {dict.opacityDesc[lore.opacity]}
                 </div>
               </div>
 
               <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#9A6B2F] mb-1">
+                <div
+                  className="text-[11.5px] uppercase tracking-[0.12em] font-semibold mb-1.5"
+                  style={{ color: 'var(--color-accent, #C9A86A)' }}
+                >
                   {dict.dossierHistory}
                 </div>
-                <p className="text-[#26221E]">{lore.history[lang]}</p>
+                <p className="opacity-85">{lore.history[lang]}</p>
               </div>
 
               <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#9A6B2F] mb-1">
+                <div
+                  className="text-[11.5px] uppercase tracking-[0.12em] font-semibold mb-1.5"
+                  style={{ color: 'var(--color-accent, #C9A86A)' }}
+                >
                   {dict.dossierLeather}
                 </div>
-                <p className="text-[#26221E]">{lore.leatherUsage[lang]}</p>
+                <p className="opacity-85">{lore.leatherUsage[lang]}</p>
               </div>
 
-              <div className="p-3.5 rounded-2xl border flex flex-col gap-2.5" style={{ backgroundColor: '#EFEAE1', borderColor: 'rgba(154,107,47,0.35)' }}>
-                <div className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#9A6B2F]">
+              <div
+                className="p-4 rounded-xl border flex flex-col gap-3"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
+                  borderColor: 'color-mix(in srgb, var(--color-accent, #C9A86A) 35%, transparent)',
+                }}
+              >
+                <div
+                  className="text-[11.5px] uppercase tracking-[0.12em] font-semibold"
+                  style={{ color: 'var(--color-accent, #C9A86A)' }}
+                >
                   {dict.dossierWhereToBuy}
                 </div>
 
                 <div>
-                  <div className="text-[11px] font-semibold text-[#181715] mb-1.5">
+                  <div className="text-[12px] font-semibold opacity-80 mb-1.5">
                     {dict.dossierLeatherBrands}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {lore.whereToBuy.leatherBrands.map((b) => (
                       <span
                         key={b}
-                        className="text-[11px] font-mono px-2.5 py-0.5 rounded-full border text-[#181715]"
-                        style={{ backgroundColor: '#F7F4EE', borderColor: 'rgba(24,23,21,0.14)' }}
+                        className="text-[12px] font-mono px-2.5 py-1 rounded-lg border"
+                        style={{
+                          backgroundColor: 'var(--color-surface, #141416)',
+                          borderColor: hairline,
+                        }}
                       >
                         {b}
                       </span>
@@ -383,15 +407,18 @@ export function PigmentDossierModal({
                 </div>
 
                 <div>
-                  <div className="text-[11px] font-semibold text-[#181715] mb-1.5">
+                  <div className="text-[12px] font-semibold opacity-80 mb-1.5">
                     {dict.dossierArtSuppliers}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {lore.whereToBuy.pigmentSuppliers.map((s) => (
                       <span
                         key={s}
-                        className="text-[11px] font-mono px-2.5 py-0.5 rounded-full border text-[#524E47]"
-                        style={{ backgroundColor: '#F7F4EE', borderColor: 'rgba(24,23,21,0.12)' }}
+                        className="text-[12px] font-mono px-2.5 py-1 rounded-lg border opacity-80"
+                        style={{
+                          backgroundColor: 'var(--color-surface, #141416)',
+                          borderColor: hairline,
+                        }}
                       >
                         {s}
                       </span>
@@ -399,23 +426,23 @@ export function PigmentDossierModal({
                   </div>
                 </div>
 
-                <div
-                  className="text-[11px] text-[#524E47] pt-2 border-t"
-                  style={{ borderColor: 'rgba(24,23,21,0.1)' }}
-                >
+                <div className="text-[12px] opacity-70 pt-2.5 border-t" style={{ borderColor: hairline }}>
                   {lore.whereToBuy.searchHint[lang]}
                 </div>
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full mt-4 py-3 rounded-full text-[11.5px] font-sans uppercase tracking-[0.16em] font-semibold cursor-pointer border-none"
-              style={{ backgroundColor: '#181715', color: '#F7F4EE' }}
-            >
-              {dict.dossierClose}
-            </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full h-11 rounded-xl text-[13px] font-sans uppercase tracking-[0.12em] font-semibold cursor-pointer border-none"
+                style={{
+                  backgroundColor: 'var(--color-ink, #F4F0E8)',
+                  color: 'var(--color-bg, #0B0B0C)',
+                }}
+              >
+                {dict.dossierClose}
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}
@@ -430,6 +457,8 @@ interface MasterGuideModalProps {
 }
 
 export function MasterGuideModal({ open, dict, onClose }: MasterGuideModalProps) {
+  const hairline = 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)'
+
   return (
     <AnimatePresence>
       {open && (
@@ -438,72 +467,86 @@ export function MasterGuideModal({ open, dict, onClose }: MasterGuideModalProps)
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(11, 11, 12, 0.72)' }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(10, 10, 11, 0.76)' }}
         >
           <motion.div
-            initial={{ y: 16, opacity: 0 }}
+            initial={{ y: 14, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 16, opacity: 0 }}
+            exit={{ y: 14, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[480px] max-h-[85vh] overflow-y-auto p-5 rounded-3xl border"
+            className="w-full max-w-[500px] max-h-[86vh] overflow-y-auto rounded-2xl border shadow-2xl"
             style={{
-              backgroundColor: '#F7F4EE',
-              color: '#181715',
-              borderColor: 'rgba(24,23,21,0.14)',
-              boxShadow: '0 24px 60px rgba(0,0,0,0.42)',
+              backgroundColor: 'var(--color-surface, #141416)',
+              color: 'var(--color-ink, #F4F0E8)',
+              borderColor: hairline,
             }}
           >
             <div
-              className="flex items-center justify-between gap-3 pb-3 mb-3.5 border-b"
-              style={{ borderColor: 'rgba(24,23,21,0.1)' }}
+              className="px-5 py-4 flex items-center justify-between gap-3 border-b"
+              style={{ borderColor: hairline }}
             >
-              <h3 className="text-[17px] font-serif font-bold text-[#181715]">
+              <h3 className="text-[20px] font-serif font-semibold leading-tight">
                 {dict.guideModalTitle}
               </h3>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-8 h-8 rounded-full border text-[#181715] cursor-pointer"
-                style={{ borderColor: 'rgba(24,23,21,0.16)', backgroundColor: '#EFEAE1' }}
+                className="w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 cursor-pointer"
+                style={{ borderColor: hairline, color: 'var(--color-ink, #F4F0E8)' }}
+                aria-label={dict.dossierClose}
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex flex-col gap-3.5 text-[13px] font-sans leading-relaxed">
+            <div className="p-5 flex flex-col gap-4 text-[13.5px] font-sans leading-relaxed">
               <div>
-                <div className="font-semibold text-[#9A6B2F] mb-1">{dict.guideSectionCoats}</div>
-                <p className="text-[#26221E]">{dict.guideSectionCoatsText}</p>
+                <div className="font-semibold mb-1" style={{ color: 'var(--color-accent, #C9A86A)' }}>
+                  {dict.guideSectionCoats}
+                </div>
+                <p className="opacity-85">{dict.guideSectionCoatsText}</p>
               </div>
               <div>
-                <div className="font-semibold text-[#9A6B2F] mb-1">{dict.guideSectionWetDry}</div>
-                <p className="text-[#26221E]">{dict.guideSectionWetDryText}</p>
+                <div className="font-semibold mb-1" style={{ color: 'var(--color-accent, #C9A86A)' }}>
+                  {dict.guideSectionWetDry}
+                </div>
+                <p className="opacity-85">{dict.guideSectionWetDryText}</p>
               </div>
               <div>
-                <div className="font-semibold text-[#9A6B2F] mb-1">{dict.guideSectionIlluminant}</div>
-                <p className="text-[#26221E]">{dict.guideSectionIlluminantText}</p>
+                <div className="font-semibold mb-1" style={{ color: 'var(--color-accent, #C9A86A)' }}>
+                  {dict.guideSectionIlluminant}
+                </div>
+                <p className="opacity-85">{dict.guideSectionIlluminantText}</p>
               </div>
               <div
-                className="p-3.5 rounded-2xl border flex flex-col gap-1.5"
-                style={{ backgroundColor: '#EFEAE1', borderColor: 'rgba(154,107,47,0.35)' }}
+                className="p-4 rounded-xl border flex flex-col gap-2"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
+                  borderColor: 'color-mix(in srgb, var(--color-accent, #C9A86A) 35%, transparent)',
+                }}
               >
-                <div className="font-semibold text-[#9A6B2F]">{dict.guideSectionOpacity}</div>
-                <div className="text-[12px] text-[#181715]">• {dict.opacityDesc.opaque}</div>
-                <div className="text-[12px] text-[#181715]">• {dict.opacityDesc['semi-opaque']}</div>
-                <div className="text-[12px] text-[#181715]">• {dict.opacityDesc['semi-transparent']}</div>
-                <div className="text-[12px] text-[#181715]">• {dict.opacityDesc.transparent}</div>
+                <div className="font-semibold" style={{ color: 'var(--color-accent, #C9A86A)' }}>
+                  {dict.guideSectionOpacity}
+                </div>
+                <div className="text-[12.5px] opacity-85">• {dict.opacityDesc.opaque}</div>
+                <div className="text-[12.5px] opacity-85">• {dict.opacityDesc['semi-opaque']}</div>
+                <div className="text-[12.5px] opacity-85">• {dict.opacityDesc['semi-transparent']}</div>
+                <div className="text-[12.5px] opacity-85">• {dict.opacityDesc.transparent}</div>
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full mt-4 py-3 rounded-full text-[11.5px] font-sans uppercase tracking-[0.16em] font-semibold cursor-pointer border-none"
-              style={{ backgroundColor: '#181715', color: '#F7F4EE' }}
-            >
-              {dict.dossierClose}
-            </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full h-11 rounded-xl text-[13px] font-sans uppercase tracking-[0.12em] font-semibold cursor-pointer border-none"
+                style={{
+                  backgroundColor: 'var(--color-ink, #F4F0E8)',
+                  color: 'var(--color-bg, #0B0B0C)',
+                }}
+              >
+                {dict.dossierClose}
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}
