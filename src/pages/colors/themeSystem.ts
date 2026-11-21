@@ -25,16 +25,16 @@ export type StudioBgPreset = {
 }
 
 export const STUDIO_BG_PRESETS: readonly StudioBgPreset[] = [
-  { id: 'cream', hex: '#F5F1EB' },
+  { id: 'cream', hex: '#F4F1EA' },
   { id: 'white', hex: '#FFFFFF' },
-  { id: 'light-gray', hex: '#E7E5E0' },
-  { id: 'graphite', hex: '#262523' },
-  { id: 'black', hex: '#111112' },
+  { id: 'light-gray', hex: '#E6E3DC' },
+  { id: 'graphite', hex: '#232220' },
+  { id: 'black', hex: '#0E0E10' },
 ]
 
 export const DEFAULT_STUDIO_BG: StudioBgConfig = {
   id: 'cream',
-  customHex: '#F5F1EB',
+  customHex: '#F4F1EA',
   autoContrast: true,
 }
 
@@ -61,44 +61,44 @@ export type ThemeTokens = {
 
 export const DAY_TOKENS: ThemeTokens = {
   isDark: false,
-  pageBg: '#F5F1EB',
-  headerBg: 'rgba(245, 241, 235, 0.92)',
-  cardBg: '#FFFFFF',
-  elevatedBg: '#F9F6F1',
-  trackBg: '#EAE4DA',
-  ink: '#1C1A17',
-  muted: '#6E685F',
-  subtle: '#968F85',
-  border: 'rgba(28, 26, 23, 0.09)',
-  strongBorder: 'rgba(28, 26, 23, 0.16)',
-  activeTintBg: '#EAE1D2',
-  activeTintBorder: '#9A8263',
-  activeTintInk: '#1C1A17',
-  primaryBtnBg: '#1C1A17',
-  primaryBtnInk: '#FAF8F4',
-  shadowCard: '0 2px 12px rgba(28, 26, 23, 0.05)',
-  shadowSoft: '0 1px 4px rgba(28, 26, 23, 0.04)',
+  pageBg: '#F4F1EA',
+  headerBg: '#F4F1EA',
+  cardBg: '#FAF8F4',
+  elevatedBg: '#EFECE4',
+  trackBg: '#DFDAD0',
+  ink: '#181613',
+  muted: '#666057',
+  subtle: '#8F887E',
+  border: 'rgba(24, 22, 19, 0.10)',
+  strongBorder: 'rgba(24, 22, 19, 0.20)',
+  activeTintBg: '#EAE3D5',
+  activeTintBorder: '#8F6F47',
+  activeTintInk: '#181613',
+  primaryBtnBg: '#181613',
+  primaryBtnInk: '#F7F4EE',
+  shadowCard: '0 1px 2px rgba(24, 22, 19, 0.04)',
+  shadowSoft: 'none',
 }
 
 export const NIGHT_TOKENS: ThemeTokens = {
   isDark: true,
-  pageBg: '#0E0E10',
-  headerBg: 'rgba(14, 14, 16, 0.92)',
-  cardBg: '#18181B',
-  elevatedBg: '#202024',
-  trackBg: '#2A2A2F',
-  ink: '#F5F2EC',
-  muted: '#A09A91',
-  subtle: '#757068',
-  border: 'rgba(245, 242, 236, 0.1)',
-  strongBorder: 'rgba(245, 242, 236, 0.18)',
-  activeTintBg: '#2C2721',
-  activeTintBorder: '#C79B58',
-  activeTintInk: '#F5F2EC',
-  primaryBtnBg: '#F5F2EC',
-  primaryBtnInk: '#141312',
-  shadowCard: '0 4px 18px rgba(0, 0, 0, 0.32)',
-  shadowSoft: '0 1px 6px rgba(0, 0, 0, 0.24)',
+  pageBg: '#0B0B0C',
+  headerBg: '#0B0B0C',
+  cardBg: '#131315',
+  elevatedBg: '#1B1B1E',
+  trackBg: '#2A2A2E',
+  ink: '#F4F0E8',
+  muted: '#9C968C',
+  subtle: '#6E6961',
+  border: 'rgba(244, 240, 232, 0.09)',
+  strongBorder: 'rgba(244, 240, 232, 0.18)',
+  activeTintBg: '#231F1A',
+  activeTintBorder: '#C6A477',
+  activeTintInk: '#F4F0E8',
+  primaryBtnBg: '#F4F0E8',
+  primaryBtnInk: '#11100F',
+  shadowCard: '0 1px 2px rgba(0, 0, 0, 0.3)',
+  shadowSoft: 'none',
 }
 
 const THEME_KEY = 'cordwainer_theme_mode_v1'
@@ -156,7 +156,7 @@ export function loadStudioBg(): StudioBgConfig {
       const id = validIds.includes(parsed.id as StudioBgId) ? (parsed.id as StudioBgId) : 'cream'
       return {
         id,
-        customHex: normalizeHex(parsed.customHex ?? '#F5F1EB', '#F5F1EB'),
+        customHex: normalizeHex(parsed.customHex ?? '#F4F1EA', '#F4F1EA'),
         autoContrast: typeof parsed.autoContrast === 'boolean' ? parsed.autoContrast : true,
       }
     }
@@ -175,9 +175,9 @@ export function saveStudioBg(cfg: StudioBgConfig): void {
 }
 
 export function resolveStudioBgHex(cfg: StudioBgConfig): string {
-  if (cfg.id === 'custom') return normalizeHex(cfg.customHex, '#F5F1EB')
+  if (cfg.id === 'custom') return normalizeHex(cfg.customHex, '#F4F1EA')
   const found = STUDIO_BG_PRESETS.find((p) => p.id === cfg.id)
-  return found ? found.hex : '#F5F1EB'
+  return found ? found.hex : '#F4F1EA'
 }
 
 export function isStudioBgDark(hex: string): boolean {
@@ -213,12 +213,12 @@ export function resolveStudioStageStyle(
   autoContrast = true,
   fallback?: boolean | ThemeTokens
 ): StudioStageStyle {
-  let hex = '#F5F1EB'
+  let hex = '#F4F1EA'
   let useAuto = autoContrast
 
   if (typeof studioBg === 'string') {
     const preset = STUDIO_BG_PRESETS.find((p) => p.id === studioBg)
-    hex = preset ? preset.hex : normalizeHex(studioBg, '#F5F1EB')
+    hex = preset ? preset.hex : normalizeHex(studioBg, '#F4F1EA')
   } else if (studioBg && typeof studioBg === 'object') {
     hex = resolveStudioBgHex(studioBg)
     useAuto = studioBg.autoContrast
@@ -226,11 +226,11 @@ export function resolveStudioStageStyle(
 
   const fallbackDark = typeof fallback === 'boolean' ? fallback : Boolean(fallback?.isDark)
   const darkStage = useAuto ? isStudioBgDark(hex) : fallbackDark
-  const textColor = darkStage ? '#F5F2EC' : '#1C1A17'
-  const mutedColor = darkStage ? 'rgba(245, 242, 236, 0.7)' : 'rgba(28, 26, 23, 0.62)'
-  const borderColor = darkStage ? 'rgba(245, 242, 236, 0.14)' : 'rgba(28, 26, 23, 0.1)'
-  const chipBg = darkStage ? 'rgba(24, 24, 27, 0.86)' : 'rgba(255, 255, 255, 0.9)'
-  const chipBorder = darkStage ? 'rgba(245, 242, 236, 0.18)' : 'rgba(28, 26, 23, 0.12)'
+  const textColor = darkStage ? '#F4F0E8' : '#181613'
+  const mutedColor = darkStage ? 'rgba(244, 240, 232, 0.68)' : 'rgba(24, 22, 19, 0.58)'
+  const borderColor = darkStage ? 'rgba(244, 240, 232, 0.14)' : 'rgba(24, 22, 19, 0.10)'
+  const chipBg = darkStage ? 'rgba(19, 19, 21, 0.88)' : 'rgba(250, 248, 244, 0.92)'
+  const chipBorder = darkStage ? 'rgba(244, 240, 232, 0.18)' : 'rgba(24, 22, 19, 0.14)'
 
   return {
     background: hex,
