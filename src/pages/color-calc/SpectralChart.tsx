@@ -24,7 +24,7 @@ export interface SpectrumSummary {
 
 const K1_SURFACE = 0.0365
 const K2_INTERNAL = 0.42
-const WL_END = WL_START + (SPECTRUM_LEN - 1) * WL_STEP // 780 nm
+const WL_END = WL_START + (SPECTRUM_LEN - 1) * WL_STEP
 
 const BAND_ZOOM_RANGES: Record<BandZoomId, { label: string; min: number; max: number }> = {
   full: { label: '380–780', min: 380, max: 780 },
@@ -88,7 +88,7 @@ interface SpectralSparklineProps {
 
 export function SpectralSparkline({
   spectrum,
-  strokeColor = '#D8A35C',
+  strokeColor = '#C9A86A',
   width = 64,
   height = 24,
 }: SpectralSparklineProps) {
@@ -286,23 +286,22 @@ export function SpectralChart({
 
   return (
     <section
-      className="border overflow-hidden"
+      className="rounded-3xl border overflow-hidden"
       style={{
-        background: 'var(--color-surface, #1C1917)',
-        borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)',
+        background: 'var(--color-surface, #141416)',
+        borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
       }}
     >
-      {/* Шапка графика: режимы R(λ) / K/S(λ) + кривые компонентов */}
       <div
         className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 border-b"
-        style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
+        style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
       >
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.22em] font-semibold opacity-80">
+          <div className="text-[11px] font-sans uppercase tracking-[0.18em] font-semibold opacity-80">
             {dict.spectralTitle}
           </div>
           {!compact && (
-            <div className="text-[10px] font-mono opacity-45 mt-0.5">
+            <div className="text-[10px] font-mono opacity-50 mt-0.5">
               {dict.spectralSubtitle}
             </div>
           )}
@@ -319,17 +318,17 @@ export function SpectralChart({
                   hapticSelect()
                   setMode(m)
                 }}
-                className="px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] font-semibold border transition-colors cursor-pointer"
+                className="px-3 py-1 rounded-full text-[10.5px] font-sans font-semibold border transition-colors cursor-pointer"
                 style={{
                   borderColor: active
-                    ? 'var(--color-accent, #D8A35C)'
-                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
+                    ? 'var(--color-accent, #C9A86A)'
+                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
                   background: active
-                    ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 16%, transparent)'
+                    ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
                     : 'transparent',
                   color: active
-                    ? 'var(--color-accent, #D8A35C)'
-                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)',
+                    ? 'var(--color-accent, #C9A86A)'
+                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 72%, transparent)',
                 }}
               >
                 {m === 'reflectance' ? dict.modeReflectance : dict.modeKS}
@@ -344,15 +343,15 @@ export function SpectralChart({
                 hapticSelect()
                 setShowComponents((v) => !v)
               }}
-              className="px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] border transition-colors cursor-pointer"
+              className="px-3 py-1 rounded-full text-[10.5px] font-sans border transition-colors cursor-pointer"
               style={{
                 borderColor: showComponents
-                  ? 'color-mix(in srgb, var(--color-ink, #F5F1EA) 36%, transparent)'
-                  : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
+                  ? 'color-mix(in srgb, var(--color-ink, #F4F0E8) 32%, transparent)'
+                  : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)',
                 background: showComponents
-                  ? 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)'
+                  ? 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)'
                   : 'transparent',
-                color: 'var(--color-ink, #F5F1EA)',
+                color: 'var(--color-ink, #F4F0E8)',
                 opacity: showComponents ? 0.95 : 0.55,
               }}
             >
@@ -362,18 +361,18 @@ export function SpectralChart({
         </div>
       </div>
 
-      {/* Панель масштабирования по диапазону длин волн */}
+      {/* Band Zoom */}
       <div
         className="px-4 py-2 flex items-center justify-between gap-2 border-b"
         style={{
-          borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
-          background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 8%, transparent)',
+          background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 2%, transparent)',
         }}
       >
-        <span className="text-[9px] font-mono uppercase tracking-[0.18em] opacity-50">
+        <span className="text-[9.5px] font-mono uppercase tracking-[0.16em] opacity-55">
           BAND ZOOM (nm)
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           {ZOOM_ORDER.map((zId) => {
             const active = zoom === zId
             return (
@@ -385,17 +384,17 @@ export function SpectralChart({
                   setZoom(zId)
                   setHoverIdx(null)
                 }}
-                className="px-2 py-0.5 text-[10px] font-mono border transition-colors cursor-pointer"
+                className="px-2.5 py-0.5 rounded-full text-[10px] font-mono border transition-colors cursor-pointer"
                 style={{
                   borderColor: active
-                    ? 'var(--color-accent, #D8A35C)'
-                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)',
+                    ? 'var(--color-accent, #C9A86A)'
+                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)',
                   background: active
-                    ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 16%, transparent)'
+                    ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
                     : 'transparent',
                   color: active
-                    ? 'var(--color-accent, #D8A35C)'
-                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 65%, transparent)',
+                    ? 'var(--color-accent, #C9A86A)'
+                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 68%, transparent)',
                 }}
               >
                 {BAND_ZOOM_RANGES[zId].label}
@@ -405,10 +404,9 @@ export function SpectralChart({
         </div>
       </div>
 
-      {/* Область графика */}
-      <div className="p-3 sm:p-4">
+      <div className="p-3.5 sm:p-4">
         {!visiblePrimary || visiblePrimary.length === 0 ? (
-          <div className="py-10 px-4 text-center text-[12px] opacity-55">
+          <div className="py-10 px-4 text-center text-[12px] font-sans opacity-60">
             {dict.noSpectrumHint}
           </div>
         ) : (
@@ -416,7 +414,7 @@ export function SpectralChart({
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-[11px] font-mono">
               <div className="flex items-center gap-2 min-w-0">
                 <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/25"
+                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/20"
                   style={{ backgroundColor: primaryColor }}
                 />
                 <span className="truncate opacity-85">{primaryLabel}</span>
@@ -424,11 +422,11 @@ export function SpectralChart({
 
               {hoveredPoint && hoveredYVal !== null ? (
                 <div
-                  className="px-2 py-0.5 border text-[11px]"
+                  className="px-2.5 py-0.5 rounded-full border text-[10.5px]"
                   style={{
-                    borderColor: 'var(--color-accent, #D8A35C)',
-                    background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 14%, transparent)',
-                    color: 'var(--color-ink, #F5F1EA)',
+                    borderColor: 'var(--color-accent, #C9A86A)',
+                    background: 'color-mix(in srgb, var(--color-accent, #C9A86A) 14%, transparent)',
+                    color: 'var(--color-ink, #F4F0E8)',
                   }}
                 >
                   {hoveredPoint.wavelength} nm · R {hoveredPoint.reflectance.toFixed(1)}% · K/S{' '}
@@ -473,7 +471,7 @@ export function SpectralChart({
                 </linearGradient>
 
                 <linearGradient id="cordwaine-area-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={primaryColor} stopOpacity="0.30" />
+                  <stop offset="0%" stopColor={primaryColor} stopOpacity="0.28" />
                   <stop offset="100%" stopColor={primaryColor} stopOpacity="0.02" />
                 </linearGradient>
               </defs>
@@ -496,7 +494,7 @@ export function SpectralChart({
                       y={y + 3}
                       textAnchor="end"
                       fill="currentColor"
-                      fillOpacity="0.5"
+                      fillOpacity="0.52"
                       fontSize="9"
                       fontFamily="monospace"
                     >
@@ -523,7 +521,7 @@ export function SpectralChart({
                       y={VB_H - 4}
                       textAnchor="middle"
                       fill="currentColor"
-                      fillOpacity="0.52"
+                      fillOpacity="0.54"
                       fontSize="9"
                       fontFamily="monospace"
                     >
@@ -538,7 +536,7 @@ export function SpectralChart({
                 y={PAD_T + PLOT_H + 6}
                 width={PLOT_W}
                 height={5}
-                rx={2}
+                rx={2.5}
                 fill="url(#cordwaine-vis-bar)"
                 opacity="0.88"
               />
@@ -576,7 +574,7 @@ export function SpectralChart({
                     y1={PAD_T}
                     x2={mapX(hoveredPoint.wavelength)}
                     y2={PAD_T + PLOT_H}
-                    stroke="#D8A35C"
+                    stroke="#C9A86A"
                     strokeWidth="1"
                     strokeDasharray="2 2"
                   />
@@ -584,7 +582,7 @@ export function SpectralChart({
                     cx={mapX(hoveredPoint.wavelength)}
                     cy={mapY(hoveredYVal)}
                     r="4.5"
-                    fill="#D8A35C"
+                    fill="#C9A86A"
                     stroke="#141210"
                     strokeWidth="1.5"
                   />
@@ -604,7 +602,7 @@ export function SpectralChart({
                   </span>
                 ))}
               </div>
-              <span className="text-[10px] opacity-45">{dict.touchChartHint}</span>
+              <span className="text-[10px] font-sans opacity-50">{dict.touchChartHint}</span>
             </div>
           </>
         )}
