@@ -6,7 +6,9 @@ import {
   SOLE_PRESETS,
   SoleColorConfig,
   formatOklch,
+  hexToOklch,
   normalizeHex,
+  oklchToHex,
 } from './colorEngine'
 import type { ColorsTranslation } from './colorsTranslations'
 import {
@@ -19,6 +21,184 @@ import {
 function sanitizeHexDraft(raw: string): string {
   const hexOnly = raw.replace(/[^0-9a-fA-F]/g, '').slice(0, 6).toUpperCase()
   return '#' + hexOnly
+}
+
+type InlineOklchPickerProps = {
+  hex: string
+  tokens: ThemeTokens
+  hueLabel: string
+  lightnessLabel: string
+  chromaLabel: string
+  onChangeHex: (nextHex: string) => void
+}
+
+const InlineOklchPicker: React.FC<InlineOklchPickerProps> = ({
+  hex,
+  tokens,
+  hueLabel,
+  lightnessLabel,
+  chromaLabel,
+  onChangeHex,
+}) => {
+  const safeHex = normalizeHex(hex, '#FAF8F4')
+  const parsed = hexToOklch(safeHex)
+
+  const [savedHue, setSavedHue] = useState<number>(() => Math.round(parsed.h || 140))
+  const [hexDraft, setHexDraft] = useState<string>(safeHex)
+
+  useEffect(() => {
+    setHexDraft(safeHex)
+    if (parsed.c > 0.015) {
+      setSavedHue(Math.round(parsed.h))
+    }
+  }, [safeHex, parsed.c, parsed.h])
+
+  const activeHue = parsed.c > 0.015 ? Math.round(parsed.h) : savedHue
+  const activeL = Math.round(Math.max(12, Math.min(96, parsed.l * 100)))
+  const activeC = Math.round(Math.max(0, Math.min(22, parsed.c * 100)))
+
+  const handleHue = (nextH: number) => {
+    setSavedHue(nextH)
+    const effectiveC = parsed.c < 0.04 ? 0.14 : parsed.c
+    const effectiveL = parsed.l < 0.18 || parsed.l > 0.92 ? 0.68 : parsed.l
+    onChangeHex(oklchToHex(effectiveL, effectiveC, nextH))
+  }
+
+  const handleL = (nextLPct: number) => {
+    onChangeHex(oklchToHex(nextLPct / 100, activeC / 100, activeHue))
+  }
+
+  const handleC = (nextCPct: number) => {
+    onChangeHex(oklchToHex(activeL / 100, nextCPct / 100, activeHue))
+  }
+
+  const handleManualHex = (raw: string) => {
+    const cleaned = sanitizeHexDraft(raw)
+    setHexDraft(cleaned)
+    if (cleaned.length === 7) {
+      const normalized = normalizeHex(cleaned, '')
+      if (normalized) onChangeHex(normalized)
+    }
+  }
+
+  const inputBg = tokens.isDark ? '#1B1B1E' : '#FFFFFF'
+  const inputInk = tokens.isDark ? '#F4F0E8' : '#181613'
+
+  const lStart = oklchToHex(0.14, activeC / 100, activeHue)
+  const lMid = oklchToHex(0.56, activeC / 100, activeHue)
+  const lEnd = oklchToHex(0.95, activeC / 100, activeHue)
+
+  const cStart = oklchToHex(activeL / 100, 0, activeHue)
+  const cEnd = oklchToHex(activeL / 100, 0.22, activeHue)
+
+  return (
+    <div
+      className="pt-4 border-t space-y-3.5"
+      style={{ borderColor: tokens.border }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="w-8 h-8 rounded-lg border shrink-0"
+            style={{
+              backgroundColor: safeHex,
+              borderColor: tokens.strongBorder,
+            }}
+          />
+          <span className="text-[12px] font-mono tabular-nums truncate" style={{ color: tokens.muted }}>
+            {formatOklch(safeHex)}
+          </span>
+        </div>
+
+        <input
+          type="text"
+          inputMode="text"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          value={hexDraft}
+          onChange={(e) => handleManualHex(e.target.value)}
+          maxLength={7}
+          spellCheck={false}
+          placeholder="#FAF8F4"
+          className="w-[100px] px-2.5 py-1.5 rounded-lg border text-[13px] font-mono font-semibold uppercase tracking-wider focus:outline-none shrink-0"
+          style={{
+            backgroundColor: inputBg,
+            borderColor: tokens.activeTintBorder,
+            color: inputInk,
+            WebkitTextFillColor: inputInk,
+            opacity: 1,
+          }}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[12px]">
+          <span style={{ color: tokens.muted }}>{hueLabel}</span>
+          <span className="font-mono tabular-nums" style={{ color: tokens.ink }}>
+            {activeHue}°
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={359}
+          step={1}
+          value={activeHue}
+          onChange={(e) => handleHue(Number(e.target.value))}
+          className="w-full h-3 rounded-full appearance-none cursor-pointer"
+          style={{
+            background:
+              'linear-gradient(90deg, #E5485B 0%, #E58C38 14%, #D9C938 28%, #52C962 44%, #36B8C9 58%, #4F78E5 72%, #A652E5 86%, #E5485B 100%)',
+            accentColor: tokens.ink,
+          }}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[12px]">
+          <span style={{ color: tokens.muted }}>{lightnessLabel}</span>
+          <span className="font-mono tabular-nums" style={{ color: tokens.ink }}>
+            {activeL}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={12}
+          max={96}
+          step={1}
+          value={activeL}
+          onChange={(e) => handleL(Number(e.target.value))}
+          className="w-full h-3 rounded-full appearance-none cursor-pointer"
+          style={{
+            background: `linear-gradient(90deg, ${lStart} 0%, ${lMid} 50%, ${lEnd} 100%)`,
+            accentColor: tokens.ink,
+          }}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[12px]">
+          <span style={{ color: tokens.muted }}>{chromaLabel}</span>
+          <span className="font-mono tabular-nums" style={{ color: tokens.ink }}>
+            {Math.round((activeC / 22) * 100)}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={22}
+          step={1}
+          value={activeC}
+          onChange={(e) => handleC(Number(e.target.value))}
+          className="w-full h-3 rounded-full appearance-none cursor-pointer"
+          style={{
+            background: `linear-gradient(90deg, ${cStart} 0%, ${cEnd} 100%)`,
+            accentColor: tokens.ink,
+          }}
+        />
+      </div>
+    </div>
+  )
 }
 
 type ToneControlCardProps = {
@@ -205,8 +385,6 @@ type SoleColorCardProps = {
   onResetSole: () => void
 }
 
-const EXTRA_SOLE_TONES = ['#F0EAE0', '#D8CFC2', '#7A746B', '#4A3728']
-
 export const SoleColorCard: React.FC<SoleColorCardProps> = ({
   t,
   tokens,
@@ -215,26 +393,6 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
   onChangeSole,
   onResetSole,
 }) => {
-  const [hexDraft, setHexDraft] = useState(soleConfig.customHex)
-
-  useEffect(() => {
-    setHexDraft(soleConfig.customHex)
-  }, [soleConfig.customHex])
-
-  const handleCustomHex = (raw: string) => {
-    const cleaned = sanitizeHexDraft(raw)
-    setHexDraft(cleaned)
-    if (cleaned.length === 7) {
-      const normalized = normalizeHex(cleaned, '')
-      if (normalized) {
-        onChangeSole({ presetId: 'custom', customHex: normalized })
-      }
-    }
-  }
-
-  const inputBg = tokens.isDark ? '#1B1B1E' : '#FFFFFF'
-  const inputInk = tokens.isDark ? '#F4F0E8' : '#181613'
-
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -251,7 +409,6 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
             type="button"
             onClick={() => {
               triggerHaptic('reset', hapticsEnabled)
-              setHexDraft('#FAF8F4')
               onResetSole()
             }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium shrink-0 transition-colors"
@@ -309,68 +466,14 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
         })}
       </div>
 
-      <div
-        className="pt-4 border-t flex flex-wrap items-center justify-between gap-3"
-        style={{ borderColor: tokens.border }}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-medium" style={{ color: tokens.muted }}>
-            {t.soleCustom}
-          </span>
-          <div className="flex items-center gap-1.5">
-            {EXTRA_SOLE_TONES.map((tone) => {
-              const active = soleConfig.presetId === 'custom' && soleConfig.customHex === tone
-              return (
-                <button
-                  key={tone}
-                  type="button"
-                  aria-label={tone}
-                  onClick={() => {
-                    triggerHaptic('select', hapticsEnabled)
-                    setHexDraft(tone)
-                    onChangeSole({ presetId: 'custom', customHex: tone })
-                  }}
-                  className="w-6 h-6 rounded-full border"
-                  style={{
-                    backgroundColor: tone,
-                    borderColor: active ? tokens.activeTintBorder : tokens.strongBorder,
-                    boxShadow: active ? `0 0 0 2px ${tokens.activeTintBorder}` : 'none',
-                  }}
-                />
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span
-            className="w-7 h-7 rounded-lg border shrink-0"
-            style={{
-              backgroundColor: normalizeHex(soleConfig.customHex, '#FAF8F4'),
-              borderColor: tokens.strongBorder,
-            }}
-          />
-          <input
-            type="text"
-            inputMode="text"
-            autoCapitalize="characters"
-            autoCorrect="off"
-            value={hexDraft}
-            onChange={(e) => handleCustomHex(e.target.value)}
-            maxLength={7}
-            spellCheck={false}
-            placeholder="#FAF8F4"
-            className="w-[104px] px-3 py-2 rounded-lg border text-[13px] font-mono font-semibold uppercase tracking-wider focus:outline-none"
-            style={{
-              backgroundColor: inputBg,
-              borderColor: soleConfig.presetId === 'custom' ? tokens.activeTintBorder : tokens.strongBorder,
-              color: inputInk,
-              WebkitTextFillColor: inputInk,
-              opacity: 1,
-            }}
-          />
-        </div>
-      </div>
+      <InlineOklchPicker
+        hex={soleConfig.customHex}
+        tokens={tokens}
+        hueLabel={t.hueLabel}
+        lightnessLabel={t.tintLabel}
+        chromaLabel={t.chromaLabel}
+        onChangeHex={(nextHex) => onChangeSole({ presetId: 'custom', customHex: nextHex })}
+      />
     </div>
   )
 }
@@ -383,8 +486,6 @@ type StudioBgCardProps = {
   onChangeStudioBg: (next: StudioBgConfig) => void
 }
 
-const EXTRA_BG_TONES = ['#EDE8DF', '#D6D2C9', '#383633', '#191B1E']
-
 export const StudioBgCard: React.FC<StudioBgCardProps> = ({
   t,
   tokens,
@@ -392,26 +493,6 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
   hapticsEnabled,
   onChangeStudioBg,
 }) => {
-  const [hexDraft, setHexDraft] = useState(studioBg.customHex)
-
-  useEffect(() => {
-    setHexDraft(studioBg.customHex)
-  }, [studioBg.customHex])
-
-  const handleCustomHex = (raw: string) => {
-    const cleaned = sanitizeHexDraft(raw)
-    setHexDraft(cleaned)
-    if (cleaned.length === 7) {
-      const normalized = normalizeHex(cleaned, '')
-      if (normalized) {
-        onChangeStudioBg({ ...studioBg, id: 'custom', customHex: normalized })
-      }
-    }
-  }
-
-  const inputBg = tokens.isDark ? '#1B1B1E' : '#FFFFFF'
-  const inputInk = tokens.isDark ? '#F4F0E8' : '#181613'
-
   return (
     <div className="space-y-4">
       <div>
@@ -489,49 +570,14 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
       </div>
 
       {studioBg.id === 'custom' && (
-        <div
-          className="pt-3 border-t flex flex-wrap items-center justify-between gap-3"
-          style={{ borderColor: tokens.border }}
-        >
-          <div className="flex items-center gap-1.5">
-            {EXTRA_BG_TONES.map((tone) => (
-              <button
-                key={tone}
-                type="button"
-                aria-label={tone}
-                onClick={() => {
-                  triggerHaptic('select', hapticsEnabled)
-                  setHexDraft(tone)
-                  onChangeStudioBg({ ...studioBg, id: 'custom', customHex: tone })
-                }}
-                className="w-6 h-6 rounded-full border"
-                style={{
-                  backgroundColor: tone,
-                  borderColor: studioBg.customHex === tone ? tokens.activeTintBorder : tokens.strongBorder,
-                }}
-              />
-            ))}
-          </div>
-          <input
-            type="text"
-            inputMode="text"
-            autoCapitalize="characters"
-            autoCorrect="off"
-            value={hexDraft}
-            onChange={(e) => handleCustomHex(e.target.value)}
-            maxLength={7}
-            spellCheck={false}
-            placeholder="#F4F1EA"
-            className="w-[104px] px-3 py-2 rounded-lg border text-[13px] font-mono font-semibold uppercase tracking-wider focus:outline-none"
-            style={{
-              backgroundColor: inputBg,
-              borderColor: tokens.activeTintBorder,
-              color: inputInk,
-              WebkitTextFillColor: inputInk,
-              opacity: 1,
-            }}
-          />
-        </div>
+        <InlineOklchPicker
+          hex={studioBg.customHex}
+          tokens={tokens}
+          hueLabel={t.hueLabel}
+          lightnessLabel={t.tintLabel}
+          chromaLabel={t.chromaLabel}
+          onChangeHex={(nextHex) => onChangeStudioBg({ ...studioBg, id: 'custom', customHex: nextHex })}
+        />
       )}
 
       <div
