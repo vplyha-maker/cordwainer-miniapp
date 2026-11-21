@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties }
 import type { Lang } from '../../App'
 import type { Pigment } from '../../data/pigments'
 import { loadAllPigments } from '../../data/loadPigments'
+import { getPigmentLore } from '../../data/pigmentLore'
 import { usePaintMix } from '../../hooks/usePaintMix'
 import { useColorCalculations } from '../../hooks/useColorCalculations'
 import {
@@ -163,9 +164,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     return workerRef.current
   }, [])
 
+  const baseSpectrum = useMemo(() => {
+    if (pigments.length === 0) return null
+    return resolveSubstrateSpectrum(substrateId, customSubstrateHex, pigments)
+  }, [substrateId, customSubstrateHex, pigments])
+
+  const substrateDisplayHex = useMemo(() => {
+    if (!baseSpectrum) return undefined
+    return rgbToHex(spectrumToRGBWithIlluminant(baseSpectrum, illuminant)).toUpperCase()
+  }, [baseSpectrum, illuminant])
+
   const layerSwatches = useMemo<LayerSwatchItem[] | null>(() => {
-    if (!mixedColor?.spectrum || pigments.length === 0) return null
-    const baseSpectrum = resolveSubstrateSpectrum(substrateId, customSubstrateHex, pigments)
+    if (!mixedColor?.spectrum || !baseSpectrum) return null
     const sim = simulateLayersKM(baseSpectrum, mixedColor.spectrum, system)
     return [
       {
@@ -189,7 +199,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         hex: rgbToHex(spectrumToRGBWithIlluminant(sim.final, illuminant)).toUpperCase(),
       },
     ]
-  }, [mixedColor, pigments, substrateId, customSubstrateHex, system, illuminant, dict.coatLabels])
+  }, [mixedColor, baseSpectrum, system, illuminant, dict.coatLabels])
 
   const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
 
@@ -296,10 +306,72 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     [setPaints]
   )
 
-  const copyHex = async () => {
+  // Копирование полной спецификации рецепта с компонентами, % и рекомендациями по смешиванию
+  const copyRecipe = async () => {
     if (!displayHex) return
+
+    const activeRows = paints
+      .map((row) => {
+        const ml = parseFloat(row.amount) || 0
+        const pig = pigments.find((p) => p.id === row.pigmentId)
+        return { row, ml, pig }
+      })
+      .filter((x) => x.ml > 0 && x.pig)
+
+    let textToCopy = displayHex
+
+    if (activeRows.length > 0 && totalAmount > 0) {
+      const illInfo = dict.illuminants[illuminant]
+      const labStr = activeLab
+        ? ` (L*${activeLab.L.toFixed(0)} a*${activeLab.a.toFixed(0)} b*${activeLab.b.toFixed(0)})`
+        : ''
+      const volStr =
+        totalAmount >= 1000
+          ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
+          : `${totalAmount.toFixed(1)} ${dict.ml}`
+
+      const lines: string[] = [
+        `CORDWAINE · SPECTRAL ATELIER`,
+        `${dict.result}: ${displayHex}${labStr}`,
+        `${isWet ? dict.wet : dict.dry} · ${illInfo.short} (${illInfo.temp})${activeCoat ? ` · ${activeCoat.label}` : ''}`,
+        `${dict.totalVolume}: ${volStr}`,
+        '',
+        `${dict.mixComposition}:`,
+      ]
+
+      const tips: string[] = []
+
+      activeRows.forEach((item, idx) => {
+        const pig = item.pig!
+        const lore = getPigmentLore(pig, lang)
+        const name =
+          pig.id === 'acrylic_binder'
+            ? dict.binder
+            : lang === 'uk'
+            ? pig.name.uk || pig.name.ru
+            : lang === 'de'
+            ? pig.name.de || pig.name.ru
+            : pig.name.ru
+        const pct = Math.round((item.ml / totalAmount) * 100)
+        const ciCode = lore.code.split('·')[0].trim()
+        const brand = lore.whereToBuy.leatherBrands[0] || ''
+
+        lines.push(`${idx + 1}. ${name} (${ciCode}) — ${item.ml.toFixed(2)} ${dict.ml} (${pct}%)`)
+        lines.push(`   ${dict.opacityLabels[lore.opacity]}${brand ? ` · ${brand}` : ''}`)
+        if (lore.leatherUsage[lang]) {
+          tips.push(`• ${name}: ${lore.leatherUsage[lang]}`)
+        }
+      })
+
+      if (tips.length > 0) {
+        lines.push('', `${dict.dossierLeather}:`, ...tips)
+      }
+
+      textToCopy = lines.join('\n')
+    }
+
     try {
-      await navigator.clipboard?.writeText(displayHex)
+      await navigator.clipboard?.writeText(textToCopy)
       hapticSuccess()
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
@@ -553,6 +625,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }}
       substrateId={substrateId}
       customSubstrateHex={customSubstrateHex}
+      substrateDisplayHex={substrateDisplayHex}
       onSelectSubstrate={(id) => {
         hapticSelect()
         setSubstrateId(id)
@@ -576,7 +649,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }}
       liveDeltaE={liveDeltaE}
       copied={copied}
-      onCopyHex={copyHex}
+      onCopyHex={copyRecipe}
       isAutoAdjusting={isAutoAdjusting}
       onAutoAdjust={autoAdjustCurrentMix}
       onInspectPigment={(id) => {
@@ -676,7 +749,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         toggleTheme()
       }}
       aria-label={isDark ? 'Light mode' : 'Dark mode'}
-      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-colors border"
+      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 cursor-pointer border"
       style={{
         backgroundColor: tokens.surface,
         borderColor: tokens.border,
@@ -701,8 +774,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       initial={prefersReduced ? { opacity: 1 } : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={prefersReduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-      transition={{ duration: prefersReduced ? 0.05 : 0.2 }}
-      className="min-h-[100dvh] flex flex-col w-full overflow-x-hidden transition-colors duration-200 select-none"
+      transition={{ duration: prefersReduced ? 0.05 : 0.18 }}
+      className="min-h-[100dvh] flex flex-col w-full overflow-x-hidden select-none"
       style={{
         ...themeVars,
         backgroundColor: tokens.pageBg,
@@ -722,7 +795,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               hapticTap()
               onBack()
             }}
-            className="w-10 h-10 rounded-xl flex items-center justify-center border cursor-pointer transition-colors"
+            className="w-10 h-10 rounded-xl flex items-center justify-center border cursor-pointer"
             style={{
               backgroundColor: tokens.surface,
               borderColor: tokens.border,
@@ -763,7 +836,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     hapticSelect()
                     setDesktopRightTab(id)
                   }}
-                  className="px-4 py-1.5 rounded-lg text-[12px] font-sans font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-1.5 rounded-lg text-[12px] font-sans font-semibold cursor-pointer"
                   style={{
                     backgroundColor: active ? tokens.activeBg : 'transparent',
                     color: active ? tokens.activeText : tokens.inkSecondary,
@@ -778,7 +851,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           <button
             type="button"
             onClick={handleToggleHaptics}
-            className="h-10 px-3.5 rounded-xl text-[12px] font-sans font-medium border cursor-pointer transition-colors"
+            className="h-10 px-3.5 rounded-xl text-[12px] font-sans font-medium border cursor-pointer"
             style={{
               backgroundColor: hapticsOn ? tokens.activeTintBg : tokens.surface,
               borderColor: hapticsOn ? tokens.activeTintBorder : tokens.border,
@@ -843,7 +916,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   hapticSelect()
                   setMobileTab(tItem.id)
                 }}
-                className="py-1.5 px-0.5 rounded-lg text-[11px] font-sans font-semibold transition-colors cursor-pointer truncate"
+                className="py-1.5 px-0.5 rounded-lg text-[11px] font-sans font-semibold cursor-pointer truncate"
                 style={{
                   backgroundColor: active ? tokens.activeBg : 'transparent',
                   color: active ? tokens.activeText : tokens.inkSecondary,
@@ -866,7 +939,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         {mobileTab === 'archive' && archiveNode}
       </main>
 
-      {/* ПЛАНШЕТ (md) И ПК (xl) */}
+      {/* ПЛАНШЕТ И ПК */}
       <main className="hidden md:grid md:grid-cols-12 gap-6 xl:gap-8 px-6 lg:px-8 pt-6 pb-20 max-w-[1440px] mx-auto w-full flex-1 items-start">
         <div className="md:col-span-7 xl:col-span-7 flex flex-col gap-6">
           {formulaNode}
@@ -917,7 +990,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               type="button"
               onClick={recipeResult ? sendRecipeToMix : runRecipeSearch}
               disabled={recipeLoading || loading || inventoryIds.length === 0}
-              className="h-10 px-4 rounded-xl text-[13px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
+              className="h-10 px-4 rounded-xl text-[13px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0"
               style={{
                 backgroundColor: recipeResult ? tokens.accent : tokens.activeBg,
                 color: tokens.activeText,
@@ -928,9 +1001,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           ) : (
             <button
               type="button"
-              onClick={copyHex}
+              onClick={copyRecipe}
               disabled={!displayHex}
-              className="h-10 px-4 rounded-xl text-[13px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
+              className="h-10 px-4 rounded-xl text-[13px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0"
               style={{
                 backgroundColor: tokens.activeBg,
                 color: tokens.activeText,
