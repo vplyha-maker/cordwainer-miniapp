@@ -676,7 +676,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         toggleTheme()
       }}
       aria-label={isDark ? 'Light mode' : 'Dark mode'}
-      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 cursor-pointer transition-colors border"
+      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-colors border"
       style={{
         backgroundColor: tokens.surface,
         borderColor: tokens.border,
@@ -684,12 +684,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }}
     >
       {isDark ? (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <circle cx="12" cy="12" r="4" />
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
         </svg>
       ) : (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
       )}
@@ -710,19 +710,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
     >
-      {/* ШАПКА ТОЛЬКО ДЛЯ ПЛАНШЕТА И ПК */}
+      {/* ШАПКА ДЛЯ ПЛАНШЕТА И ПК */}
       <header
-        className="hidden md:flex items-center justify-between px-6 lg:px-8 py-3.5 border-b max-w-[1440px] mx-auto w-full"
+        className="hidden md:flex items-center justify-between px-6 lg:px-8 py-4 border-b max-w-[1440px] mx-auto w-full"
         style={{ borderColor: tokens.border }}
       >
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={() => {
               hapticTap()
               onBack()
             }}
-            className="w-9 h-9 rounded-full flex items-center justify-center border cursor-pointer transition-colors"
+            className="w-10 h-10 rounded-xl flex items-center justify-center border cursor-pointer transition-colors"
             style={{
               backgroundColor: tokens.surface,
               borderColor: tokens.border,
@@ -730,27 +730,27 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             }}
             aria-label={dict.back}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 18L9 12L15 6" />
             </svg>
           </button>
 
           <div>
             <div
-              className="text-[10px] tracking-[0.26em] uppercase font-semibold"
+              className="text-[11px] tracking-[0.22em] uppercase font-semibold"
               style={{ color: tokens.accent }}
             >
               {dict.brand} · {dict.edition}
             </div>
-            <h1 className="text-[20px] font-serif tracking-tight leading-tight mt-0.5">
+            <h1 className="text-[22px] font-serif tracking-tight leading-tight mt-0.5">
               {dict.title}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <div
-            className="flex p-1 rounded-full border"
+            className="flex p-1 rounded-xl border"
             style={{ backgroundColor: tokens.surface, borderColor: tokens.border }}
           >
             {(['match', 'archive'] as const).map((id) => {
@@ -763,7 +763,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     hapticSelect()
                     setDesktopRightTab(id)
                   }}
-                  className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-[0.14em] font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-1.5 rounded-lg text-[12px] font-sans font-semibold transition-colors cursor-pointer"
                   style={{
                     backgroundColor: active ? tokens.activeBg : 'transparent',
                     color: active ? tokens.activeText : tokens.inkSecondary,
@@ -778,13 +778,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           <button
             type="button"
             onClick={handleToggleHaptics}
-            className="h-9 px-3 rounded-full text-[11px] font-sans font-medium border cursor-pointer transition-colors"
+            className="h-10 px-3.5 rounded-xl text-[12px] font-sans font-medium border cursor-pointer transition-colors"
             style={{
               backgroundColor: hapticsOn ? tokens.activeTintBg : tokens.surface,
               borderColor: hapticsOn ? tokens.activeTintBorder : tokens.border,
               color: hapticsOn ? tokens.accent : tokens.inkMuted,
             }}
-            title="Haptic Feedback"
           >
             {hapticsOn ? 'Haptic ON' : 'Haptic OFF'}
           </button>
@@ -797,27 +796,27 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               hapticTap()
               setShowGuideModal(true)
             }}
-            className="h-9 px-3.5 rounded-full text-[11px] uppercase tracking-[0.12em] font-semibold border cursor-pointer"
+            className="h-10 px-4 rounded-xl text-[12px] font-sans font-semibold border cursor-pointer"
             style={{
               backgroundColor: tokens.surface,
               borderColor: tokens.border,
               color: tokens.accent,
             }}
           >
-            ? {dict.guideBtn}
+            {dict.guideBtn}
           </button>
         </div>
       </header>
 
-      {/* МОБИЛЬНАЯ КОМПАКТНАЯ СТРОКА УПРАВЛЕНИЯ */}
-      <div className="md:hidden px-3.5 pt-2.5 pb-2 flex items-center gap-2">
+      {/* МОБИЛЬНАЯ СТРОКА НАВИГАЦИИ */}
+      <div className="md:hidden px-4 pt-3 pb-2.5 flex items-center gap-2">
         <button
           type="button"
           onClick={() => {
             hapticTap()
             onBack()
           }}
-          className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center border cursor-pointer"
+          className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center border cursor-pointer"
           style={{
             backgroundColor: tokens.surface,
             borderColor: tokens.border,
@@ -825,13 +824,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           }}
           aria-label={dict.back}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18L9 12L15 6" />
           </svg>
         </button>
 
         <div
-          className="flex-1 min-w-0 grid grid-cols-4 p-1 rounded-full border"
+          className="flex-1 min-w-0 grid grid-cols-4 p-1 rounded-xl border"
           style={{ backgroundColor: tokens.surface, borderColor: tokens.border }}
         >
           {mobileTabs.map((tItem) => {
@@ -844,7 +843,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   hapticSelect()
                   setMobileTab(tItem.id)
                 }}
-                className="py-1.5 px-0.5 rounded-full text-[9.5px] font-sans font-semibold uppercase tracking-[0.01em] transition-colors cursor-pointer truncate"
+                className="py-1.5 px-0.5 rounded-lg text-[11px] font-sans font-semibold transition-colors cursor-pointer truncate"
                 style={{
                   backgroundColor: active ? tokens.activeBg : 'transparent',
                   color: active ? tokens.activeText : tokens.inkSecondary,
@@ -859,55 +858,55 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         {themeToggleButton}
       </div>
 
-      {/* МОБИЛЬНЫЙ РЕЖИМ */}
-      <main className="md:hidden px-3.5 pt-1 pb-20 flex-1">
+      {/* СМАРТФОН */}
+      <main className="md:hidden px-4 pt-1 pb-24 flex-1">
         {mobileTab === 'formula' && formulaNode}
         {mobileTab === 'spectrum' && spectralNode}
         {mobileTab === 'match' && matchingNode}
         {mobileTab === 'archive' && archiveNode}
       </main>
 
-      {/* ПЛАНШЕТ И ПК */}
-      <main className="hidden md:grid md:grid-cols-12 gap-6 px-6 lg:px-8 pt-5 pb-16 max-w-[1440px] mx-auto w-full flex-1 items-start">
-        <div className="md:col-span-7 flex flex-col gap-5">
+      {/* ПЛАНШЕТ (md) И ПК (xl) */}
+      <main className="hidden md:grid md:grid-cols-12 gap-6 xl:gap-8 px-6 lg:px-8 pt-6 pb-20 max-w-[1440px] mx-auto w-full flex-1 items-start">
+        <div className="md:col-span-7 xl:col-span-7 flex flex-col gap-6">
           {formulaNode}
           {spectralNode}
         </div>
-        <div className="md:col-span-5 flex flex-col gap-5">
+        <div className="md:col-span-5 xl:col-span-5 flex flex-col gap-6 xl:sticky xl:top-6">
           {desktopRightTab === 'match' ? matchingNode : archiveNode}
         </div>
       </main>
 
       {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ */}
       <footer
-        className="sticky bottom-0 z-30 border-t px-4 py-2.5"
+        className="sticky bottom-0 z-30 border-t px-4 py-3"
         style={{
           backgroundColor: tokens.pageBg,
           borderColor: tokens.border,
-          paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
         }}
       >
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-2">
+        <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => {
               hapticTap()
               setShowGuideModal(true)
             }}
-            className="flex items-center gap-2 bg-transparent border-0 cursor-pointer py-1 px-1.5 rounded-full shrink-0"
+            className="flex items-center gap-2.5 bg-transparent border-0 cursor-pointer py-1 px-1 shrink-0"
             style={{ color: tokens.ink }}
           >
             <span
-              className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
+              className="w-4 h-4 rounded-full border border-black/15 shrink-0"
               style={{ backgroundColor: footerColor }}
             />
-            <span className="text-[12px] font-mono font-semibold tabular-nums">
+            <span className="text-[13px] font-mono font-semibold tabular-nums">
               {footerLabel}
             </span>
           </button>
 
           <span
-            className="hidden min-[380px]:inline text-[9.5px] font-sans uppercase tracking-[0.18em] truncate"
+            className="hidden min-[400px]:inline text-[11px] font-sans uppercase tracking-[0.18em] truncate"
             style={{ color: tokens.inkMuted }}
           >
             CORDWAINE · SPECTRAL ATELIER
@@ -918,7 +917,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               type="button"
               onClick={recipeResult ? sendRecipeToMix : runRecipeSearch}
               disabled={recipeLoading || loading || inventoryIds.length === 0}
-              className="h-9 px-4 rounded-full text-[12px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
+              className="h-10 px-4 rounded-xl text-[13px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
               style={{
                 backgroundColor: recipeResult ? tokens.accent : tokens.activeBg,
                 color: tokens.activeText,
@@ -931,7 +930,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               type="button"
               onClick={copyHex}
               disabled={!displayHex}
-              className="h-9 px-4 rounded-full text-[12px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
+              className="h-10 px-4 rounded-xl text-[13px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
               style={{
                 backgroundColor: tokens.activeBg,
                 color: tokens.activeText,
