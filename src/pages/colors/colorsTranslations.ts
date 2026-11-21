@@ -2,6 +2,8 @@ import type { Lang } from '../../App'
 import type { FootwearMappingPreset, Scheme, SneakerZoneKey, SolePresetId } from './colorEngine'
 import type { StudioBgId, ThemeMode } from './themeSystem'
 
+export type SupportedLang = Lang
+
 export type ColorsTranslation = {
   title: string
   settingsTitle: string
@@ -73,6 +75,8 @@ export type ColorsTranslation = {
   proBuyBtn: string
   proProcessing: string
   proActive: string
+  paymentVerifyFailed: string
+  paymentPendingMsg: string
   schemes: Record<Scheme, { name: string; short: string; desc: string }>
   presets: Record<FootwearMappingPreset, string>
   zones: Record<SneakerZoneKey, string>
@@ -83,6 +87,8 @@ export type ColorsTranslation = {
     close: string
   }
 }
+
+export type TranslationDict = ColorsTranslation
 
 export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
   ru: {
@@ -139,7 +145,7 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     chromaLabel: 'Насыщенность',
     wheelModelLabel: 'Цветовая модель круга',
     hapticsLabel: 'Виброотклик',
-    hapticsDesc: 'Тактильная отдача кнопок и круга',
+    hapticsDesc: 'Тактильная отдача и щелчок кнопок',
     langLabel: 'Язык интерфейса',
     interfaceBlock: 'Отображение и интерфейс',
     slots: {
@@ -173,6 +179,8 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     proBuyBtn: 'Открыть за {stars} ★',
     proProcessing: 'Открываем оплату…',
     proActive: 'PRO активен',
+    paymentVerifyFailed: 'Не удалось подтвердить оплату. Попробуйте снова через пару секунд.',
+    paymentPendingMsg: 'Платёж обрабатывается Telegram. Доступ откроется автоматически.',
     schemes: {
       complementary: {
         name: 'Комплементарная',
@@ -313,7 +321,7 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     chromaLabel: 'Насиченість',
     wheelModelLabel: 'Колірна модель кола',
     hapticsLabel: 'Вібровідгук',
-    hapticsDesc: 'Тактильна віддача кнопок і кола',
+    hapticsDesc: 'Тактильна віддача та клік кнопок',
     langLabel: 'Мова інтерфейсу',
     interfaceBlock: 'Відображення та інтерфейс',
     slots: {
@@ -347,6 +355,8 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     proBuyBtn: 'Відкрити за {stars} ★',
     proProcessing: 'Відкриваємо оплату…',
     proActive: 'PRO активний',
+    paymentVerifyFailed: 'Не вдалося підтвердити оплату. Спробуйте ще раз за кілька секунд.',
+    paymentPendingMsg: 'Платіж обробляється Telegram. Доступ відкриється автоматично.',
     schemes: {
       complementary: {
         name: 'Комплементарна',
@@ -487,7 +497,7 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     chromaLabel: 'Sättigung',
     wheelModelLabel: 'Farbkreis-Modell',
     hapticsLabel: 'Haptik',
-    hapticsDesc: 'Taktiles Feedback für Tasten und Farbkreis',
+    hapticsDesc: 'Taktiles Feedback & Klickton',
     langLabel: 'Sprache',
     interfaceBlock: 'Darstellung & Oberfläche',
     slots: {
@@ -521,6 +531,8 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     proBuyBtn: 'Freischalten für {stars} ★',
     proProcessing: 'Zahlung wird geöffnet…',
     proActive: 'PRO aktiv',
+    paymentVerifyFailed: 'Zahlung konnte nicht bestätigt werden. Bitte kurz erneut versuchen.',
+    paymentPendingMsg: 'Zahlung wird von Telegram verarbeitet.',
     schemes: {
       complementary: {
         name: 'Komplementär',
