@@ -77,7 +77,7 @@ const SUBSTRATE_COPY: Record<
   }
 > = {
   ru: {
-    title: 'Исходная кожа',
+    title: 'Кожа-подложка',
     custom: 'Своя',
     raw: 'Кожа до',
     dryShort: 'Сухая',
@@ -87,7 +87,7 @@ const SUBSTRATE_COPY: Record<
     batchPlaceholder: 'мл',
   },
   uk: {
-    title: 'Вихідна шкіра',
+    title: 'Шкіра-підкладка',
     custom: 'Своя',
     raw: 'Шкіра до',
     dryShort: 'Суха',
@@ -210,6 +210,7 @@ export function FormulaPanel({
   const squareColor = displayHex || '#1E1B19'
   const activeIllInfo = dict.illuminants[illuminant]
   const subCopy = SUBSTRATE_COPY[lang] || SUBSTRATE_COPY.ru
+  const hairline = 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)'
 
   const rawSubstrateHex =
     substrateId === 'custom'
@@ -295,8 +296,7 @@ export function FormulaPanel({
   const applyCustomBatch = () => {
     const num = parseFloat(customBatchMl.replace(',', '.'))
     if (!Number.isFinite(num) || num <= 0) return
-    const clamped = Math.max(1, Math.min(MAX_MANUAL_ML, num))
-    onScaleToVolume(clamped)
+    onScaleToVolume(Math.max(1, Math.min(MAX_MANUAL_ML, num)))
     setCustomBatchMl('')
   }
 
@@ -313,18 +313,11 @@ export function FormulaPanel({
     .filter((s) => s.pct > 0)
 
   return (
-    <div className="flex flex-col gap-4 relative">
-      {/* SVG-фильтр для живой фактуры натуральной кожи */}
+    <div className="flex flex-col gap-6 relative">
       <svg className="absolute w-0 h-0 pointer-events-none" aria-hidden="true">
         <defs>
           <filter id={grainFilterId} x="0%" y="0%" width="100%" height="100%">
-            <feTurbulence
-              type="fractalNoise"
-              baseFrequency="0.72"
-              numOctaves="3"
-              seed="7"
-              stitchTiles="stitch"
-            />
+            <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="7" stitchTiles="stitch" />
             <feColorMatrix type="saturate" values="0" />
             <feComponentTransfer>
               <feFuncA type="linear" slope="0.24" />
@@ -333,41 +326,38 @@ export function FormulaPanel({
         </defs>
       </svg>
 
-      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА ОТТЕНКА */}
+      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА ПРИ ПРОКРУТКЕ */}
       <AnimatePresence>
         {showStickySwatch && (
           <motion.div
-            initial={{ opacity: 0, y: -18 }}
+            initial={{ opacity: 0, y: -14 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -18 }}
-            transition={{ duration: 0.18 }}
-            className="fixed left-3.5 right-3.5 z-40 max-w-[640px] mx-auto px-3 py-2 rounded-2xl border flex items-center justify-between gap-2.5 backdrop-blur-xl shadow-xl"
+            exit={{ opacity: 0, y: -14 }}
+            transition={{ duration: 0.16 }}
+            className="fixed left-4 right-4 z-40 max-w-[680px] mx-auto px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 backdrop-blur-md shadow-lg"
             style={{
               top: 'calc(10px + env(safe-area-inset-top, 0px))',
-              background: 'color-mix(in srgb, var(--color-surface, #141416) 90%, transparent)',
-              borderColor: 'color-mix(in srgb, var(--color-accent, #C9A86A) 42%, transparent)',
+              background: 'color-mix(in srgb, var(--color-surface, #141416) 94%, transparent)',
+              borderColor: hairline,
             }}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               <div
-                className="w-10 h-10 rounded-xl shrink-0 relative overflow-hidden border border-black/25 transition-colors duration-200"
+                className="w-10 h-10 rounded-xl shrink-0 relative overflow-hidden border border-black/20"
                 style={{ backgroundColor: squareColor }}
               >
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{ background: ILLUMINANT_GLOW[illuminant] }}
-                />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: ILLUMINANT_GLOW[illuminant] }} />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-serif text-[18px] leading-none tabular-nums">
+                <div className="flex items-center gap-2">
+                  <span className="font-serif text-[20px] leading-none tabular-nums">
                     {displayHex || '#------'}
                   </span>
                   {liveDeltaE !== null && (
                     <span
-                      className="px-1.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold whitespace-nowrap"
+                      className="px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold whitespace-nowrap"
                       style={{
-                        backgroundColor: 'rgba(0,0,0,0.62)',
+                        backgroundColor: 'rgba(0,0,0,0.68)',
                         color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
                       }}
                     >
@@ -375,9 +365,8 @@ export function FormulaPanel({
                     </span>
                   )}
                 </div>
-                <span className="block text-[10px] font-sans opacity-65 truncate mt-0.5">
+                <span className="block text-[12px] font-sans opacity-65 truncate mt-0.5 tabular-nums">
                   {activeCoat ? (activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label) : dict.mix} ·{' '}
-                  {isWet ? subCopy.wetShort : subCopy.dryShort} ·{' '}
                   {totalAmount >= 1000
                     ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
                     : `${totalAmount.toFixed(1)} ${dict.ml}`}
@@ -389,7 +378,7 @@ export function FormulaPanel({
               type="button"
               onClick={onCopyHex}
               disabled={!displayHex}
-              className="h-8 px-3 rounded-full text-[10px] font-sans uppercase tracking-[0.1em] font-semibold border shrink-0 cursor-pointer disabled:opacity-30"
+              className="h-9 px-4 rounded-xl text-[12px] font-sans font-semibold border shrink-0 cursor-pointer disabled:opacity-30"
               style={{
                 borderColor: 'var(--color-accent, #C9A86A)',
                 background: copied ? 'var(--color-accent, #C9A86A)' : 'transparent',
@@ -402,21 +391,22 @@ export function FormulaPanel({
         )}
       </AnimatePresence>
 
-      {/* ЖИВАЯ КАРТА ОТТЕНКА */}
+      {/* СЦЕНА ВЫКРАСКИ КОЖИ (Editorial Plate) */}
       <section
         ref={swatchAnchorRef}
-        className="rounded-3xl border overflow-hidden"
+        className="rounded-2xl border overflow-hidden"
         style={{
           background: 'var(--color-surface, #141416)',
-          borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
+          borderColor: hairline,
         }}
       >
+        {/* Верхняя строка: заголовок + справка + тумблер Сухая/Мокрая */}
         <div
-          className="px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b"
-          style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
+          className="px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-3 border-b"
+          style={{ borderColor: hairline }}
         >
-          <div className="flex items-center gap-2">
-            <span className="text-[10.5px] font-sans uppercase tracking-[0.16em] opacity-75 font-semibold">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[12px] font-sans uppercase tracking-[0.12em] font-semibold opacity-80">
               {dict.result}
             </span>
             <button
@@ -425,17 +415,11 @@ export function FormulaPanel({
                 setShowNotes((v) => !v)
                 hapticTap()
               }}
-              className="w-5 h-5 rounded-full text-[11px] flex items-center justify-center border cursor-pointer transition-colors"
+              className="w-6 h-6 rounded-full text-[12px] font-serif italic flex items-center justify-center border cursor-pointer transition-colors"
               style={{
-                borderColor: showNotes
-                  ? 'var(--color-accent, #C9A86A)'
-                  : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 18%, transparent)',
+                borderColor: showNotes ? 'var(--color-accent, #C9A86A)' : hairline,
                 color: showNotes ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
-                background: showNotes
-                  ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 14%, transparent)'
-                  : 'transparent',
               }}
-              title={dict.guideBtn}
               aria-label="Info"
             >
               i
@@ -443,7 +427,7 @@ export function FormulaPanel({
             <button
               type="button"
               onClick={onOpenGuide}
-              className="text-[10.5px] font-sans underline cursor-pointer bg-transparent border-none p-0 opacity-85"
+              className="text-[12px] font-sans underline underline-offset-4 cursor-pointer bg-transparent border-none p-0 opacity-85"
               style={{ color: 'var(--color-accent, #C9A86A)' }}
             >
               {dict.guideBtn}
@@ -452,11 +436,8 @@ export function FormulaPanel({
               <button
                 type="button"
                 onClick={onClearTarget}
-                className="text-[9.5px] font-sans uppercase tracking-[0.08em] px-2 py-0.5 rounded-full border cursor-pointer"
-                style={{
-                  borderColor: 'color-mix(in srgb, var(--color-danger, #f87171) 45%, transparent)',
-                  color: 'var(--color-danger, #f87171)',
-                }}
+                className="text-[12px] font-sans font-medium px-2 py-0.5 rounded-md cursor-pointer bg-transparent border-none"
+                style={{ color: 'var(--color-danger, #f87171)' }}
               >
                 ✕ {dict.reset}
               </button>
@@ -464,10 +445,10 @@ export function FormulaPanel({
           </div>
 
           <div
-            className="inline-flex p-0.5 rounded-full border"
+            className="inline-flex p-0.5 rounded-xl border"
             style={{
               background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
+              borderColor: hairline,
             }}
           >
             <button
@@ -475,7 +456,7 @@ export function FormulaPanel({
               onClick={() => {
                 if (isWet) onToggleWet()
               }}
-              className="px-2.5 py-1 rounded-full text-[10px] font-sans uppercase tracking-[0.06em] font-semibold transition-colors cursor-pointer"
+              className="px-3 py-1 rounded-lg text-[12px] font-sans font-medium transition-colors cursor-pointer"
               style={{
                 background: !isWet ? 'var(--color-ink, #F4F0E8)' : 'transparent',
                 color: !isWet ? 'var(--color-bg, #0B0B0C)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 65%, transparent)',
@@ -488,7 +469,7 @@ export function FormulaPanel({
               onClick={() => {
                 if (!isWet) onToggleWet()
               }}
-              className="px-2.5 py-1 rounded-full text-[10px] font-sans uppercase tracking-[0.06em] font-semibold transition-colors cursor-pointer"
+              className="px-3 py-1 rounded-lg text-[12px] font-sans font-medium transition-colors cursor-pointer"
               style={{
                 background: isWet ? 'var(--color-accent, #C9A86A)' : 'transparent',
                 color: isWet ? 'var(--color-bg, #0B0B0C)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 65%, transparent)',
@@ -501,10 +482,10 @@ export function FormulaPanel({
 
         {showNotes && (
           <div
-            className="px-4 py-2.5 text-[11px] font-sans opacity-80 border-b flex flex-col gap-1"
+            className="px-5 py-3 text-[13px] leading-relaxed font-sans opacity-80 border-b flex flex-col gap-1.5"
             style={{
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 8%, transparent)',
-              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
+              borderColor: hairline,
+              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 2.5%, transparent)',
             }}
           >
             <span>{isWet ? dict.wetExplain : dict.dryExplain}</span>
@@ -514,318 +495,169 @@ export function FormulaPanel({
           </div>
         )}
 
-        {/* ИНТЕРАКТИВНЫЙ ЖИВОЙ ОБРАЗЕЦ КОЖИ СО ШТОРКОЙ «ДО / ПОСЛЕ» */}
-        <div className="p-3">
+        {/* ГЛАВНАЯ ВЫКРАСКА КОЖИ — во всю ширину без внутренних рамок */}
+        <div
+          ref={stageRef}
+          onPointerDown={(e) => {
+            if (!hasComparisonCurtain) return
+            e.currentTarget.setPointerCapture(e.pointerId)
+            setIsDraggingSplit(true)
+            hapticTap()
+            updateSplitFromClientX(e.clientX)
+          }}
+          onPointerMove={(e) => {
+            if (!isDraggingSplit || !hasComparisonCurtain) return
+            updateSplitFromClientX(e.clientX)
+          }}
+          onPointerUp={() => setIsDraggingSplit(false)}
+          onPointerCancel={() => setIsDraggingSplit(false)}
+          className="relative w-full overflow-hidden select-none touch-none"
+          style={{
+            height: 204,
+            cursor: hasComparisonCurtain ? 'ew-resize' : 'default',
+          }}
+        >
           <div
-            ref={stageRef}
-            onPointerDown={(e) => {
-              if (!hasComparisonCurtain) return
-              e.currentTarget.setPointerCapture(e.pointerId)
-              setIsDraggingSplit(true)
-              hapticTap()
-              updateSplitFromClientX(e.clientX)
-            }}
-            onPointerMove={(e) => {
-              if (!isDraggingSplit || !hasComparisonCurtain) return
-              updateSplitFromClientX(e.clientX)
-            }}
-            onPointerUp={() => setIsDraggingSplit(false)}
-            onPointerCancel={() => setIsDraggingSplit(false)}
-            className="relative w-full overflow-hidden rounded-2xl select-none touch-none shadow-inner"
-            style={{
-              height: 176,
-              cursor: hasComparisonCurtain ? 'ew-resize' : 'default',
-            }}
-          >
+            className="absolute inset-0 transition-colors duration-300"
+            style={{ backgroundColor: squareColor }}
+          />
+
+          {hasComparisonCurtain && (
             <div
               className="absolute inset-0 transition-colors duration-300"
-              style={{ backgroundColor: squareColor }}
-            />
-
-            {hasComparisonCurtain && (
-              <div
-                className="absolute inset-0 transition-colors duration-300"
-                style={{
-                  backgroundColor: leftCompareHex,
-                  clipPath: `inset(0 ${100 - splitPct}% 0 0)`,
-                }}
-              />
-            )}
-
-            <div
-              className="absolute inset-0 pointer-events-none mix-blend-overlay"
               style={{
-                filter: `url(#${grainFilterId})`,
-                opacity: isWet ? 0.55 : 0.78,
+                backgroundColor: leftCompareHex,
+                clipPath: `inset(0 ${100 - splitPct}% 0 0)`,
               }}
             />
+          )}
 
+          <div
+            className="absolute inset-0 pointer-events-none mix-blend-overlay"
+            style={{
+              filter: `url(#${grainFilterId})`,
+              opacity: isWet ? 0.55 : 0.78,
+            }}
+          />
+
+          <div
+            className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+            style={{ background: ILLUMINANT_GLOW[illuminant] }}
+          />
+
+          {isWet && (
             <div
               className="absolute inset-0 pointer-events-none transition-opacity duration-300"
-              style={{ background: ILLUMINANT_GLOW[illuminant] }}
+              style={{
+                background:
+                  'linear-gradient(125deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 28%, rgba(255,255,255,0) 52%, rgba(0,0,0,0.14) 100%)',
+              }}
             />
+          )}
 
-            {isWet && (
+          {hasComparisonCurtain && (
+            <div
+              className="absolute top-0 bottom-0 pointer-events-none z-20"
+              style={{ left: `${splitPct}%` }}
+            >
               <div
-                className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+                className="w-[1.5px] h-full -translate-x-1/2"
                 style={{
-                  background:
-                    'linear-gradient(125deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 28%, rgba(255,255,255,0) 52%, rgba(0,0,0,0.14) 100%)',
+                  background: 'rgba(255,255,255,0.8)',
+                  boxShadow: '0 0 8px rgba(0,0,0,0.45)',
                 }}
               />
-            )}
-
-            {hasComparisonCurtain && (
               <div
-                className="absolute top-0 bottom-0 pointer-events-none z-20"
-                style={{ left: `${splitPct}%` }}
-              >
-                <div
-                  className="w-[1.5px] h-full -translate-x-1/2"
-                  style={{
-                    background: 'rgba(255,255,255,0.75)',
-                    boxShadow: '0 0 8px rgba(0,0,0,0.45)',
-                  }}
-                />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border transition-transform duration-150"
-                  style={{
-                    transform: `translate(-50%, -50%) scale(${isDraggingSplit ? 1.15 : 1})`,
-                    background: 'rgba(18,18,20,0.68)',
-                    borderColor: 'rgba(255,255,255,0.65)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l-3 3 3 3M16 9l3 3-3 3" />
-                  </svg>
-                </div>
-              </div>
-            )}
-
-            <div className="relative z-10 p-3 flex items-center justify-between w-full gap-2 pointer-events-none">
-              <span
-                className="px-2.5 py-0.5 rounded-full text-[9.5px] font-mono uppercase tracking-[0.1em] text-white backdrop-blur-sm"
-                style={{ backgroundColor: 'rgba(0,0,0,0.48)' }}
-              >
-                {activeIllInfo.short} · {activeIllInfo.temp}
-              </span>
-
-              {liveDeltaE !== null && (
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold tracking-[0.06em] backdrop-blur-sm whitespace-nowrap"
-                  style={{
-                    backgroundColor: 'rgba(0,0,0,0.62)',
-                    color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
-                  }}
-                >
-                  ΔE₀₀ {liveDeltaE.toFixed(1)}
-                </span>
-              )}
-            </div>
-
-            <div className="absolute bottom-2.5 left-3 right-3 z-10 flex items-end justify-between gap-2 pointer-events-none">
-              {hasComparisonCurtain ? (
-                <span
-                  className="px-2 py-0.5 rounded-full text-[9px] uppercase tracking-[0.12em] font-mono text-white backdrop-blur-sm truncate max-w-[44%]"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.48)' }}
-                >
-                  {leftCompareLabel}
-                </span>
-              ) : (
-                <span />
-              )}
-
-              <span
-                className="px-2.5 py-0.5 rounded-full text-[9.5px] uppercase tracking-[0.12em] font-mono text-white backdrop-blur-sm whitespace-nowrap"
-                style={{ backgroundColor: 'rgba(0,0,0,0.52)' }}
-              >
-                {activeCoat ? (activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label) : dict.mix} ·{' '}
-                {displayHex || 'UNMIXED'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Освещение */}
-        <div
-          className="px-4 py-2 flex flex-wrap items-center justify-between gap-2 border-t"
-          style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
-        >
-          <span className="text-[10px] font-sans uppercase tracking-[0.14em] opacity-55 font-semibold">
-            {dict.illuminantLabel}
-          </span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {ILLUMINANT_ORDER.map((ill) => {
-              const active = illuminant === ill
-              const info = dict.illuminants[ill]
-              return (
-                <button
-                  key={ill}
-                  type="button"
-                  onClick={() => onIlluminantChange(ill)}
-                  className="px-2.5 py-1 rounded-full text-[10.5px] font-sans font-medium border transition-colors cursor-pointer"
-                  style={{
-                    borderColor: active
-                      ? 'var(--color-accent, #C9A86A)'
-                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
-                    background: active
-                      ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
-                      : 'transparent',
-                    color: active
-                      ? 'var(--color-accent, #C9A86A)'
-                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 72%, transparent)',
-                  }}
-                  title={`${info.label} (${info.temp})`}
-                >
-                  {info.short}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Исходная кожа + 4 слоя нанесения */}
-        {layerSwatches && (
-          <div
-            className="px-3.5 py-2.5 border-t flex flex-col gap-2"
-            style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
-          >
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-sans uppercase tracking-[0.12em] opacity-55 font-semibold mr-1">
-                {subCopy.title}:
-              </span>
-              {SUBSTRATE_PRESETS.map((preset) => {
-                const active = substrateId === preset.id
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => onSelectSubstrate(preset.id)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-sans font-medium border transition-colors cursor-pointer"
-                    style={{
-                      borderColor: active
-                        ? 'var(--color-accent, #C9A86A)'
-                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
-                      background: active
-                        ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
-                        : 'transparent',
-                      color: active
-                        ? 'var(--color-accent, #C9A86A)'
-                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 75%, transparent)',
-                    }}
-                  >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/25"
-                      style={{ backgroundColor: preset.fallbackHex }}
-                    />
-                    <span>{preset.label[lang]}</span>
-                  </button>
-                )
-              })}
-
-              <label
-                className="relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-sans font-medium border transition-colors cursor-pointer overflow-hidden"
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm border transition-transform duration-150"
                 style={{
-                  borderColor:
-                    substrateId === 'custom'
-                      ? 'var(--color-accent, #C9A86A)'
-                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 18%, transparent)',
-                  background:
-                    substrateId === 'custom'
-                      ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
-                      : 'transparent',
-                  color:
-                    substrateId === 'custom'
-                      ? 'var(--color-accent, #C9A86A)'
-                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 75%, transparent)',
+                  transform: `translate(-50%, -50%) scale(${isDraggingSplit ? 1.12 : 1})`,
+                  background: 'rgba(18,18,20,0.72)',
+                  borderColor: 'rgba(255,255,255,0.7)',
                 }}
               >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/25"
-                  style={{ backgroundColor: customSubstrateHex }}
-                />
-                <span>+ {subCopy.custom}</span>
-                <input
-                  type="color"
-                  value={customSubstrateHex}
-                  onChange={(e) => onCustomSubstrateChange(e.target.value.toUpperCase())}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                  aria-label={subCopy.custom}
-                />
-              </label>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l-3 3 3 3M16 9l3 3-3 3" />
+                </svg>
+              </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-4 gap-1.5">
-              {layerSwatches.map((ls, idx) => {
-                const isSelectedCoat = selectedCoatIdx === idx
-                const displayLabel = ls.short === '∞' ? subCopy.fullShort : ls.label
-                return (
-                  <button
-                    key={ls.short}
-                    type="button"
-                    onClick={() => onSelectCoat(idx)}
-                    className="flex items-center justify-center gap-1 py-2 px-1 rounded-2xl border transition-colors cursor-pointer min-w-0"
-                    style={{
-                      borderColor: isSelectedCoat
-                        ? 'var(--color-accent, #C9A86A)'
-                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
-                      background: isSelectedCoat
-                        ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 15%, transparent)'
-                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
-                    }}
-                  >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{
-                        backgroundColor: ls.hex,
-                        border: '1px solid rgba(0,0,0,0.25)',
-                      }}
-                    />
-                    <span
-                      className="text-[9.5px] font-sans whitespace-nowrap"
-                      style={{
-                        fontWeight: isSelectedCoat ? 600 : 500,
-                        opacity: isSelectedCoat ? 1 : 0.72,
-                        color: 'var(--color-ink, #F4F0E8)',
-                      }}
-                    >
-                      {displayLabel}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Технический подвал HEX / CIELAB / Объём */}
-        <div
-          className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-t"
-          style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
-        >
-          <div className="flex flex-col">
-            <span className="text-[9.5px] font-sans uppercase tracking-[0.16em] opacity-50">
-              HEX / CIELAB {activeCoat ? `· ${activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label}` : ''}
+          <div className="relative z-10 p-3.5 flex items-center justify-between w-full gap-2 pointer-events-none">
+            <span
+              className="px-2.5 py-1 rounded-md text-[11px] font-mono tracking-[0.04em] text-white"
+              style={{ backgroundColor: 'rgba(0,0,0,0.52)' }}
+            >
+              {activeIllInfo.short} · {activeIllInfo.temp}
             </span>
-            <div className="flex items-baseline gap-2.5 mt-0.5">
-              <span className="font-serif text-[25px] leading-none tracking-tight tabular-nums">
+
+            {liveDeltaE !== null && (
+              <span
+                className="px-2.5 py-1 rounded-md text-[12px] font-mono font-semibold whitespace-nowrap"
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.68)',
+                  color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
+                }}
+              >
+                ΔE₀₀ {liveDeltaE.toFixed(1)}
+              </span>
+            )}
+          </div>
+
+          <div className="absolute bottom-3 left-3.5 right-3.5 z-10 flex items-end justify-between gap-2 pointer-events-none">
+            {hasComparisonCurtain ? (
+              <span
+                className="px-2.5 py-1 rounded-md text-[11px] font-mono text-white truncate max-w-[46%]"
+                style={{ backgroundColor: 'rgba(0,0,0,0.52)' }}
+              >
+                {leftCompareLabel}
+              </span>
+            ) : (
+              <span />
+            )}
+
+            <span
+              className="px-2.5 py-1 rounded-md text-[11px] font-mono text-white whitespace-nowrap"
+              style={{ backgroundColor: 'rgba(0,0,0,0.56)' }}
+            >
+              {activeCoat ? (activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label) : dict.mix} ·{' '}
+              {displayHex || 'UNMIXED'}
+            </span>
+          </div>
+        </div>
+
+        {/* ГЛАВНЫЕ ЦИФРЫ (HEX / CIELAB / Объём / Копировать) */}
+        <div
+          className="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-4 border-b"
+          style={{ borderColor: hairline }}
+        >
+          <div>
+            <div className="flex items-baseline gap-3">
+              <span className="font-serif text-[32px] leading-none tracking-tight tabular-nums">
                 {displayHex || '#------'}
               </span>
               {activeLab && (
-                <span className="font-mono text-[10.5px] opacity-60 tabular-nums">
+                <span className="font-mono text-[12px] opacity-60 tabular-nums">
                   L*{activeLab.L.toFixed(0)} a*{activeLab.a.toFixed(0)} b*{activeLab.b.toFixed(0)}
                 </span>
               )}
             </div>
+            {liveDeltaE !== null && (
+              <p className="text-[12px] font-sans opacity-70 mt-1">
+                {liveDeltaE <= 2
+                  ? dict.ciePerfect
+                  : liveDeltaE <= 5
+                  ? dict.cieAcceptable
+                  : dict.cieBad}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div className="text-right">
-              <span className="block text-[9.5px] font-sans uppercase tracking-[0.14em] opacity-50">
+              <span className="block text-[11px] font-sans opacity-55">
                 {dict.totalVolume}
               </span>
-              <span className="font-serif text-[19px] leading-tight tabular-nums">
+              <span className="font-serif text-[23px] leading-tight tabular-nums">
                 {totalAmount >= 1000
                   ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
                   : `${totalAmount.toFixed(1)} ${dict.ml}`}
@@ -836,7 +668,7 @@ export function FormulaPanel({
               type="button"
               onClick={onCopyHex}
               disabled={!displayHex}
-              className="h-9 px-4 rounded-full text-[10.5px] font-sans uppercase tracking-[0.12em] font-semibold border transition-colors disabled:opacity-30 cursor-pointer"
+              className="h-10 px-4 rounded-xl text-[12.5px] font-sans font-semibold border transition-colors disabled:opacity-30 cursor-pointer"
               style={{
                 borderColor: 'var(--color-accent, #C9A86A)',
                 background: copied ? 'var(--color-accent, #C9A86A)' : 'transparent',
@@ -848,40 +680,160 @@ export function FormulaPanel({
           </div>
         </div>
 
-        {liveDeltaE !== null && (
-          <div
-            className="px-4 py-2 text-[11px] font-sans border-t"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 8%, transparent)',
-              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
-            }}
-          >
-            <span className="opacity-80">
-              {liveDeltaE <= 2
-                ? dict.ciePerfect
-                : liveDeltaE <= 5
-                ? dict.cieAcceptable
-                : dict.cieBad}
-            </span>
+        {/* ЕДИНАЯ ШКАЛА ОСВЕЩЕНИЯ (вместо 4 отдельных таблеток) */}
+        <div
+          className="grid grid-cols-4 border-b divide-x"
+          style={{ borderColor: hairline }}
+        >
+          {ILLUMINANT_ORDER.map((ill) => {
+            const active = illuminant === ill
+            const info = dict.illuminants[ill]
+            return (
+              <button
+                key={ill}
+                type="button"
+                onClick={() => onIlluminantChange(ill)}
+                className="py-2.5 px-1 text-[12px] font-sans font-medium transition-colors cursor-pointer text-center"
+                style={{
+                  borderColor: hairline,
+                  background: active
+                    ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 14%, transparent)'
+                    : 'transparent',
+                  color: active ? 'var(--color-accent, #C9A86A)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 68%, transparent)',
+                }}
+                title={`${info.label} (${info.temp})`}
+              >
+                {info.short}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ПОДЛОЖКА КОЖИ + ПОЛОСА 4 СЛОЁВ */}
+        {layerSwatches && (
+          <div className="flex flex-col">
+            <div
+              className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b"
+              style={{ borderColor: hairline }}
+            >
+              <span className="text-[12px] font-sans opacity-60">{subCopy.title}</span>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                {SUBSTRATE_PRESETS.map((preset) => {
+                  const active = substrateId === preset.id
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => onSelectSubstrate(preset.id)}
+                      className="inline-flex items-center gap-1.5 text-[12px] font-sans cursor-pointer bg-transparent border-none p-0 transition-opacity"
+                      style={{
+                        color: active ? 'var(--color-ink, #F4F0E8)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 62%, transparent)',
+                        fontWeight: active ? 600 : 400,
+                      }}
+                    >
+                      <span
+                        className="w-4 h-4 rounded-full shrink-0 transition-transform"
+                        style={{
+                          backgroundColor: preset.fallbackHex,
+                          boxShadow: active
+                            ? '0 0 0 2px var(--color-surface, #141416), 0 0 0 3.5px var(--color-accent, #C9A86A)'
+                            : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
+                        }}
+                      />
+                      <span>{preset.label[lang]}</span>
+                    </button>
+                  )
+                })}
+
+                <label
+                  className="relative inline-flex items-center gap-1.5 text-[12px] font-sans cursor-pointer"
+                  style={{
+                    color: substrateId === 'custom' ? 'var(--color-accent, #C9A86A)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 62%, transparent)',
+                    fontWeight: substrateId === 'custom' ? 600 : 400,
+                  }}
+                >
+                  <span
+                    className="w-4 h-4 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: customSubstrateHex,
+                      boxShadow:
+                        substrateId === 'custom'
+                          ? '0 0 0 2px var(--color-surface, #141416), 0 0 0 3.5px var(--color-accent, #C9A86A)'
+                          : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
+                    }}
+                  />
+                  <span>+ {subCopy.custom}</span>
+                  <input
+                    type="color"
+                    value={customSubstrateHex}
+                    onChange={(e) => onCustomSubstrateChange(e.target.value.toUpperCase())}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    aria-label={subCopy.custom}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* 4-колоночная полоса слоёв с верхним цветовым индикатором */}
+            <div className="grid grid-cols-4 divide-x" style={{ borderColor: hairline }}>
+              {layerSwatches.map((ls, idx) => {
+                const isSelectedCoat = selectedCoatIdx === idx
+                const displayLabel = ls.short === '∞' ? subCopy.fullShort : ls.label
+                return (
+                  <button
+                    key={ls.short}
+                    type="button"
+                    onClick={() => onSelectCoat(idx)}
+                    className="relative pt-3 pb-2.5 px-1 text-center cursor-pointer transition-colors"
+                    style={{
+                      borderColor: hairline,
+                      background: isSelectedCoat
+                        ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 11%, transparent)'
+                        : 'transparent',
+                    }}
+                  >
+                    <span
+                      className="block h-1.5 w-10 mx-auto rounded-full mb-1.5 border border-black/15"
+                      style={{ backgroundColor: ls.hex }}
+                    />
+                    <span
+                      className="block text-[12px] font-sans whitespace-nowrap"
+                      style={{
+                        fontWeight: isSelectedCoat ? 600 : 400,
+                        color: isSelectedCoat
+                          ? 'var(--color-accent, #C9A86A)'
+                          : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 72%, transparent)',
+                      }}
+                    >
+                      {displayLabel}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
       </section>
 
-      {/* ПРОПОРЦИИ КОМПОНЕНТОВ */}
+      {/* ПРОПОРЦИИ КОМПОНЕНТОВ (единая таблица-ведомость без вложенных рамок) */}
       <section
-        className="rounded-3xl border p-4"
+        className="rounded-2xl border overflow-hidden"
         style={{
           background: 'var(--color-surface, #141416)',
-          borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
+          borderColor: hairline,
         }}
       >
-        <div className="flex items-center justify-between pb-2.5">
+        <div
+          className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b"
+          style={{ borderColor: hairline }}
+        >
           <div className="flex items-center gap-2.5">
             <span
-              className="w-3.5 h-3.5 rounded-full inline-block border border-black/20 transition-colors duration-200"
+              className="w-3.5 h-3.5 rounded-full inline-block border border-black/20"
               style={{ backgroundColor: squareColor }}
             />
-            <h2 className="text-[11px] font-sans uppercase tracking-[0.18em] font-semibold opacity-80">
+            <h2 className="text-[12px] font-sans uppercase tracking-[0.12em] font-semibold opacity-85">
               {dict.mixComposition}
             </h2>
           </div>
@@ -890,7 +842,7 @@ export function FormulaPanel({
             <button
               type="button"
               onClick={onClearAmounts}
-              className="text-[11px] font-sans font-medium opacity-75 hover:opacity-100 cursor-pointer"
+              className="text-[12.5px] font-sans font-medium opacity-80 hover:opacity-100 cursor-pointer bg-transparent border-none p-0"
               style={{ color: 'var(--color-danger, #f87171)' }}
             >
               {dict.clear}
@@ -898,43 +850,27 @@ export function FormulaPanel({
           )}
         </div>
 
-        {/* Живая полоса пропорций («мерный стакан») */}
-        <div
-          className="w-full h-2 rounded-full overflow-hidden flex mb-3 border"
-          style={{
-            background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 8%, transparent)',
-            borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
-          }}
-        >
+        {/* Живая полоса пропорций */}
+        <div className="h-1.5 w-full flex" style={{ background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 6%, transparent)' }}>
           {activeSegments.map((seg) => (
             <div
               key={seg.id}
               className="h-full transition-[width] duration-200"
-              style={{
-                width: `${seg.pct}%`,
-                backgroundColor: seg.hex,
-              }}
+              style={{ width: `${seg.pct}%`, backgroundColor: seg.hex }}
             />
           ))}
         </div>
 
-        {/* МАСШТАБИРОВАНИЕ ПАРТИИ ПОД ТОЧНЫЙ ОБЪЁМ (10 / 20 / 25 / 50 / 100 / свой мл) */}
+        {/* Линейка масштабирования партии */}
         {totalAmount > 0 && (
           <div
-            className="mb-3.5 p-2.5 rounded-2xl border flex flex-col gap-2"
+            className="px-4 sm:px-5 py-3 border-b flex items-center justify-between gap-2 flex-wrap"
             style={{
-              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 2.5%, transparent)',
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)',
+              borderColor: hairline,
+              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 2%, transparent)',
             }}
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[9.5px] font-sans uppercase tracking-[0.14em] opacity-60 font-semibold">
-                {subCopy.batchLabel}
-              </span>
-              <span className="font-mono text-[10.5px] opacity-65 tabular-nums">
-                {totalAmount.toFixed(1)} {dict.ml}
-              </span>
-            </div>
+            <span className="text-[12px] font-sans opacity-60">{subCopy.batchLabel}</span>
 
             <div className="flex items-center gap-1.5 flex-wrap">
               {BATCH_PRESETS.map((vol) => {
@@ -944,17 +880,12 @@ export function FormulaPanel({
                     key={vol}
                     type="button"
                     onClick={() => onScaleToVolume(vol)}
-                    className="px-2.5 py-1 rounded-full text-[10.5px] font-mono font-semibold border transition-colors cursor-pointer tabular-nums"
+                    className="h-8 px-2.5 rounded-lg text-[12px] font-mono font-medium transition-colors cursor-pointer tabular-nums"
                     style={{
-                      borderColor: isCurrent
-                        ? 'var(--color-accent, #C9A86A)'
-                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
                       background: isCurrent
-                        ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 18%, transparent)'
-                        : 'transparent',
-                      color: isCurrent
                         ? 'var(--color-accent, #C9A86A)'
-                        : 'var(--color-ink, #F4F0E8)',
+                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 6%, transparent)',
+                      color: isCurrent ? 'var(--color-bg, #0B0B0C)' : 'var(--color-ink, #F4F0E8)',
                     }}
                   >
                     {vol}
@@ -963,11 +894,8 @@ export function FormulaPanel({
               })}
 
               <div
-                className="inline-flex items-center rounded-full border pl-2.5 pr-1 py-0.5 ml-auto"
-                style={{
-                  borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
-                  background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
-                }}
+                className="inline-flex items-center h-8 rounded-lg border pl-2.5 pr-1"
+                style={{ borderColor: hairline }}
               >
                 <input
                   type="text"
@@ -982,14 +910,14 @@ export function FormulaPanel({
                     if (e.key === 'Enter') applyCustomBatch()
                   }}
                   placeholder={subCopy.batchPlaceholder}
-                  className="w-11 bg-transparent text-[11px] font-mono focus:outline-none tabular-nums"
+                  className="w-11 bg-transparent text-[12px] font-mono focus:outline-none tabular-nums"
                   style={{ color: 'var(--color-ink, #F4F0E8)' }}
                 />
                 <button
                   type="button"
                   onClick={applyCustomBatch}
                   disabled={!customBatchMl}
-                  className="px-2 py-0.5 rounded-full text-[9.5px] font-sans font-semibold uppercase tracking-[0.06em] cursor-pointer disabled:opacity-30"
+                  className="h-6 px-2 rounded-md text-[11px] font-sans font-semibold cursor-pointer disabled:opacity-30"
                   style={{
                     background: 'var(--color-accent, #C9A86A)',
                     color: 'var(--color-bg, #0B0B0C)',
@@ -1003,25 +931,25 @@ export function FormulaPanel({
         )}
 
         {loading ? (
-          <div className="py-10 text-center text-[12px] font-sans uppercase tracking-[0.18em] opacity-45">
+          <div className="py-12 text-center text-[13px] font-sans opacity-50">
             {dict.loading}
           </div>
         ) : loadError ? (
-          <div className="py-6 flex flex-col items-center gap-3">
-            <p className="text-[12px]" style={{ color: 'var(--color-danger, #f87171)' }}>
+          <div className="py-8 flex flex-col items-center gap-3">
+            <p className="text-[13px]" style={{ color: 'var(--color-danger, #f87171)' }}>
               {dict.loadError}
             </p>
             <button
               type="button"
               onClick={onRetryLoad}
-              className="px-4 py-2 rounded-full text-[11px] uppercase tracking-[0.14em] border cursor-pointer"
+              className="h-10 px-5 rounded-xl text-[13px] font-sans font-medium border cursor-pointer"
               style={{ borderColor: 'var(--color-accent, #C9A86A)', color: 'var(--color-accent, #C9A86A)' }}
             >
               {dict.retry}
             </button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="divide-y" style={{ borderColor: hairline }}>
             {paints.map((paint, idx) => {
               const currentAmount = parseFloat(paint.amount) || 0
               const sliderPos = mlToSliderPos(currentAmount)
@@ -1034,16 +962,16 @@ export function FormulaPanel({
               return (
                 <div
                   key={paint.id}
-                  className="p-3 rounded-2xl border overflow-hidden transition-colors"
+                  className="px-4 sm:px-5 py-4 transition-colors"
                   style={{
-                    background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
-                    borderColor: isDragging
-                      ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 45%, transparent)'
-                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)',
+                    borderColor: hairline,
+                    background: isDragging
+                      ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 4%, transparent)'
+                      : 'transparent',
                   }}
                 >
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="font-serif text-[13px] opacity-45 w-[18px] shrink-0">
+                  <div className="flex items-center gap-2.5 w-full">
+                    <span className="font-serif text-[15px] opacity-45 w-5 shrink-0 tabular-nums">
                       0{idx + 1}
                     </span>
 
@@ -1061,7 +989,7 @@ export function FormulaPanel({
                       <SpectralSparkline
                         spectrum={selectedPigment?.spectrum}
                         strokeColor={selectedPigment?.hex || '#C9A86A'}
-                        width={54}
+                        width={56}
                         height={24}
                       />
                     </div>
@@ -1070,34 +998,31 @@ export function FormulaPanel({
                       type="button"
                       onClick={() => onRemovePaint(paint.id)}
                       disabled={paints.length <= 1}
-                      className="w-7 h-7 rounded-full flex items-center justify-center opacity-45 hover:opacity-100 disabled:opacity-15 shrink-0 cursor-pointer"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center opacity-45 hover:opacity-100 disabled:opacity-15 shrink-0 cursor-pointer"
                       aria-label="Remove"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
 
-                  {/* Дозирование: анимированная шкала 0–100 мл + микрошаг − / + */}
-                  <div className="pl-[26px] pr-0.5 mt-3 w-full">
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-1">
+                  {/* Дозирование: − / поле / + и точная линейка 0–100 мл */}
+                  <div className="pl-7 mt-3.5">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleStep(paint.id, currentAmount, -1)}
                           disabled={currentAmount <= 0}
-                          className="w-6 h-6 rounded-full border flex items-center justify-center text-[13px] leading-none font-mono transition-colors disabled:opacity-25 cursor-pointer"
-                          style={{
-                            borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
-                            color: 'var(--color-ink, #F4F0E8)',
-                          }}
+                          className="w-8 h-8 rounded-lg border flex items-center justify-center text-[16px] leading-none font-mono transition-colors disabled:opacity-25 cursor-pointer"
+                          style={{ borderColor: hairline, color: 'var(--color-ink, #F4F0E8)' }}
                           aria-label="Decrease"
                         >
                           −
                         </button>
 
-                        <div className="flex items-baseline gap-1 px-1">
+                        <div className="flex items-baseline gap-1 px-1.5">
                           <input
                             ref={(el) => {
                               if (el) amountRefs.current.set(paint.id, el)
@@ -1126,22 +1051,19 @@ export function FormulaPanel({
                                 }
                               }
                             }}
-                            className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[15px] font-semibold focus:outline-none p-0 w-[48px] tabular-nums"
+                            className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[16px] font-semibold focus:outline-none p-0 w-[54px] tabular-nums"
                             placeholder="0.0"
                             style={{ color: 'var(--color-ink, #F4F0E8)' }}
                           />
-                          <span className="text-[11px] font-sans opacity-55">{dict.ml}</span>
+                          <span className="text-[12px] font-sans opacity-55">{dict.ml}</span>
                         </div>
 
                         <button
                           type="button"
                           onClick={() => handleStep(paint.id, currentAmount, 1)}
                           disabled={currentAmount >= MAX_MANUAL_ML}
-                          className="w-6 h-6 rounded-full border flex items-center justify-center text-[13px] leading-none font-mono transition-colors disabled:opacity-25 cursor-pointer"
-                          style={{
-                            borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
-                            color: 'var(--color-ink, #F4F0E8)',
-                          }}
+                          className="w-8 h-8 rounded-lg border flex items-center justify-center text-[16px] leading-none font-mono transition-colors disabled:opacity-25 cursor-pointer"
+                          style={{ borderColor: hairline, color: 'var(--color-ink, #F4F0E8)' }}
                           aria-label="Increase"
                         >
                           +
@@ -1149,29 +1071,24 @@ export function FormulaPanel({
                       </div>
 
                       <span
-                        className="font-mono text-[11.5px] font-semibold tabular-nums transition-colors"
+                        className="font-mono text-[13px] font-semibold tabular-nums transition-colors"
                         style={{
                           color: isDragging ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
-                          opacity: isDragging ? 1 : 0.62,
+                          opacity: isDragging ? 1 : 0.65,
                         }}
                       >
                         {pct}%
                       </span>
                     </div>
 
-                    <div className="relative h-7 flex items-center select-none touch-none">
+                    <div className="relative h-8 flex items-center select-none touch-none">
                       <div
                         className="w-full h-1.5 rounded-full overflow-hidden relative"
-                        style={{
-                          background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
-                        }}
+                        style={{ background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)' }}
                       >
                         <div
                           className="h-full rounded-full transition-[width] duration-75"
-                          style={{
-                            width: `${fillPct}%`,
-                            background: 'var(--color-accent, #C9A86A)',
-                          }}
+                          style={{ width: `${fillPct}%`, background: 'var(--color-accent, #C9A86A)' }}
                         />
                       </div>
 
@@ -1180,12 +1097,12 @@ export function FormulaPanel({
                         return (
                           <span
                             key={tick.ml}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-2.5 rounded-full pointer-events-none transition-colors duration-150"
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-2.5 rounded-full pointer-events-none"
                             style={{
                               left: `${tick.pct}%`,
                               background: passed
                                 ? 'var(--color-accent, #C9A86A)'
-                                : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 24%, transparent)',
+                                : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 26%, transparent)',
                             }}
                           />
                         )
@@ -1195,13 +1112,13 @@ export function FormulaPanel({
                         className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full pointer-events-none transition-transform duration-150"
                         style={{
                           left: `${fillPct}%`,
-                          width: 18,
-                          height: 18,
-                          transform: `translate(-50%, -50%) scale(${isDragging ? 1.18 : 1})`,
+                          width: 20,
+                          height: 20,
+                          transform: `translate(-50%, -50%) scale(${isDragging ? 1.15 : 1})`,
                           background: 'var(--color-accent, #C9A86A)',
                           border: '2px solid var(--color-surface, #141416)',
                           boxShadow: isDragging
-                            ? '0 0 0 6px color-mix(in srgb, var(--color-accent, #C9A86A) 24%, transparent)'
+                            ? '0 0 0 6px color-mix(in srgb, var(--color-accent, #C9A86A) 22%, transparent)'
                             : '0 1px 4px rgba(0,0,0,0.35)',
                         }}
                       />
@@ -1225,7 +1142,7 @@ export function FormulaPanel({
                       />
                     </div>
 
-                    <div className="relative h-4 mt-0.5 text-[9.5px] font-mono tabular-nums select-none">
+                    <div className="relative h-4 mt-1 text-[11px] font-mono tabular-nums select-none">
                       {SLIDER_TICKS.map((tick) => {
                         const isNear =
                           (tick.ml === 0 && currentAmount === 0) ||
@@ -1241,13 +1158,11 @@ export function FormulaPanel({
                         return (
                           <span
                             key={tick.ml}
-                            className="absolute top-0 whitespace-nowrap transition-colors duration-150"
+                            className="absolute top-0 whitespace-nowrap transition-colors"
                             style={{
                               ...alignStyle,
-                              color: isNear
-                                ? 'var(--color-accent, #C9A86A)'
-                                : 'var(--color-ink, #F4F0E8)',
-                              opacity: isNear ? 1 : 0.42,
+                              color: isNear ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
+                              opacity: isNear ? 1 : 0.45,
                               fontWeight: isNear ? 600 : 400,
                             }}
                           >
@@ -1257,33 +1172,30 @@ export function FormulaPanel({
                         )
                       })}
                     </div>
-                  </div>
 
-                  <div
-                    className="flex items-center justify-between gap-2 pl-[26px] mt-2.5 pt-2 border-t text-[11px]"
-                    style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 7%, transparent)' }}
-                  >
-                    <button
-                      type="button"
-                      onClick={onOpenGuide}
-                      className="opacity-70 truncate min-w-0 flex-1 text-left bg-transparent border-none p-0 text-inherit cursor-pointer"
-                      title={dict.opacityDesc[lore.opacity]}
-                    >
-                      <span className="underline decoration-dotted">
-                        {dict.opacityLabels[lore.opacity]}
-                      </span>
-                      {' · '}
-                      <span>{lore.whereToBuy.leatherBrands[0]}</span>
-                    </button>
+                    <div className="flex items-center justify-between gap-2 mt-3 text-[12px]">
+                      <button
+                        type="button"
+                        onClick={onOpenGuide}
+                        className="opacity-65 truncate min-w-0 flex-1 text-left bg-transparent border-none p-0 text-inherit cursor-pointer"
+                        title={dict.opacityDesc[lore.opacity]}
+                      >
+                        <span className="underline decoration-dotted underline-offset-4">
+                          {dict.opacityLabels[lore.opacity]}
+                        </span>
+                        {' · '}
+                        <span>{lore.whereToBuy.leatherBrands[0]}</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => onInspectPigment(paint.pigmentId)}
-                      className="shrink-0 font-semibold underline whitespace-nowrap text-[11px] bg-transparent border-none p-0 cursor-pointer"
-                      style={{ color: 'var(--color-accent, #C9A86A)' }}
-                    >
-                      ⓘ {dict.pigmentInfoBtn}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => onInspectPigment(paint.pigmentId)}
+                        className="shrink-0 font-medium underline underline-offset-4 whitespace-nowrap bg-transparent border-none p-0 cursor-pointer"
+                        style={{ color: 'var(--color-accent, #C9A86A)' }}
+                      >
+                        {dict.pigmentInfoBtn}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -1291,12 +1203,16 @@ export function FormulaPanel({
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-2.5 mt-4">
+        {/* Действия */}
+        <div
+          className="px-4 sm:px-5 py-4 border-t flex flex-col sm:flex-row gap-2.5"
+          style={{ borderColor: hairline }}
+        >
           <button
             type="button"
             onClick={onAddPaint}
             disabled={loading || loadError}
-            className="flex-1 py-3 rounded-full text-[11.5px] font-sans uppercase tracking-[0.14em] font-semibold border transition-opacity disabled:opacity-40 cursor-pointer"
+            className="flex-1 h-11 rounded-xl text-[13px] font-sans font-medium border transition-opacity disabled:opacity-40 cursor-pointer"
             style={{
               borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 22%, transparent)',
               color: 'var(--color-ink, #F4F0E8)',
@@ -1310,7 +1226,7 @@ export function FormulaPanel({
               type="button"
               onClick={onAutoAdjust}
               disabled={isAutoAdjusting || loading}
-              className="flex-1 py-3 rounded-full text-[11.5px] font-sans uppercase tracking-[0.14em] font-semibold transition-opacity disabled:opacity-40 cursor-pointer"
+              className="flex-1 h-11 rounded-xl text-[13px] font-sans font-semibold transition-opacity disabled:opacity-40 cursor-pointer"
               style={{
                 background: 'var(--color-accent, #C9A86A)',
                 color: 'var(--color-bg, #0B0B0C)',
