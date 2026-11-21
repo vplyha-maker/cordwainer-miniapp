@@ -40,6 +40,7 @@ import {
   isHapticsEnabled,
   setHapticsEnabled,
 } from './haptics'
+import { resolveSubstrateSpectrum, type SubstratePresetId } from './substrate'
 
 export interface ColorCalcPageProps {
   lang: Lang
@@ -89,6 +90,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const [isWet, setIsWet] = useState(false)
   const [illuminant, setIlluminant] = useState<IlluminantType>('D65')
+  const [substrateId, setSubstrateId] = useState<SubstratePresetId | 'custom'>('crust')
+  const [customSubstrateHex, setCustomSubstrateHex] = useState('#6E4B3A')
   const [selectedCoatIdx, setSelectedCoatIdx] = useState<number>(3)
   const [isAutoAdjusting, setIsAutoAdjusting] = useState(false)
 
@@ -168,13 +171,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const layerSwatches = useMemo<LayerSwatchItem[] | null>(() => {
     if (!mixedColor?.spectrum || pigments.length === 0) return null
-    const basePigment =
-      pigments.find((p) => p.id === 'cardboard') ||
-      pigments.find((p) => p.id === 'titanium_white') ||
-      pigments.find((p) => p.id === 'pw_6_anatase')
-    if (!basePigment?.spectrum) return null
-
-    const sim = simulateLayersKM(basePigment.spectrum, mixedColor.spectrum, system)
+    const baseSpectrum = resolveSubstrateSpectrum(substrateId, customSubstrateHex, pigments)
+    const sim = simulateLayersKM(baseSpectrum, mixedColor.spectrum, system)
     return [
       {
         short: 'I',
@@ -197,7 +195,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         hex: rgbToHex(spectrumToRGBWithIlluminant(sim.final, illuminant)).toUpperCase(),
       },
     ]
-  }, [mixedColor, pigments, system, illuminant, dict.coatLabels])
+  }, [mixedColor, pigments, substrateId, customSubstrateHex, system, illuminant, dict.coatLabels])
 
   const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
 
@@ -537,6 +535,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         hapticSelect()
         setIlluminant(ill)
       }}
+      substrateId={substrateId}
+      customSubstrateHex={customSubstrateHex}
+      onSelectSubstrate={(id) => {
+        hapticSelect()
+        setSubstrateId(id)
+      }}
+      onCustomSubstrateChange={(hex) => {
+        setSubstrateId('custom')
+        setCustomSubstrateHex(hex)
+      }}
       layerSwatches={layerSwatches}
       selectedCoatIdx={selectedCoatIdx}
       onSelectCoat={(idx) => {
@@ -774,7 +782,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </div>
       </header>
 
-      {/* МОБИЛЬНАЯ КОМПАКТНАЯ СТРОКА УПРАВЛЕНИЯ (как в SizeCalcPage: без шапки, скруглённые пиллы) */}
+      {/* МОБИЛЬНАЯ КОМПАКТНАЯ СТРОКА УПРАВЛЕНИЯ */}
       <div className="md:hidden px-3.5 pt-2.5 pb-2 flex items-center gap-2">
         <button
           type="button"
@@ -809,7 +817,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   hapticSelect()
                   setMobileTab(tItem.id)
                 }}
-                className="py-1.5 px-1 rounded-full text-[10.5px] font-sans font-semibold uppercase tracking-[0.04em] transition-colors cursor-pointer truncate"
+                className="py-1.5 px-0.5 rounded-full text-[9.5px] font-sans font-semibold uppercase tracking-[0.01em] transition-colors cursor-pointer truncate"
                 style={{
                   backgroundColor: active ? tokens.activeBg : 'transparent',
                   color: active ? tokens.activeText : tokens.inkSecondary,
@@ -843,7 +851,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </div>
       </main>
 
-      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ (в стиле ColorsPage) */}
+      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ */}
       <footer
         className="sticky bottom-0 z-30 border-t px-4 py-2.5"
         style={{
