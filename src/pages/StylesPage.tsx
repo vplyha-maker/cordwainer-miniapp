@@ -44,8 +44,8 @@ type StylesPageProps = {
 
 const pageVariants = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.4 } },
-  exit: { opacity: 0, transition: { duration: 0.3 } },
+  animate: { opacity: 1, transition: { duration: 0.35 } },
+  exit: { opacity: 0, transition: { duration: 0.25 } },
 }
 
 export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) {
@@ -163,6 +163,36 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
     [currentLang]
   )
 
+  const scrollToSlideIndex = useCallback((targetIdx: number) => {
+    const container = scrollRef.current
+    if (!container) return
+
+    const clampedIdx = Math.max(0, Math.min(targetIdx, slideRefs.current.length - 1))
+
+    if (jumpTimerRef.current !== null) {
+      window.clearTimeout(jumpTimerRef.current)
+      jumpTimerRef.current = null
+    }
+
+    isJumpingRef.current = true
+    setActiveIndex(clampedIdx)
+
+    const targetEl = slideRefs.current[clampedIdx]
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth' })
+    } else {
+      container.scrollTo({
+        top: clampedIdx * container.clientHeight,
+        behavior: 'smooth',
+      })
+    }
+
+    jumpTimerRef.current = window.setTimeout(() => {
+      isJumpingRef.current = false
+      jumpTimerRef.current = null
+    }, 750)
+  }, [])
+
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -187,44 +217,13 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
   const handleSmartScroll = () => {
     hapticTap()
 
-    const container = scrollRef.current
-    if (!container) return
-
-    if (jumpTimerRef.current !== null) {
-      window.clearTimeout(jumpTimerRef.current)
-      jumpTimerRef.current = null
-    }
-
     if (buttonMode === 'up') {
       returnSlideIndexRef.current = activeIndex
-      isJumpingRef.current = true
-      setActiveIndex(0)
-
-      container.scrollTo({ top: 0, behavior: 'smooth' })
-      jumpTimerRef.current = window.setTimeout(() => {
-        isJumpingRef.current = false
-        jumpTimerRef.current = null
-      }, 750)
+      scrollToSlideIndex(0)
     } else if (buttonMode === 'down' && returnSlideIndexRef.current !== null) {
-      const targetIdx = Math.min(returnSlideIndexRef.current, slideRefs.current.length - 1)
-      isJumpingRef.current = true
-      setActiveIndex(targetIdx)
-
-      const targetEl = slideRefs.current[targetIdx]
-      if (targetEl) {
-        targetEl.scrollIntoView({ behavior: 'smooth' })
-      } else {
-        container.scrollTo({
-          top: targetIdx * container.clientHeight,
-          behavior: 'smooth',
-        })
-      }
-
-      jumpTimerRef.current = window.setTimeout(() => {
-        isJumpingRef.current = false
-        returnSlideIndexRef.current = null
-        jumpTimerRef.current = null
-      }, 750)
+      const savedIdx = returnSlideIndexRef.current
+      returnSlideIndexRef.current = null
+      scrollToSlideIndex(savedIdx)
     }
   }
 
@@ -418,7 +417,7 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
       initial="initial"
       animate="animate"
       exit="exit"
-      className="fixed inset-0 z-50 bg-[#050505] text-[#F4F0E8] overflow-hidden"
+      className="fixed inset-0 z-50 bg-[#0B0B0A] text-[#F4F0E8] overflow-hidden"
     >
       <style>{`
         .snap-container {
@@ -433,28 +432,22 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
           -webkit-tap-highlight-color: transparent !important;
           -webkit-touch-callout: none;
         }
-        @keyframes subtleGlow {
-          0%, 100% { border-color: rgba(255, 255, 255, 0.25); box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
-          50% { border-color: rgba(255, 255, 255, 0.65); box-shadow: 0 0 24px rgba(255, 255, 255, 0.14); }
-        }
-        .paywall-btn {
-          animation: subtleGlow 3.5s infinite ease-in-out;
-        }
       `}</style>
 
+      {/* Единый верхний хедер для всех экранов */}
       <header
         style={{
           paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 10px)',
         }}
-        className="fixed top-0 left-0 right-0 z-[200] px-6 pb-2 flex justify-between items-center pointer-events-none"
+        className="fixed top-0 left-0 right-0 z-[200] px-5 md:px-8 pb-3 flex justify-between items-center pointer-events-none bg-gradient-to-b from-[#0B0B0A]/80 to-transparent"
       >
         <button
           type="button"
           onClick={handleBackPress}
           style={{ touchAction: 'manipulation' }}
-          className="pointer-events-auto cursor-pointer min-h-[38px] min-w-[84px] flex items-center justify-center gap-2 py-2 px-3.5 -ml-1 rounded-full bg-black/55 backdrop-blur-xl border border-white/25 text-[10px] font-sans uppercase tracking-[0.2em] text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
+          className="pointer-events-auto cursor-pointer min-h-[44px] px-4 rounded-[6px] bg-[#141312] border border-[#F4F0E8]/20 hover:border-[#C9A97E]/60 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-[#F4F0E8] active:scale-95 transition-colors"
         >
-          <span className="text-xs leading-none">←</span>
+          <span aria-hidden="true">←</span>
           <span>{t.back}</span>
         </button>
 
@@ -462,21 +455,20 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
           type="button"
           onClick={handleSmartScroll}
           style={{ touchAction: 'manipulation' }}
-          className={`pointer-events-auto cursor-pointer min-h-[38px] flex items-center gap-1.5 py-2 px-3.5 rounded-full bg-black/55 backdrop-blur-xl border border-white/25 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] shadow-[0_4px_16px_rgba(0,0,0,0.5)] transition-all duration-500 active:scale-95 ${
+          className={`pointer-events-auto cursor-pointer min-h-[44px] px-4 rounded-[6px] bg-[#141312] border border-[#F4F0E8]/20 hover:border-[#C9A97E]/60 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-[#F4F0E8] transition-all duration-300 active:scale-95 ${
             buttonMode !== 'hidden'
               ? 'opacity-100 translate-y-0'
-              : 'opacity-0 -translate-y-3 pointer-events-none'
+              : 'opacity-0 -translate-y-2 pointer-events-none'
           }`}
         >
           <svg
-            width="11"
-            height="11"
+            width="14"
+            height="14"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="square"
-            className={`transition-transform duration-500 ${
+            strokeWidth="1.6"
+            className={`transition-transform duration-300 ${
               buttonMode === 'down' ? 'rotate-180' : 'rotate-0'
             }`}
           >
@@ -486,79 +478,141 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
         </button>
       </header>
 
+      {/* Уведомление о копировании */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -16 }}
+            initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
+            exit={{ opacity: 0, y: -12 }}
             style={{
-              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 56px)',
+              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 64px)',
             }}
-            className="fixed left-1/2 -translate-x-1/2 z-[220] px-4 py-2 rounded-full bg-white text-black text-[10px] font-sans uppercase tracking-[0.2em] shadow-xl pointer-events-none"
+            className="fixed left-1/2 -translate-x-1/2 z-[220] px-4 py-2.5 rounded-[6px] bg-[#C9A97E] text-[#0B0B0A] text-xs font-medium tracking-[0.04em] pointer-events-none"
           >
             {toastMessage}
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div
-        ref={scrollRef}
-        className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
-      >
-        {visibleStyles.map((slide, index) => {
-          const isActive = activeIndex === index
-          const isNextSlideReadyToPreload =
-            index === activeIndex + 1 && readySlideIndex === activeIndex
-          const isPrevSlide = index === activeIndex - 1
+      {/* Студийный контейнер:
+          - Mobile & Tablet: 1 колонка
+          - Desktop (xl >= 1280px): левый индекс фасонов + основная рабочая область */}
+      <div className="h-full w-full xl:grid xl:grid-cols-[220px_1fr]">
+        {/* Левый индекс фасонов для десктопа (xl+) */}
+        <aside className="hidden xl:flex xl:flex-col xl:justify-center xl:border-r xl:border-[#F4F0E8]/10 xl:px-6 xl:pt-20 xl:pb-8 bg-[#141312]/50">
+          <p className="text-xs uppercase tracking-[0.08em] text-[#A39E93] mb-4">
+            Index
+          </p>
+          <nav aria-label="Styles index" className="flex flex-col gap-1 overflow-y-auto pr-1">
+            {visibleStyles.map((slide, idx) => {
+              const isSelected = activeIndex === idx
+              return (
+                <button
+                  key={slide.id}
+                  type="button"
+                  onClick={() => {
+                    hapticTap()
+                    scrollToSlideIndex(idx)
+                  }}
+                  className={`w-full min-h-[38px] px-3 py-1.5 rounded-[6px] flex items-center gap-2.5 text-left text-xs transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#C9A97E] text-[#0B0B0A] font-medium'
+                      : 'text-[#F4F0E8]/75 hover:bg-[#1C1B19] hover:text-[#F4F0E8]'
+                  }`}
+                >
+                  <span
+                    className={`tabular-nums shrink-0 ${
+                      isSelected ? 'text-[#0B0B0A]/80' : 'text-[#A39E93]'
+                    }`}
+                  >
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+                  <span className="truncate">
+                    {slide.title[currentLang].replace('\n', ' ')}
+                  </span>
+                </button>
+              )
+            })}
 
-          const shouldLoadVideo = isActive || isNextSlideReadyToPreload || isPrevSlide
-          const shouldKeepInMemory = Math.abs(activeIndex - index) <= 1
+            {showPaywallSlide && (
+              <button
+                type="button"
+                onClick={() => {
+                  hapticTap()
+                  scrollToSlideIndex(visibleStyles.length)
+                }}
+                className={`mt-2 w-full min-h-[38px] px-3 py-1.5 rounded-[6px] border flex items-center justify-between text-xs transition-colors cursor-pointer ${
+                  isPaywallSlideActive
+                    ? 'border-[#C9A97E] bg-[#C9A97E] text-[#0B0B0A] font-medium'
+                    : 'border-[#C9A97E]/40 text-[#C9A97E] hover:bg-[#1C1B19]'
+                }`}
+              >
+                <span>PRO</span>
+                <span className="tabular-nums">{PRO_VIDEOS_PRICE_STARS} ⭐️</span>
+              </button>
+            )}
+          </nav>
+        </aside>
 
-          return (
-            <div
-              key={slide.id}
-              ref={(el) => {
-                slideRefs.current[index] = el
+        {/* Основная скролл-лента */}
+        <div
+          ref={scrollRef}
+          className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
+        >
+          {visibleStyles.map((slide, index) => {
+            const isActive = activeIndex === index
+            const isNextSlideReadyToPreload =
+              index === activeIndex + 1 && readySlideIndex === activeIndex
+            const isPrevSlide = index === activeIndex - 1
+
+            const shouldLoadVideo = isActive || isNextSlideReadyToPreload || isPrevSlide
+            const shouldKeepInMemory = Math.abs(activeIndex - index) <= 1
+
+            return (
+              <div
+                key={slide.id}
+                ref={(el) => {
+                  slideRefs.current[index] = el
+                }}
+                data-index={index}
+                className="h-full w-full snap-start snap-always"
+              >
+                <SlideItem
+                  slide={slide}
+                  lang={currentLang}
+                  index={index}
+                  totalCount={totalStylesCount}
+                  isActive={isActive}
+                  shouldLoadVideo={shouldLoadVideo}
+                  shouldKeepInMemory={shouldKeepInMemory}
+                  isMuted={isMuted}
+                  onToggleMute={handleToggleMute}
+                  onForceMuteSync={handleForceMuteSync}
+                  onShowToast={showToast}
+                  onActiveVideoReady={handleActiveVideoReady}
+                />
+              </div>
+            )
+          })}
+
+          {showPaywallSlide && (
+            <PaywallSlide
+              index={visibleStyles.length}
+              slideRef={(el) => {
+                slideRefs.current[visibleStyles.length] = el
               }}
-              data-index={index}
-              className="h-full w-full snap-start snap-always"
-            >
-              <SlideItem
-                slide={slide}
-                lang={currentLang}
-                index={index}
-                totalCount={totalStylesCount}
-                isActive={isActive}
-                shouldLoadVideo={shouldLoadVideo}
-                shouldKeepInMemory={shouldKeepInMemory}
-                isMuted={isMuted}
-                onToggleMute={handleToggleMute}
-                onForceMuteSync={handleForceMuteSync}
-                onShowToast={showToast}
-                onActiveVideoReady={handleActiveVideoReady}
-              />
-            </div>
-          )
-        })}
-
-        {showPaywallSlide && (
-          <PaywallSlide
-            index={visibleStyles.length}
-            slideRef={(el) => {
-              slideRefs.current[visibleStyles.length] = el
-            }}
-            isActive={isPaywallSlideActive}
-            previewVideo={STYLES_DATA[FREE_STYLES_COUNT]?.video}
-            lockedPreviewTitles={lockedPreviewTitles}
-            t={t}
-            paymentState={paymentState}
-            isPaymentBusy={isPaymentBusy}
-            onProClick={() => void handleProClick()}
-          />
-        )}
+              isActive={isPaywallSlideActive}
+              previewVideo={STYLES_DATA[FREE_STYLES_COUNT]?.video}
+              lockedPreviewTitles={lockedPreviewTitles}
+              t={t}
+              paymentState={paymentState}
+              isPaymentBusy={isPaymentBusy}
+              onProClick={() => void handleProClick()}
+            />
+          )}
+        </div>
       </div>
     </motion.div>
   )
 }
-
