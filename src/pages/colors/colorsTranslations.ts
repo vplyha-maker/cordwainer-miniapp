@@ -77,6 +77,9 @@ export type ColorsTranslation = {
   proActive: string
   paymentVerifyFailed: string
   paymentPendingMsg: string
+  paymentTelegramOnly: string
+  paymentInvoiceError: string
+  paymentGenericFailed: string
   schemes: Record<Scheme, { name: string; short: string; desc: string }>
   presets: Record<FootwearMappingPreset, string>
   zones: Record<SneakerZoneKey, string>
@@ -181,6 +184,9 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     proActive: 'PRO активен',
     paymentVerifyFailed: 'Не удалось подтвердить оплату. Попробуйте снова через пару секунд.',
     paymentPendingMsg: 'Платёж обрабатывается Telegram. Доступ откроется автоматически.',
+    paymentTelegramOnly: 'Откройте приложение внутри Telegram для оплаты Stars.',
+    paymentInvoiceError: 'Не удалось создать счёт для оплаты.',
+    paymentGenericFailed: 'Оплата не была завершена. Попробуйте снова.',
     schemes: {
       complementary: {
         name: 'Комплементарная',
@@ -357,6 +363,9 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     proActive: 'PRO активний',
     paymentVerifyFailed: 'Не вдалося підтвердити оплату. Спробуйте ще раз за кілька секунд.',
     paymentPendingMsg: 'Платіж обробляється Telegram. Доступ відкриється автоматично.',
+    paymentTelegramOnly: 'Відкрийте застосунок усередині Telegram для оплати Stars.',
+    paymentInvoiceError: 'Не вдалося створити рахунок для оплати.',
+    paymentGenericFailed: 'Оплату не завершено. Спробуйте ще раз.',
     schemes: {
       complementary: {
         name: 'Комплементарна',
@@ -533,6 +542,9 @@ export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
     proActive: 'PRO aktiv',
     paymentVerifyFailed: 'Zahlung konnte nicht bestätigt werden. Bitte kurz erneut versuchen.',
     paymentPendingMsg: 'Zahlung wird von Telegram verarbeitet.',
+    paymentTelegramOnly: 'Öffne die App in Telegram für Stars-Zahlungen.',
+    paymentInvoiceError: 'Rechnung konnte nicht erstellt werden.',
+    paymentGenericFailed: 'Zahlung nicht abgeschlossen. Bitte erneut versuchen.',
     schemes: {
       complementary: {
         name: 'Komplementär',
