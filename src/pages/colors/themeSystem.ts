@@ -187,6 +187,7 @@ export function isStudioBgDark(hex: string): boolean {
 export type StudioStageStyle = {
   background: string
   backgroundColor: string
+  bgHex: string
   hex: string
   isDarkStage: boolean
   isDark: boolean
@@ -195,9 +196,13 @@ export type StudioStageStyle = {
   mutedTextColor: string
   labelColor: string
   borderColor: string
+  dividerColor: string
   chipBg: string
   chipBorder: string
   chipText: string
+  btnBg: string
+  btnBorder: string
+  btnText: string
   buttonBg: string
   buttonBorder: string
   buttonText: string
@@ -206,7 +211,7 @@ export type StudioStageStyle = {
 export function resolveStudioStageStyle(
   studioBg: string | StudioBgConfig | undefined,
   autoContrast = true,
-  fallbackDark = false
+  fallback?: boolean | ThemeTokens
 ): StudioStageStyle {
   let hex = '#F5F1EB'
   let useAuto = autoContrast
@@ -219,6 +224,7 @@ export function resolveStudioStageStyle(
     useAuto = studioBg.autoContrast
   }
 
+  const fallbackDark = typeof fallback === 'boolean' ? fallback : Boolean(fallback?.isDark)
   const darkStage = useAuto ? isStudioBgDark(hex) : fallbackDark
   const textColor = darkStage ? '#F5F2EC' : '#1C1A17'
   const mutedColor = darkStage ? 'rgba(245, 242, 236, 0.7)' : 'rgba(28, 26, 23, 0.62)'
@@ -229,6 +235,7 @@ export function resolveStudioStageStyle(
   return {
     background: hex,
     backgroundColor: hex,
+    bgHex: hex,
     hex,
     isDarkStage: darkStage,
     isDark: darkStage,
@@ -237,9 +244,13 @@ export function resolveStudioStageStyle(
     mutedTextColor: mutedColor,
     labelColor: mutedColor,
     borderColor,
+    dividerColor: borderColor,
     chipBg,
     chipBorder,
     chipText: textColor,
+    btnBg: chipBg,
+    btnBorder: chipBorder,
+    btnText: textColor,
     buttonBg: chipBg,
     buttonBorder: chipBorder,
     buttonText: textColor,
