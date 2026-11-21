@@ -96,7 +96,7 @@ const InlineOklchPicker: React.FC<InlineOklchPickerProps> = ({
       className="pt-4 border-t space-y-3.5"
       style={{ borderColor: tokens.border }}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="hidden md:flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <span
             className="w-8 h-8 rounded-lg border shrink-0"
