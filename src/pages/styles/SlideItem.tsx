@@ -355,7 +355,7 @@ export function SlideItem({
           ? `Смотри, какой фасон: ${title} в энциклопедии Cordwainer!`
           : `Дивись, який фасон: ${title} в енциклопедії Cordwainer!`
 
-    const url = 'https://www.cordwaine.app'
+    const url = `https://www.cordwaine.app/?style=${encodeURIComponent(slide.id)}`
 
     try {
       if (isRunningInTelegram() && tg?.openTelegramLink) {
@@ -448,11 +448,7 @@ export function SlideItem({
 
   return (
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always bg-[#0B0B0A] md:flex md:items-center md:justify-center md:px-8 md:pt-20 md:pb-8">
-      {/* Внутренний адаптивный контейнер:
-          - Mobile (<768px): полный экран 100%
-          - Tablet / Desktop (>=768px): двухколоночная журнальная композиция с кадром 9:16 и редакционной панелью */}
       <div className="relative h-full w-full md:h-auto md:max-h-[calc(100vh-112px)] md:max-w-[920px] md:grid md:grid-cols-[minmax(280px,390px)_1fr] md:gap-10 md:items-center">
-        {/* Блок видео / изображения */}
         <div className="relative h-full w-full md:h-[min(78vh,740px)] md:aspect-[9/16] md:mx-auto md:rounded-[8px] md:border md:border-[#F4F0E8]/12 overflow-hidden bg-[#141312]">
           {!isVideoLoaded && (
             <div className="absolute inset-0 z-0 flex items-center justify-center bg-[#141312]">
@@ -536,8 +532,7 @@ export function SlideItem({
             )}
           </AnimatePresence>
 
-          {/* Градиенты для читаемости текста только на мобильном экране */}
-          <div className="md:hidden absolute top-0 left-0 right-0 h-[30%] bg-gradient-to-b from-[#0B0B0A]/80 to-transparent z-10 pointer-events-none" />
+          <div className="md:hidden absolute top-0 left-0 right-0 h-[32%] bg-gradient-to-b from-[#0B0B0A]/85 via-[#0B0B0A]/45 to-transparent z-10 pointer-events-none" />
           <div
             className={`md:hidden absolute bottom-0 left-0 right-0 bg-gradient-to-t z-10 pointer-events-none transition-all duration-300 ${
               isDescOpen
@@ -546,13 +541,13 @@ export function SlideItem({
             }`}
           />
 
-          {/* Заголовок и счётчик поверх кадра на мобильном экране */}
+          {/* Заголовок и счётчик с безопасным отступом от верхней панели навигации */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
             transition={{ duration: 0.45, ease: editorialEase }}
             style={{
-              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 56px)',
+              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 74px)',
             }}
             className="md:hidden absolute left-5 right-5 z-20 flex items-start justify-between gap-4 pointer-events-none"
           >
@@ -574,7 +569,6 @@ export function SlideItem({
             </div>
           </motion.div>
 
-          {/* Нижняя панель управления на мобильном экране */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
@@ -633,7 +627,6 @@ export function SlideItem({
           </motion.div>
         </div>
 
-        {/* Редакционная колонка для планшета и компьютера (>=768px) */}
         <div className="hidden md:flex md:flex-col md:justify-between md:h-[min(78vh,740px)] md:py-4 md:pr-2">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-[#F4F0E8]/12 mb-6">
