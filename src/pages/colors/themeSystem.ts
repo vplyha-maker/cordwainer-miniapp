@@ -184,6 +184,68 @@ export function isStudioBgDark(hex: string): boolean {
   return getRelativeLuminance(hex) < 0.28
 }
 
+export type StudioStageStyle = {
+  background: string
+  backgroundColor: string
+  hex: string
+  isDarkStage: boolean
+  isDark: boolean
+  textColor: string
+  mutedColor: string
+  mutedTextColor: string
+  labelColor: string
+  borderColor: string
+  chipBg: string
+  chipBorder: string
+  chipText: string
+  buttonBg: string
+  buttonBorder: string
+  buttonText: string
+}
+
+export function resolveStudioStageStyle(
+  studioBg: string | StudioBgConfig | undefined,
+  autoContrast = true,
+  fallbackDark = false
+): StudioStageStyle {
+  let hex = '#F5F1EB'
+  let useAuto = autoContrast
+
+  if (typeof studioBg === 'string') {
+    const preset = STUDIO_BG_PRESETS.find((p) => p.id === studioBg)
+    hex = preset ? preset.hex : normalizeHex(studioBg, '#F5F1EB')
+  } else if (studioBg && typeof studioBg === 'object') {
+    hex = resolveStudioBgHex(studioBg)
+    useAuto = studioBg.autoContrast
+  }
+
+  const darkStage = useAuto ? isStudioBgDark(hex) : fallbackDark
+  const textColor = darkStage ? '#F5F2EC' : '#1C1A17'
+  const mutedColor = darkStage ? 'rgba(245, 242, 236, 0.7)' : 'rgba(28, 26, 23, 0.62)'
+  const borderColor = darkStage ? 'rgba(245, 242, 236, 0.14)' : 'rgba(28, 26, 23, 0.1)'
+  const chipBg = darkStage ? 'rgba(24, 24, 27, 0.86)' : 'rgba(255, 255, 255, 0.9)'
+  const chipBorder = darkStage ? 'rgba(245, 242, 236, 0.18)' : 'rgba(28, 26, 23, 0.12)'
+
+  return {
+    background: hex,
+    backgroundColor: hex,
+    hex,
+    isDarkStage: darkStage,
+    isDark: darkStage,
+    textColor,
+    mutedColor,
+    mutedTextColor: mutedColor,
+    labelColor: mutedColor,
+    borderColor,
+    chipBg,
+    chipBorder,
+    chipText: textColor,
+    buttonBg: chipBg,
+    buttonBorder: chipBorder,
+    buttonText: textColor,
+  }
+}
+
 export function loadHapticsEnabled(): boolean {
   return isHapticsEnabled()
 }
