@@ -1,1020 +1,44 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  type MouseEvent,
+  type TouchEvent,
+} from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang as AppLang } from '../App'
+import { getUiText } from './styles/i18n'
+import { PaywallSlide } from './styles/PaywallSlide'
+import { SlideItem } from './styles/SlideItem'
+import { STYLES_DATA } from './styles/stylesData'
+import { getTelegramWebApp, isRunningInTelegram, showTelegramAlert } from './styles/telegram'
+import {
+  FREE_STYLES_COUNT,
+  PREVIEW_TAG_COUNT,
+  PRO_STORAGE_KEY,
+  PRO_VIDEOS_PRICE_STARS,
+  normalizeSupportedLang,
+  type PaymentState,
+  type StyleSlide,
+  type SupportedLang,
+} from './styles/types'
 
-export type SupportedLang = 'ru' | 'uk' | 'de'
-
-export function normalizeSupportedLang(input: unknown): SupportedLang {
-  if (input === 'ru' || input === 'uk' || input === 'de') return input
-  return 'ru'
+export {
+  FREE_STYLES_COUNT,
+  PREVIEW_TAG_COUNT,
+  PRO_VIDEOS_PRICE_STARS,
+  STYLES_DATA,
+  normalizeSupportedLang,
+  type PaymentState,
+  type StyleSlide,
+  type SupportedLang,
 }
 
 type StylesPageProps = {
   onBack: () => void
   lang: AppLang
-}
-
-export type StyleSlide = {
-  id: string
-  video?: string
-  poster?: string
-  image?: string
-  title: { ru: string; uk: string; de: string }
-  subtitle: { ru: string; uk: string; de: string }
-  desc: { ru: string; uk: string; de: string }
-  hideWatermark?: boolean
-}
-
-export type PaymentState =
-  | 'idle'
-  | 'creating_invoice'
-  | 'invoice_open'
-  | 'verifying_payment'
-  | 'purchased'
-  | 'failed'
-
-// Рыночная цена разового пожизненного доступа к AI-видео лукбуку (включая все будущие пополнения коллекции)
-// 350 Telegram Stars (~$6.99 USD) окупает генерацию ИИ-видео и CDN-трафик при марже сторов
-export const PRO_VIDEOS_PRICE_STARS = 350
-export const FREE_STYLES_COUNT = 3
-export const PREVIEW_TAG_COUNT = 4
-
-const PRO_STORAGE_KEY = 'cordwainer_pro_videos_unlocked'
-
-type TelegramWebApp = {
-  initData?: string
-  initDataUnsafe?: { user?: { id?: number } }
-  HapticFeedback?: {
-    impactOccurred: (style: 'light' | 'medium' | 'heavy') => void
-    notificationOccurred: (type: 'error' | 'success' | 'warning') => void
-    selectionChanged: () => void
-  }
-  BackButton?: {
-    show: () => void
-    hide: () => void
-    onClick: (cb: () => void) => void
-    offClick: (cb: () => void) => void
-  }
-  ready: () => void
-  expand?: () => void
-  disableVerticalSwipes?: () => void
-  showAlert?: (message: string) => void
-  openTelegramLink?: (url: string) => void
-  openInvoice?: (link: string, cb: (status: string) => void) => void
-}
-
-function getTelegramWebApp(): TelegramWebApp | undefined {
-  try {
-    return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
-  } catch {
-    return undefined
-  }
-}
-
-const getDeviceId = (): string => {
-  if (typeof window === 'undefined') return 'unknown'
-  const tg = getTelegramWebApp()
-  const tgUserId = tg?.initDataUnsafe?.user?.id?.toString()
-  if (tgUserId) return tgUserId
-  try {
-    let deviceId = localStorage.getItem('cordwainer_device_id')
-    if (!deviceId) {
-      deviceId = 'web_' + Math.random().toString(36).substring(2, 15)
-      localStorage.setItem('cordwainer_device_id', deviceId)
-    }
-    return deviceId
-  } catch {
-    return 'web_guest'
-  }
-}
-
-/**
- * Точная проверка: запущено ли приложение реально внутри Telegram WebView,
- * а не просто открыто в браузере с подключенным скриптом telegram-web-app.js
- */
-const isRunningInTelegram = (): boolean => {
-  if (typeof window === 'undefined') return false
-  const tg = getTelegramWebApp()
-  return Boolean(tg?.initData && tg.initData.length > 0 && tg?.initDataUnsafe?.user?.id)
-}
-
-const showTelegramAlert = (message: string) => {
-  const tg = getTelegramWebApp()
-  if (isRunningInTelegram() && tg?.showAlert) {
-    try {
-      tg.showAlert(message)
-      return
-    } catch {}
-  }
-  alert(message)
-}
-
-const LockIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-    <path d="M7 11V7a5 5 0 0110 0v4"></path>
-  </svg>
-)
-
-/**
- * Динамический генератор локализованных текстов (STYLE-010):
- * автоматически подставляет актуальное число фасонов из STYLES_DATA и цену PRO_VIDEOS_PRICE_STARS,
- * поэтому при добавлении новых ИИ-видео в массив тексты и счётчики обновляются сами.
- */
-function getUiText(lang: SupportedLang, totalCount: number) {
-  const lockedCount = Math.max(0, totalCount - FREE_STYLES_COUNT)
-  const extraCount = Math.max(0, lockedCount - PREVIEW_TAG_COUNT)
-
-  const dict = {
-    ru: {
-      back: 'Назад',
-      aboutStyle: 'О фасоне',
-      hideDesc: 'Скрыть',
-      copied: 'Ссылка скопирована',
-      up: 'Наверх',
-      down: 'Вернуться',
-      moreStyles: `+ ещё ${extraCount} фасонов и новые AI-релизы`,
-      loadingVideo: 'Загрузка кадра...',
-      videoErrorRetry: 'Повтор загрузки...',
-      errTgOnly: 'Оплата через Telegram Stars доступна внутри приложения Telegram.',
-      errPayment: 'Оплата была отменена или не завершена.',
-      errVerifyFailed:
-        'Платёж ещё не подтверждён сервером. Подождите пару секунд и попробуйте снова.',
-      errPending: 'Платёж обрабатывается Telegram. Доступ откроется автоматически после подтверждения.',
-      errServer: 'Ошибка соединения',
-      paywall: {
-        tag: `ЗАКРЫТАЯ AI-КОЛЛЕКЦИЯ • +${lockedCount} ФАСОНОВ`,
-        title: 'Полный\nЛукбук',
-        desc: `Вы посмотрели ${FREE_STYLES_COUNT} из ${totalCount} фасонов. Разблокируйте полный доступ ко всей видео-энциклопедии обуви и всем будущим AI-пополнениям навсегда.`,
-        priceNote: `Разовый платёж • Все ${totalCount}+ фасонов и будущие обновления навсегда`,
-        btn: `ОТКРЫТЬ ВЕСЬ ЛУКБУК • ${PRO_VIDEOS_PRICE_STARS} ⭐️`,
-        loading: 'ПОДГОТОВКА СЧЕТА...',
-        verifying: 'ПРОВЕРКА ОПЛАТЫ...',
-      },
-    },
-    uk: {
-      back: 'Назад',
-      aboutStyle: 'Про фасон',
-      hideDesc: 'Сховати',
-      copied: 'Посилання скопійовано',
-      up: 'Вгору',
-      down: 'Повернутися',
-      moreStyles: `+ ще ${extraCount} фасонів та нові AI-релізи`,
-      loadingVideo: 'Завантаження кадру...',
-      videoErrorRetry: 'Повторне завантаження...',
-      errTgOnly: 'Оплата через Telegram Stars доступна всередині додатку Telegram.',
-      errPayment: 'Оплату було скасовано або не завершено.',
-      errVerifyFailed:
-        'Платіж ще не підтверджено сервером. Зачекайте кілька секунд і спробуйте знову.',
-      errPending:
-        'Платіж обробляється Telegram. Доступ відкриється автоматично після підтвердження.',
-      errServer: 'Помилка з’єднання',
-      paywall: {
-        tag: `ЗАКРИТА AI-КОЛЕКЦІЯ • +${lockedCount} ФАСОНІВ`,
-        title: 'Повний\nЛукбук',
-        desc: `Ви переглянули ${FREE_STYLES_COUNT} з ${totalCount} фасонів. Розблокуйте повний доступ до всієї відео-енциклопедії взуття та всіх майбутніх AI-поповнень назавжди.`,
-        priceNote: `Разовий платіж • Усі ${totalCount}+ фасонів та майбутні оновлення назавжди`,
-        btn: `ВІДКРИТИ ВЕСЬ ЛУКБУК • ${PRO_VIDEOS_PRICE_STARS} ⭐️`,
-        loading: 'ПІДГОТОВКА РАХУНКУ...',
-        verifying: 'ПЕРЕВІРКА ОПЛАТИ...',
-      },
-    },
-    de: {
-      back: 'Zurück',
-      aboutStyle: 'Details',
-      hideDesc: 'Schließen',
-      copied: 'Link kopiert',
-      up: 'Nach oben',
-      down: 'Zurück',
-      moreStyles: `+ ${extraCount} weitere Stile & neue KI-Releases`,
-      loadingVideo: 'Video wird geladen...',
-      videoErrorRetry: 'Erneut versuchen...',
-      errTgOnly: 'Zahlung mit Telegram Stars ist nur in der Telegram-App verfügbar.',
-      errPayment: 'Zahlung wurde abgebrochen.',
-      errVerifyFailed:
-        'Zahlung noch nicht vom Server bestätigt. Bitte warten Sie kurz und versuchen Sie es erneut.',
-      errPending:
-        'Zahlung wird von Telegram verarbeitet. Der Zugang wird nach Bestätigung freigeschaltet.',
-      errServer: 'Verbindungsfehler',
-      paywall: {
-        tag: `EXKLUSIVE KI-KOLLEKTION • +${lockedCount} STILE`,
-        title: 'Volles\nLookbook',
-        desc: `Sie haben ${FREE_STYLES_COUNT} von ${totalCount} Stilen gesehen. Schalten Sie den dauerhaften Zugang zur gesamten Video-Enzyklopädie inklusive aller künftigen KI-Updates frei.`,
-        priceNote: `Einmalige Zahlung • Alle ${totalCount}+ Stile & künftige Updates dauerhaft`,
-        btn: `VOLLES LOOKBOOK FREISCHALTEN • ${PRO_VIDEOS_PRICE_STARS} ⭐️`,
-        loading: 'WIRD GELADEN...',
-        verifying: 'ZAHLUNG PRÜFEN...',
-      },
-    },
-  }
-
-  return dict[lang] ?? dict.ru
-}
-
-export const STYLES_DATA: StyleSlide[] = [
-  {
-    id: 'botford',
-    video: '/Fason/Botford.mp4',
-    poster: '/Fason/posters/Botford.jpg',
-    title: { ru: 'Ботфорты', uk: 'Ботфорти', de: 'Overknee' },
-    subtitle: { ru: 'Высокий стиль', uk: 'Високий стиль', de: 'Hoher Stil' },
-    desc: {
-      ru: 'Смелость и элегантность в каждом шаге. Визуально удлиняют силуэт и становятся главным, безупречным акцентом любого образа.',
-      uk: 'Сміливість та елегантність у кожному кроці. Візуально подовжують силует і стають головним, бездоганним акцентом будь-якого образу.',
-      de: 'Mut und Eleganz bei jedem Schritt. Verlängern optisch die Silhouette und werden zum perfekten Hauptakzent jedes Looks.',
-    },
-  },
-  {
-    id: 'chelsea',
-    video: '/Fason/chelsi.mp4',
-    title: { ru: 'Челси', uk: 'Челсі', de: 'Chelsea' },
-    subtitle: { ru: 'Вечная классика', uk: 'Вічна класика', de: 'Ewiger Klassiker' },
-    desc: {
-      ru: 'Лаконичный дизайн и максимальный комфорт. Идеальный баланс между строгой классикой и расслабленным повседневным стилем.',
-      uk: 'Лаконічний дизайн та максимальний комфорт. Ідеальний баланс між суворою класикою та розслабленим повсякденним стилем.',
-      de: 'Puristisches Design und maximaler Komfort. Die perfekte Balance zwischen strenger Klassik und entspanntem Alltagsstil.',
-    },
-  },
-  {
-    id: 'martins',
-    video: '/Fason/martins.mp4',
-    title: { ru: 'Мартинсы\n/ Берцы', uk: 'Мартінси\n/ Берці', de: 'Combat\nBoots' },
-    subtitle: { ru: 'Бунтарский дух', uk: 'Бунтарський дух', de: 'Rebellischer Geist' },
-    desc: {
-      ru: 'Грубая эстетика, покорившая мировые подиумы. Массивная подошва и высокая шнуровка создают дерзкий, но притягательный контраст.',
-      uk: 'Груба естетика, що підкорила світові подіуми. Масивна підошва та висока шнурівка створюють зухвалий, але притягальний контраст.',
-      de: 'Raue Ästhetik, die die Laufstege der Welt eroberte. Massive Sohle und hohe Schnürung schaffen einen provokanten, aber anziehenden Kontrast.',
-    },
-  },
-  {
-    id: 'lofer',
-    video: '/Fason/lofer.mp4',
-    title: { ru: 'Лоферы', uk: 'Лофери', de: 'Loafer' },
-    subtitle: { ru: 'Тихая роскошь', uk: 'Тиха розкіш', de: 'Stiller Luxus' },
-    desc: {
-      ru: 'Воплощение элегантности и абсолютного комфорта. Идеальная база, которая делает любой образ статусным и расслабленным одновременно.',
-      uk: 'Втілення елегантності та абсолютного комфорту. Ідеальна база, яка робить будь-який образ статусним і розслабленим водночас.',
-      de: 'Die Verkörperung von Eleganz und absolutem Komfort. Die ideale Basis, die jeden Look zugleich statusbewusst und entspannt wirken lässt.',
-    },
-  },
-  {
-    id: 'sock_boots',
-    video: '/Fason/Sock_boots.mp4',
-    title: { ru: 'Туфли\n/ Чулки', uk: 'Туфлі\n/ Панчохи', de: 'Sock\nBoots' },
-    subtitle: { ru: 'Гибридная эстетика', uk: 'Гібридна естетика', de: 'Hybride Ästhetik' },
-    desc: {
-      ru: 'Смелый гибрид классической лодочки и эластичного трикотажа. Безупречно облегает щиколотку, добавляя образу утонченной дерзости и абсолютного комфорта.',
-      uk: 'Сміливий гібрид класичного човника та еластичного трикотажу. Бездоганно облягає кісточку, додаючи образу вишуканої зухвалості та абсолютного комфорту.',
-      de: 'Ein mutiger Hybrid aus klassischem Pump und elastischem Strick. Umschließt den Knöchel makellos und verleiht dem Look raffinierte Kühnheit und absoluten Komfort.',
-    },
-  },
-  {
-    id: 'cozaki',
-    video: '/Fason/cozaki.mp4',
-    title: { ru: 'Казаки', uk: 'Козаки', de: 'Western\nBoots' },
-    subtitle: { ru: 'Свобода формы', uk: 'Свобода форми', de: 'Freiheit der Form' },
-    desc: {
-      ru: 'Знаковый скошенный каблук и характерный мыс. Идеальный баланс между эстетикой дикого запада и ритмом современного мегаполиса.',
-      uk: 'Знаковий скошений каблук та характерний мис. Ідеальний баланс між естетикою дикого заходу та ритмом сучасного мегаполиса.',
-      de: 'Ikonischer abgeschrägter Absatz und charakteristische Spitze. Die perfekte Balance zwischen der Ästhetik des Wilden Westens und dem Rhythmus der modernen Metropole.',
-    },
-  },
-  {
-    id: 'boti',
-    video: '/Fason/boti.mp4',
-    title: { ru: 'Ботильоны', uk: 'Ботильйони', de: 'Stiefeletten' },
-    subtitle: { ru: 'Идеальные пропорции', uk: 'Ідеальні пропорції', de: 'Perfekte Proportionen' },
-    desc: {
-      ru: 'Безукоризненная архитектура обуви, мягко обнимающая щиколотку. Универсальный силуэт для создания выверенных, элегантных образов.',
-      uk: "Бездоганна архітектура взуття, що м'яко обіймає кісточку. Універсальний силует для створення вивірених, елегантних образів.",
-      de: 'Makellose Schuharchitektur, die den Knöchel sanft umschließt. Eine universelle Silhouette zur Kreation ausgewogener, eleganter Looks.',
-    },
-  },
-  {
-    id: 'mary_jane',
-    video: '/Fason/Mary_Jane.mp4',
-    title: { ru: 'Мэри Джейн', uk: 'Мері Джейн', de: 'Mary Jane' },
-    subtitle: { ru: 'Новая романтика', uk: 'Нова романтика', de: 'Neue Romantik' },
-    desc: {
-      ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
-      uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний тон.',
-      de: 'Ein Symbol raffinierter Weiblichkeit. Der markante Riemen über dem Spann und die berührende Retro-Silhouette geben einen koketten, aber stets eleganten Ton an.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'topsaed',
-    video: '/Fason/Topsaed.mp4',
-    title: { ru: 'Топсайдеры', uk: 'Топсайдери', de: 'Bootsschuhe' },
-    subtitle: { ru: 'Эстетика ривьеры', uk: "Естетика рів'єри", de: 'Riviera-Ästhetik' },
-    desc: {
-      ru: 'Элитарная расслабленность и дух закрытых яхт-клубов. Нескользящая подошва и круговая шнуровка — безупречная база для теплого сезона.',
-      uk: 'Елітарна розслабленість та дух закритих яхт-клубів. Нековзна підошва та кругова шнурівка — бездоганна база для теплого сезону.',
-      de: 'Elitäre Lässigkeit und der Geist exklusiver Yachtclubs. Rutschfeste Sohle und Rundumschnürung — die makellose Basis für die warme Jahreszeit.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'slingback',
-    video: '/Fason/slingback1.mp4',
-    title: { ru: 'Слингбэки', uk: 'Слінгбеки', de: 'Slingbacks' },
-    subtitle: { ru: 'Изящная строгость', uk: 'Витончена строгість', de: 'Zarte Strenge' },
-    desc: {
-      ru: 'Чувственный компромисс между классической лодочкой и босоножкой. Открытая пятка визуально облегчает силуэт, делая каждый шаг невесомым.',
-      uk: "Чуттєвий компроміс між класичним човником та босоніжкою. Відкрита п'ята візуально полегшує силует, роблячи кожен крок невагомим.",
-      de: 'Ein sinnlicher Kompromiss zwischen klassischem Pump und Sandale. Die offene Ferse erleichtert die Silhouette optisch und macht jeden Schritt schwerelos.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'espadrilles',
-    video: '/Fason/Espadrilles.mp4',
-    title: { ru: 'Эспадрильи', uk: 'Еспадрильї', de: 'Espadrilles' },
-    subtitle: { ru: 'Средиземноморский шик', uk: 'Средиземноморський шик', de: 'Mediterraner Chic' },
-    desc: {
-      ru: 'Культовая летняя база, сплетенная из натурального джута. Воплощение расслабленного шика и абсолютной свободы, идеально дополняющее легкие льняные образы.',
-      uk: 'Культова літня база, сплетена з натурального джуту. Втілення розслабленого шику та абсолютної свободи, що ідеально доповнює легкі лляні образи.',
-      de: 'Die kultige Sommerbasis, geflochten aus natürlicher Jute. Die Verkörperung entspannten Chics und absoluter Freiheit, ideal passend zu leichten Leinen-Looks.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'muli',
-    video: '/Fason/muli.mp4',
-    title: { ru: 'Мюли', uk: 'Мюлі', de: 'Mules' },
-    subtitle: { ru: 'Непринужденная эстетика', uk: 'Невимушена естетика', de: 'Mühelose Ästhetik' },
-    desc: {
-      ru: 'Открытая пятка и изящный силуэт, создающие эффект абсолютной легкости. Идеальный выбор для тех, кто ценит утонченный шик и комфорт в каждом движении.',
-      uk: "Відкрита п'ята та витончений силует, що створюють ефект абсолютної легкості. Ідеальний вибір для тих, хто цінує вишуканий шик та комфорт у кожному русі.",
-      de: 'Offene Ferse und eine anmutige Silhouette, die ein Gefühl von absoluter Leichtigkeit vermitteln. Die ideale Wahl für alle, die raffinierten Chic und Komfort in jeder Bewegung schätzen.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'huaraches',
-    video: '/Fason/Huaraches.mp4',
-    title: { ru: 'Гуарачи', uk: 'Гуарачі', de: 'Huaraches' },
-    subtitle: { ru: 'Мексиканское наследие', uk: 'Мексиканська спадщина', de: 'Mexikanisches Erbe' },
-    desc: {
-      ru: 'Аутентичный колорит и изящное ручное плетение кожаных ремешков. Идеальный комфорт для жарких дней, воплощающий дух свободы и многовековые традиции ремесленников.',
-      uk: 'Автентичний колорит та витончене ручне плетіння шкіряних ремінців. Ідеальний комфорт для спекотних днів, що втілює дух свободи та багатовікові традиції ремісників.',
-      de: 'Authentisches Flair und feines Handgeflecht aus Lederriemen. Idealer Komfort für heiße Tage, der den Geist der Freiheit und jahrhundertealte Handwerkstraditionen verkörpert.',
-    },
-  },
-  {
-    id: 'riding',
-    video: '/Fason/Riding.mp4',
-    title: { ru: 'Жокейские сапоги', uk: 'Жокейські чоботи', de: 'Reiterstiefel' },
-    subtitle: { ru: 'Аристократичная стать', uk: 'Аристократична стать', de: 'Aristokratische Haltung' },
-    desc: {
-      ru: 'Строгие линии и элегантный прямой крой, вдохновленный конным спортом. Безупречно держат форму голенища, придавая любому образу благородство и утонченную строгость.',
-      uk: 'Строгі лінії та елегантний прямий крій, натхненний кінним спортом. Бездоганно тримають форму халяви, надаючи будь-якому образу шляхетності та витонченої суворості.',
-      de: 'Strenge Linien und ein eleganter, gerader Schnitt, inspiriert vom Reitsport. Sie behalten perfekt ihre Schaftform und verleihen jedem Look eine edle und raffinierte Strenge.',
-    },
-  },
-  {
-    id: 'gladiator',
-    video: '/Fason/Gladiator.mp4',
-    title: { ru: 'Гладиаторы', uk: 'Гладіатори', de: 'Gladiatoren' },
-    subtitle: { ru: 'Античная эстетика', uk: 'Антична естетика', de: 'Antike Ästhetik' },
-    desc: {
-      ru: 'Эффектное сплетение множества ремешков, изящно обхватывающих ногу. Смелый отсыл к историческому наследию, который делает даже самый простой летний наряд невероятно выразительным.',
-      uk: 'Ефектне сплетіння безлічі ремінців, що витончено охоплюють ногу. Сміливе відсилання до історичної спадщини, яке робить навіть найпростіше літнє вбрання неймовірно виразним.',
-      de: 'Ein spektakuläres Geflecht aus vielen Riemen, die das Bein elegant umschließen. Eine mutige Hommage an das historische Erbe, die selbst das einfachste Sommeroutfit unglaublich ausdrucksstark macht.',
-    },
-  },
-]
-
-type SlideItemProps = {
-  slide: StyleSlide
-  lang: SupportedLang
-  index: number
-  totalCount: number
-  isActive: boolean
-  shouldLoadVideo: boolean
-  shouldKeepInMemory: boolean
-  isMuted: boolean
-  onToggleMute: () => void
-  onForceMuteSync: () => void
-  onShowToast: (msg: string) => void
-  onActiveVideoReady: (index: number) => void
-}
-
-const smoothEase: [number, number, number, number] = [0.25, 1, 0.5, 1]
-
-function SlideItem({
-  slide,
-  lang,
-  index,
-  totalCount,
-  isActive,
-  shouldLoadVideo,
-  shouldKeepInMemory,
-  isMuted,
-  onToggleMute,
-  onForceMuteSync,
-  onShowToast,
-  onActiveVideoReady,
-}: SlideItemProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const hasFetchedLikesRef = useRef(false)
-  const tapTimeoutRef = useRef<number | null>(null)
-  const heartBurstTimeoutRef = useRef<number | null>(null)
-  const likeAbortRef = useRef<AbortController | null>(null)
-  const isLikeInFlightRef = useRef(false)
-
-  const [isLiked, setIsLiked] = useState(false)
-  const isLikedRef = useRef(false)
-  isLikedRef.current = isLiked
-
-  const [likesCount, setLikesCount] = useState(0)
-  const [isPaused, setIsPaused] = useState(false)
-  const [isDescOpen, setIsDescOpen] = useState(false)
-  const [isVideoLoaded, setIsVideoLoaded] = useState(false)
-  const [hasVideoError, setHasVideoError] = useState(false)
-  const [heartBurst, setHeartBurst] = useState<{ id: number; x: number; y: number } | null>(null)
-
-  const userId = getDeviceId()
-  const tg = getTelegramWebApp()
-  const t = useMemo(() => getUiText(lang, totalCount), [lang, totalCount])
-
-  // ИСПРАВЛЕНО (STYLE-007): Гарантированная очистка всех таймеров и AbortController при размонтировании
-  useEffect(() => {
-    return () => {
-      if (tapTimeoutRef.current !== null) {
-        window.clearTimeout(tapTimeoutRef.current)
-        tapTimeoutRef.current = null
-      }
-      if (heartBurstTimeoutRef.current !== null) {
-        window.clearTimeout(heartBurstTimeoutRef.current)
-        heartBurstTimeoutRef.current = null
-      }
-      likeAbortRef.current?.abort()
-    }
-  }, [])
-
-  // ИСПРАВЛЕНО (STYLE-009): Прямая синхронизация DOM-свойства muted на элементе <video> для iOS WebKit
-  useEffect(() => {
-    const video = videoRef.current
-    if (video) {
-      video.muted = isMuted
-    }
-  }, [isMuted])
-
-  // Отложенная загрузка лайков с AbortController
-  useEffect(() => {
-    if (!shouldLoadVideo || hasFetchedLikesRef.current) return
-    const controller = new AbortController()
-
-    const timer = window.setTimeout(async () => {
-      try {
-        const rawInitData = tg?.initData || ''
-        const res = await fetch(
-          `/api/like?style_id=${encodeURIComponent(slide.id)}&user_id=${encodeURIComponent(userId)}`,
-          {
-            signal: controller.signal,
-            headers: rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : undefined,
-          }
-        )
-        if (res.ok && !controller.signal.aborted) {
-          const data = (await res.json()) as { total?: number; isLiked?: boolean }
-          setLikesCount(Math.max(0, Number(data.total) || 0))
-          setIsLiked(Boolean(data.isLiked))
-          hasFetchedLikesRef.current = true
-        }
-      } catch {}
-    }, isActive ? 350 : 800)
-
-    return () => {
-      window.clearTimeout(timer)
-      controller.abort()
-    }
-  }, [slide.id, userId, shouldLoadVideo, isActive, tg?.initData])
-
-  // ИСПРАВЛЕНО (STYLE-003, STYLE-004, STYLE-005):
-  // Последовательная загрузка видео, выгрузка буферов за пределами соседних слайдов
-  // и автовосстановление после сбоя сети (online event)
-  const syncAndPlayActiveVideo = useCallback(() => {
-    const video = videoRef.current
-    if (!video || !isActive) return
-    if (video.readyState >= 2) {
-      setIsVideoLoaded(true)
-      onActiveVideoReady(index)
-    }
-    setIsPaused(false)
-    const playPromise = video.play()
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Если Safari / iOS заблокировал автоплей со звуком — включаем muted и синхронизируем родительский стейт (STYLE-009)
-        video.muted = true
-        onForceMuteSync()
-        video.play().catch(() => {})
-      })
-    }
-  }, [isActive, index, onActiveVideoReady, onForceMuteSync])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video || !slide.video) return
-
-    const targetSrc = slide.poster ? slide.video : `${slide.video}#t=0.001`
-
-    if (shouldLoadVideo) {
-      if (video.getAttribute('src') !== targetSrc) {
-        setIsVideoLoaded(false)
-        setHasVideoError(false)
-        video.setAttribute('src', targetSrc)
-        video.preload = isActive ? 'auto' : 'metadata'
-        video.load()
-        if (isActive) {
-          syncAndPlayActiveVideo()
-        }
-      } else {
-        if (isActive && video.preload !== 'auto') {
-          video.preload = 'auto'
-        }
-        if (isActive && video.readyState >= 2) {
-          setIsVideoLoaded(true)
-          onActiveVideoReady(index)
-        }
-      }
-    } else if (!shouldKeepInMemory) {
-      if (video.getAttribute('src')) {
-        video.pause()
-        video.removeAttribute('src')
-        video.load()
-        setIsVideoLoaded(false)
-        setHasVideoError(false)
-      }
-    }
-  }, [
-    shouldLoadVideo,
-    shouldKeepInMemory,
-    isActive,
-    slide.video,
-    slide.poster,
-    index,
-    onActiveVideoReady,
-    syncAndPlayActiveVideo,
-  ])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    if (isActive) {
-      if (video.getAttribute('src')) {
-        syncAndPlayActiveVideo()
-      }
-    } else {
-      video.pause()
-      if (video.readyState >= 1) {
-        try {
-          video.currentTime = 0.001
-        } catch {}
-      }
-      setIsPaused(false)
-      setIsDescOpen(false)
-    }
-  }, [isActive, syncAndPlayActiveVideo])
-
-  // ИСПРАВЛЕНО (STYLE-003): Если видео уже было предзагружено до того, как слайд стал активным,
-  // немедленно уведомляем родителя о готовности, чтобы не блокировать предзагрузку activeIndex + 1
-  useEffect(() => {
-    if (isActive && isVideoLoaded) {
-      onActiveVideoReady(index)
-    }
-  }, [isActive, isVideoLoaded, index, onActiveVideoReady])
-
-  // Автоматическое восстановление загрузки видео при возвращении интернета (STYLE-004)
-  useEffect(() => {
-    if (!shouldLoadVideo) return
-    const handleOnline = () => {
-      const video = videoRef.current
-      if (!video || !slide.video) return
-      if (hasVideoError || (!isVideoLoaded && video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE)) {
-        setHasVideoError(false)
-        const targetSrc = slide.poster ? slide.video : `${slide.video}#t=0.001`
-        video.setAttribute('src', targetSrc)
-        video.load()
-        if (isActive) syncAndPlayActiveVideo()
-      }
-    }
-    window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
-  }, [shouldLoadVideo, hasVideoError, isVideoLoaded, isActive, slide.video, slide.poster, syncAndPlayActiveVideo])
-
-  const handleVideoReady = () => {
-    setHasVideoError(false)
-    setIsVideoLoaded(true)
-    if (isActive) {
-      onActiveVideoReady(index)
-    }
-  }
-
-  const handleVideoError = () => {
-    setHasVideoError(true)
-    // Разблокируем очередь предзагрузки следующего слайда даже если текущий ролик недоступен
-    if (isActive) {
-      onActiveVideoReady(index)
-    }
-  }
-
-  // ИСПРАВЛЕНО (STYLE-006): Защита от гонки параллельных запросов лайков и синхронизация с ответом сервера
-  const triggerLikeRequest = useCallback(
-    async (forceLike = false) => {
-      const currentLiked = isLikedRef.current
-      if (forceLike && currentLiked) return
-      if (isLikeInFlightRef.current) return
-
-      const next = forceLike ? true : !currentLiked
-      isLikedRef.current = next
-      setIsLiked(next)
-      setLikesCount((c) => (next ? c + 1 : Math.max(0, c - 1)))
-
-      if (tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred(next ? 'medium' : 'light')
-      }
-
-      isLikeInFlightRef.current = true
-      likeAbortRef.current?.abort()
-      const controller = new AbortController()
-      likeAbortRef.current = controller
-
-      try {
-        const rawInitData = tg?.initData || ''
-        const res = await fetch(
-          `/api/like?style_id=${encodeURIComponent(slide.id)}&user_id=${encodeURIComponent(userId)}`,
-          {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              'Content-Type': 'application/json',
-              ...(rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : {}),
-            },
-            body: JSON.stringify({
-              action: next ? 'like' : 'unlike',
-              initData: rawInitData,
-            }),
-          }
-        )
-        if (!res.ok) throw new Error('Like failed')
-        const data = (await res.json().catch(() => null)) as {
-          total?: number
-          isLiked?: boolean
-        } | null
-        if (data && typeof data.total === 'number') {
-          setLikesCount(Math.max(0, data.total))
-        }
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        isLikedRef.current = !next
-        setIsLiked(!next)
-        setLikesCount((c) => (next ? Math.max(0, c - 1) : c + 1))
-      } finally {
-        isLikeInFlightRef.current = false
-      }
-    },
-    [slide.id, tg, userId]
-  )
-
-  const handleVideoTap = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isDescOpen) {
-      setIsDescOpen(false)
-      if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged()
-      return
-    }
-
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
-    if (tapTimeoutRef.current !== null) {
-      window.clearTimeout(tapTimeoutRef.current)
-      tapTimeoutRef.current = null
-
-      setHeartBurst({ id: Date.now(), x, y })
-      void triggerLikeRequest(true)
-      if (heartBurstTimeoutRef.current !== null) {
-        window.clearTimeout(heartBurstTimeoutRef.current)
-      }
-      heartBurstTimeoutRef.current = window.setTimeout(() => {
-        setHeartBurst(null)
-        heartBurstTimeoutRef.current = null
-      }, 850)
-    } else {
-      tapTimeoutRef.current = window.setTimeout(() => {
-        tapTimeoutRef.current = null
-        const video = videoRef.current
-        if (!video) return
-
-        if (video.paused) {
-          video.play().catch(() => {})
-          setIsPaused(false)
-        } else {
-          video.pause()
-          setIsPaused(true)
-        }
-        if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged()
-      }, 220)
-    }
-  }
-
-  const handleShare = async () => {
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
-
-    const title = slide.title[lang].replace('\n', ' ')
-    const text =
-      lang === 'de'
-        ? `Sieh dir diesen Stil an: ${title} in der Cordwainer Enzyklopädie!`
-        : lang === 'ru'
-          ? `Смотри, какой фасон: ${title} в энциклопедии Cordwainer!`
-          : `Дивись, який фасон: ${title} в енциклопедії Cordwainer!`
-
-    const url = 'https://www.cordwaine.app'
-
-    try {
-      if (isRunningInTelegram() && tg?.openTelegramLink) {
-        tg.openTelegramLink(
-          `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
-        )
-        return
-      }
-      if (navigator.share) {
-        await navigator.share({ title: 'Cordwainer', text, url })
-      } else {
-        await navigator.clipboard.writeText(`${text}\n${url}`)
-        onShowToast(t.copied)
-      }
-    } catch {}
-  }
-
-  const toggleDesc = () => {
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
-    setIsDescOpen((v) => !v)
-  }
-
-  return (
-    <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#050505]">
-      {/* ИСПРАВЛЕНО (STYLE-004): Скелетон отображается до реальной готовности видеокадра (независимо от наличия poster) */}
-      {!isVideoLoaded && (
-        <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-b from-[#0d0d0d] via-[#151412] to-[#080808] animate-pulse">
-          <div className="flex flex-col items-center gap-2 opacity-40">
-            <div className="w-5 h-5 rounded-full border border-white/40 border-t-white animate-spin" />
-            <span className="text-[8px] font-sans uppercase tracking-[0.3em] text-white/70">
-              {hasVideoError ? t.videoErrorRetry : t.loadingVideo}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Видео / Изображение */}
-      <div className="absolute inset-0 bg-[#050505]">
-        {slide.video ? (
-          <video
-            ref={videoRef}
-            preload="none"
-            loop
-            playsInline
-            
-            webkit-playsinline="true"
-            muted={isMuted}
-            poster={slide.poster}
-            onLoadedData={handleVideoReady}
-            onCanPlay={handleVideoReady}
-            onPlaying={handleVideoReady}
-            onError={handleVideoError}
-            className={`
-              w-full h-full object-cover
-              transition-opacity duration-300 ease-out
-              ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}
-              ${slide.hideWatermark ? 'scale-[1.08]' : ''}
-            `}
-          />
-        ) : slide.image ? (
-          <img
-            src={slide.image}
-            alt={slide.title[lang]}
-            className="w-full h-full object-cover"
-          />
-        ) : null}
-      </div>
-
-      {/* Интерактивная область видео */}
-      <div
-        onClick={handleVideoTap}
-        className="absolute inset-0 z-10 cursor-pointer select-none"
-      />
-
-      {/* Анимация сердца при двойном тапе */}
-      <AnimatePresence>
-        {heartBurst && (
-          <motion.div
-            key={heartBurst.id}
-            initial={{ scale: 0.2, opacity: 0, rotate: -12 }}
-            animate={{ scale: [0.2, 1.25, 1], opacity: [0, 1, 0], y: -40 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.75, ease: 'easeOut' }}
-            style={{ left: heartBurst.x - 40, top: heartBurst.y - 40 }}
-            className="absolute z-30 pointer-events-none text-white drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
-          >
-            <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Индикатор паузы */}
-      <AnimatePresence>
-        {isPaused && isActive && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.85 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-          >
-            <div className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-md border border-white/25 flex items-center justify-center text-white">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="ml-1">
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Деликатные градиенты */}
-      <div className="absolute top-0 left-0 right-0 h-[34%] bg-gradient-to-b from-black/75 via-black/25 to-transparent z-10 pointer-events-none" />
-      <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t z-10 pointer-events-none transition-all duration-500 ${
-          isDescOpen
-            ? 'h-[50%] from-black/90 via-black/60 to-transparent'
-            : 'h-[22%] from-black/65 via-black/25 to-transparent'
-        }`}
-      />
-
-      {/* Верхний редакционный блок с учетом safe-area-inset-top на iPhone */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
-        transition={{ duration: 0.7, ease: smoothEase, delay: 0.08 }}
-        style={{
-          top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 60px)',
-        }}
-        className="absolute left-6 right-6 z-20 flex items-start justify-between pointer-events-none"
-      >
-        <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.38em] text-white/75 mb-1.5 drop-shadow">
-            {slide.subtitle[lang]}
-          </p>
-          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.06] tracking-tight text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
-            {slide.title[lang]}
-          </h2>
-        </div>
-
-        <div className="text-[10px] font-sans tracking-[0.22em] text-white/65 mt-1 tabular-nums drop-shadow">
-          <span>{String(index + 1).padStart(2, '0')}</span>
-          <span className="text-white/35 mx-1">/</span>
-          <span className="text-white/40">{String(totalCount).padStart(2, '0')}</span>
-        </div>
-      </motion.div>
-
-      {/* Нижний компактный лукбук-док с учетом safe-area-inset-bottom */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
-        transition={{ duration: 0.7, ease: smoothEase, delay: 0.15 }}
-        style={{
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
-        }}
-        className="absolute left-6 right-6 z-20 flex flex-col pointer-events-none"
-      >
-        <AnimatePresence>
-          {isDescOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              transition={{ duration: 0.28, ease: smoothEase }}
-              onClick={toggleDesc}
-              className="pointer-events-auto mb-3 p-4 rounded-2xl bg-black/65 backdrop-blur-xl border border-white/15 shadow-2xl cursor-pointer"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[8px] font-sans uppercase tracking-[0.3em] text-white/50">
-                  {slide.subtitle[lang]}
-                </span>
-                <span className="text-[8px] font-sans uppercase tracking-[0.2em] text-white/60">
-                  {t.hideDesc} ✕
-                </span>
-              </div>
-              <p className="text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.65] text-[#F4F0E8]/95">
-                {slide.desc[lang]}
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="w-full h-px bg-white/20 mb-3" />
-
-        <div className="flex items-center justify-between gap-3 pointer-events-auto">
-          <button
-            type="button"
-            onClick={toggleDesc}
-            className="flex-1 min-w-0 text-left group py-0.5 pr-2 active:opacity-70 transition-opacity bg-transparent border-0 cursor-pointer"
-          >
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="text-[8px] font-sans uppercase tracking-[0.28em] text-white/65">
-                {t.aboutStyle}
-              </span>
-              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/30 text-[9px] leading-none text-white/80">
-                {isDescOpen ? '−' : '+'}
-              </span>
-            </div>
-            <p className="text-[11px] font-sans font-light text-white/85 truncate">
-              {slide.desc[lang]}
-            </p>
-          </button>
-
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onToggleMute}
-              aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
-              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90 cursor-pointer"
-            >
-              {isMuted ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                  <line x1="23" y1="9" x2="17" y2="15"></line>
-                  <line x1="17" y1="9" x2="23" y2="15"></line>
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                </svg>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void triggerLikeRequest(false)}
-              aria-label="Нравится"
-              className={`
-                h-9 px-2.5 min-w-[36px] rounded-full border flex items-center justify-center gap-1.5
-                transition-all duration-200 active:scale-90 cursor-pointer
-                ${
-                  isLiked
-                    ? 'border-white bg-white text-black shadow-[0_0_14px_rgba(255,255,255,0.35)]'
-                    : 'border-white/30 text-white bg-black/35 backdrop-blur-md'
-                }
-              `}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill={isLiked ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-              {likesCount > 0 && (
-                <span className="text-[9px] font-sans tracking-wider tabular-nums">
-                  {likesCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleShare()}
-              aria-label="Поделиться"
-              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90 cursor-pointer"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  )
 }
 
 const pageVariants = {
@@ -1032,25 +56,22 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
   const [activeIndex, setActiveIndex] = useState(0)
   const [readySlideIndex, setReadySlideIndex] = useState<number>(-1)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
+  const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const toastTimerRef = useRef<number | null>(null)
   const jumpTimerRef = useRef<number | null>(null)
+  const returnSlideIndexRef = useRef<number | null>(null)
+  const isJumpingRef = useRef(false)
 
-  // ИСПРАВЛЕНО (STYLE-001, STYLE-002): Строгий платёжный автомат, где источником истины выступает сервер
-  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
   const isProPurchased = paymentState === 'purchased'
   const isPaymentBusy =
     paymentState === 'creating_invoice' ||
     paymentState === 'invoice_open' ||
     paymentState === 'verifying_payment'
 
-  const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
-  const returnSlideIndexRef = useRef<number | null>(null)
-  const isJumpingRef = useRef(false)
-
-  // Очистка глобальных таймеров страницы при размонтировании (STYLE-007)
   useEffect(() => {
     return () => {
       if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
@@ -1077,8 +98,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
     setIsMuted(true)
   }, [])
 
-  // ИСПРАВЛЕНО (STYLE-001): Верификация покупки через сервер с передачей подписанного X-Telegram-Init-Data
-  // и сбросом неподтверждённого кэша localStorage
   const verifyPurchaseOnServer = useCallback(async (): Promise<boolean> => {
     const tg = getTelegramWebApp()
     const userId = tg?.initDataUnsafe?.user?.id
@@ -1126,6 +145,7 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
     ? STYLES_DATA
     : STYLES_DATA.slice(0, FREE_STYLES_COUNT)
   const showPaywallSlide = !isProPurchased
+
   const lockedPreviewTitles = useMemo(
     () =>
       STYLES_DATA.slice(FREE_STYLES_COUNT, FREE_STYLES_COUNT + PREVIEW_TAG_COUNT).map((s) =>
@@ -1155,7 +175,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
     return () => container.removeEventListener('scroll', handlePassiveScroll)
   }, [])
 
-  // ИСПРАВЛЕНО (STYLE-008): Навигация «Наверх / Вернуться» по индексу слайда с защитой от наложения таймеров
   const handleSmartScroll = () => {
     const tg = getTelegramWebApp()
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
@@ -1179,10 +198,7 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
         jumpTimerRef.current = null
       }, 750)
     } else if (buttonMode === 'down' && returnSlideIndexRef.current !== null) {
-      const targetIdx = Math.min(
-        returnSlideIndexRef.current,
-        slideRefs.current.length - 1
-      )
+      const targetIdx = Math.min(returnSlideIndexRef.current, slideRefs.current.length - 1)
       isJumpingRef.current = true
       setActiveIndex(targetIdx)
 
@@ -1241,7 +257,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
     return () => observer.disconnect()
   }, [visibleStyles.length, showPaywallSlide])
 
-  // Навигация Назад + поддержка клавиши Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onBack()
@@ -1269,7 +284,7 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
   }, [onBack])
 
   const handleBackPress = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
+    (e: MouseEvent | TouchEvent) => {
       e.stopPropagation()
       const tg = getTelegramWebApp()
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
@@ -1278,8 +293,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
     [onBack]
   )
 
-  // ИСПРАВЛЕНО (STYLE-001, STYLE-002): Строгий платёжный сценарий Telegram Stars
-  // с передачей initData, блокировкой повторного открытия счёта и проверкой на сервере после оплаты
   const handleProClick = async () => {
     if (isPaymentBusy || isProPurchased) return
     const tg = getTelegramWebApp()
@@ -1420,7 +433,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
         }
       `}</style>
 
-      {/* Верхний хедер с гарантированным отступом от статус-бара / челки iPhone в Safari и PWA */}
       <header
         style={{
           paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 10px)',
@@ -1465,7 +477,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
         </button>
       </header>
 
-      {/* Тост при копировании ссылки */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -1482,7 +493,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
         )}
       </AnimatePresence>
 
-      {/* Основная лента */}
       <div
         ref={scrollRef}
         className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
@@ -1494,8 +504,6 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
           const isPrevSlide = index === activeIndex - 1
 
           const shouldLoadVideo = isActive || isNextSlideReadyToPreload || isPrevSlide
-          // ИСПРАВЛЕНО (STYLE-005): Храним в памяти строго не более 3 видео (предыдущее, активное, следующее)
-          // во избежание переполнения лимита аппаратных декодеров MediaCodec на бюджетных Android (3–4 ГБ ОЗУ)
           const shouldKeepInMemory = Math.abs(activeIndex - index) <= 1
 
           return (
@@ -1525,98 +533,20 @@ export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) 
           )
         })}
 
-        {/* High-Fashion Paywall Slide */}
         {showPaywallSlide && (
-          <div
-            ref={(el) => {
+          <PaywallSlide
+            index={visibleStyles.length}
+            slideRef={(el) => {
               slideRefs.current[visibleStyles.length] = el
             }}
-            data-index={visibleStyles.length}
-            style={{
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 36px)',
-            }}
-            className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6"
-          >
-            {/* ИСПРАВЛЕНО (STYLE-005): Фоновое превью-видео монтируется ТОЛЬКО когда открыт сам Paywall-слайд */}
-            {STYLES_DATA[FREE_STYLES_COUNT]?.video && isPaywallSlideActive && (
-              <video
-                src={`${STYLES_DATA[FREE_STYLES_COUNT].video}#t=0.001`}
-                autoPlay
-                loop
-                muted
-                playsInline
-                preload="metadata"
-                className="absolute inset-0 w-full h-full object-cover scale-105 blur-md opacity-30 pointer-events-none"
-              />
-            )}
-
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40 z-0 pointer-events-none" />
-
-            <div className="absolute top-24 left-4 pointer-events-none select-none z-0">
-              <h2 className="font-serif text-[22vw] leading-[0.8] text-white/[0.04] tracking-tighter">
-                FULL
-                <br />
-                VIDEO
-                <br />
-                LOOKBOOK
-              </h2>
-            </div>
-
-            <div className="relative z-10 w-full mb-2">
-              <div className="w-full h-px bg-white/20 mb-6" />
-
-              <p className="text-[9px] font-sans uppercase tracking-[0.35em] text-white/60 mb-3">
-                {t.paywall.tag}
-              </p>
-
-              <h3 className="font-serif text-4xl min-[390px]:text-5xl tracking-tight text-[#F4F0E8] whitespace-pre-line mb-4">
-                {t.paywall.title}
-              </h3>
-
-              <p className="text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.7] text-white/75 max-w-[320px] mb-5">
-                {t.paywall.desc}
-              </p>
-
-              <div className="flex flex-wrap gap-1.5 mb-6">
-                {lockedPreviewTitles.map((title) => (
-                  <span
-                    key={title}
-                    className="px-2.5 py-1 text-[9px] font-sans uppercase tracking-[0.15em] text-white/75 bg-white/10 border border-white/15 backdrop-blur-sm"
-                  >
-                    {title}
-                  </span>
-                ))}
-                <span className="px-2.5 py-1 text-[9px] font-sans uppercase tracking-[0.15em] text-white/50 border border-white/10">
-                  {t.moreStyles}
-                </span>
-              </div>
-
-              <p className="text-[9px] font-sans uppercase tracking-[0.2em] text-white/50 mb-2.5">
-                {t.paywall.priceNote}
-              </p>
-
-              <button
-                type="button"
-                onClick={() => void handleProClick()}
-                disabled={isPaymentBusy}
-                style={{ touchAction: 'manipulation' }}
-                className="paywall-btn group relative flex items-center justify-between w-full h-[56px] px-6 border text-[#F4F0E8] hover:bg-white/10 active:scale-[0.98] transition-all outline-none bg-black/50 backdrop-blur-md cursor-pointer disabled:opacity-55"
-              >
-                {isPaymentBusy ? (
-                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse mx-auto">
-                    {paymentState === 'verifying_payment' ? t.paywall.verifying : t.paywall.loading}
-                  </span>
-                ) : (
-                  <>
-                    <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
-                      {t.paywall.btn}
-                    </span>
-                    <LockIcon />
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+            isActive={isPaywallSlideActive}
+            previewVideo={STYLES_DATA[FREE_STYLES_COUNT]?.video}
+            lockedPreviewTitles={lockedPreviewTitles}
+            t={t}
+            paymentState={paymentState}
+            isPaymentBusy={isPaymentBusy}
+            onProClick={() => void handleProClick()}
+          />
         )}
       </div>
     </motion.div>
