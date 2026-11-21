@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type MouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { hapticSwatch, hapticTap, triggerHaptic } from './haptics'
 import { getUiText } from './i18n'
 import { getDeviceId, getTelegramWebApp, isRunningInTelegram } from './telegram'
 import type { StyleSlide, SupportedLang } from './types'
