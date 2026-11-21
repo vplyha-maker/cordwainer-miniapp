@@ -1,254 +1,266 @@
-import { useEffect, useRef, useState, type MutableRefObject } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 'react'
 import type { Lang } from '../../App'
 import type { Pigment } from '../../data/pigments'
-import { getPigmentLore } from '../../data/pigmentLore'
 import type { PaintPart } from '../../hooks/usePaintMix'
-import type { IlluminantType } from '../../utils/colorScience'
+import type { IlluminantId } from '../../utils/colorScience'
+import { getPigmentLore } from '../../data/pigmentLore'
 import { PigmentSelector } from '../../components/PigmentSelector'
-import { SpectralSparkline } from './SpectralChart'
 import type { ColorCalcDict } from './i18n'
-import { SUBSTRATE_PRESETS, type SubstratePresetId } from './substrate'
-import { hapticConfirm, hapticSelect, hapticTap } from './haptics'
+import { hapticSelect, hapticTap } from './haptics'
 
-export interface LayerSwatchItem {
-  short: string
-  label: string
+export interface SubstratePreset {
+  id: string
   hex: string
+  label: { ru: string; uk: string; de: string }
 }
 
-type AmountInputMap = Map<string, HTMLInputElement>
-type NumberRecord = Record<string, number>
-type LabColor = { L: number; a: number; b: number }
+export const SUBSTRATE_PRESETS: SubstratePreset[] = [
+  { id: 'crust', hex: '#d8c5a8', label: { ru: 'Краст', uk: 'Краст', de: 'Crust' } },
+  { id: 'white', hex: '#f2f0eb', label: { ru: 'Белая', uk: 'Біла', de: 'Weiß' } },
+  { id: 'cognac', hex: '#8b4513', label: { ru: 'Коньяк', uk: 'Коньяк', de: 'Cognac' } },
+  { id: 'espresso', hex: '#3b2314', label: { ru: 'Эспрессо', uk: 'Еспресо', de: 'Espresso' } },
+  { id: 'black', hex: '#1c1b1a', label: { ru: 'Чёрная', uk: 'Чорна', de: 'Schwarz' } },
+]
 
-interface SliderGestureState {
-  paintId: string
-  pointerId: number
-  startX: number
-  startY: number
-  rectLeft: number
-  rectWidth: number
-  locked: 'none' | 'horizontal' | 'vertical'
+export const MAX_ML_INPUT = 1000
+const BATCH_PRESETS = [10, 20, 25, 50, 100]
+
+type AmountInputMap = Map<string, HTMLInputElement>
+
+function mlToSliderPos(ml: number): number {
+  const v = Math.max(0, Math.min(100, ml))
+  if (v <= 5) return (v / 5) * 35
+  if (v <= 30) return 35 + ((v - 5) / 25) * 35
+  return 70 + ((v - 30) / 70) * 30
+}
+
+function sliderPosToMl(pos: number): number {
+  const p = Math.max(0, Math.min(100, pos))
+  if (p <= 35) {
+    return Math.round(((p / 35) * 5) * 10) / 10
+  }
+  if (p <= 70) {
+    const raw = 5 + ((p - 35) / 35) * 25
+    return Math.round(raw * 2) / 2
+  }
+  const raw = 30 + ((p - 70) / 30) * 70
+  return Math.round(raw)
+}
+
+function formatMl(val: number): string {
+  if (!Number.isFinite(val) || val <= 0) return '0.0'
+  if (val < 10) return (Math.round(val * 10) / 10).toFixed(1)
+  if (Math.abs(val - Math.round(val)) < 0.05) return String(Math.round(val))
+  return (Math.round(val * 10) / 10).toFixed(1)
+}
+
+interface HorizontalIntentSliderProps {
+  valueMl: number
+  accentHex: string
+  onChangeMl: (nextMl: number) => void
+}
+
+function HorizontalIntentSlider({
+  valueMl,
+  accentHex,
+  onChangeMl,
+}: HorizontalIntentSliderProps) {
+  const trackRef = useRef<HTMLDivElement | null>(null)
+  const dragStateRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    mode: 'pending' | 'horizontal' | 'vertical'
+  } | null>(null)
+  const lastEmittedRef = useRef<number>(valueMl)
+
+  const posPct = mlToSliderPos(valueMl)
+
+  const updateFromClientX = useCallback(
+    (clientX: number) => {
+      const el = trackRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      if (rect.width <= 0) return
+      const pct = ((clientX - rect.left) / rect.width) * 100
+      const nextMl = sliderPosToMl(pct)
+      if (nextMl !== lastEmittedRef.current) {
+        lastEmittedRef.current = nextMl
+        onChangeMl(nextMl)
+      }
+    },
+    [onChangeMl]
+  )
+
+  return (
+    <div
+      ref={trackRef}
+      style={{ touchAction: 'pan-y' }}
+      onPointerDown={(e) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return
+        lastEmittedRef.current = valueMl
+        dragStateRef.current = {
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          mode: e.pointerType === 'mouse' ? 'horizontal' : 'pending',
+        }
+        if (e.pointerType === 'mouse') {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          updateFromClientX(e.clientX)
+        }
+      }}
+      onPointerMove={(e) => {
+        const st = dragStateRef.current
+        if (!st || st.pointerId !== e.pointerId) return
+        if (st.mode === 'vertical') return
+
+        if (st.mode === 'pending') {
+          const dx = Math.abs(e.clientX - st.startX)
+          const dy = Math.abs(e.clientY - st.startY)
+          if (dx < 7 && dy < 7) return
+          if (dy > dx) {
+            st.mode = 'vertical'
+            return
+          }
+          st.mode = 'horizontal'
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId)
+          } catch {
+            // ignore
+          }
+        }
+
+        if (st.mode === 'horizontal') {
+          updateFromClientX(e.clientX)
+        }
+      }}
+      onPointerUp={(e) => {
+        const st = dragStateRef.current
+        if (!st || st.pointerId !== e.pointerId) return
+        if (st.mode === 'pending') {
+          const dx = Math.abs(e.clientX - st.startX)
+          const dy = Math.abs(e.clientY - st.startY)
+          if (dx < 6 && dy < 6) {
+            updateFromClientX(e.clientX)
+            hapticTap()
+          }
+        }
+        dragStateRef.current = null
+      }}
+      onPointerCancel={() => {
+        dragStateRef.current = null
+      }}
+      className="relative h-8 flex items-center cursor-pointer select-none"
+    >
+      <div className="w-full h-1.5 rounded-full bg-[#e8e3da] dark:bg-white/12 overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${posPct}%`,
+            backgroundColor: '#9a723c',
+          }}
+        />
+      </div>
+      <div
+        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border-2 border-white dark:border-[#141413] shadow-sm pointer-events-none"
+        style={{
+          left: `${posPct}%`,
+          backgroundColor: accentHex || '#9a723c',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.28)',
+        }}
+      />
+    </div>
+  )
 }
 
 interface FormulaPanelProps {
   lang: Lang
   dict: ColorCalcDict
   pigments: Pigment[]
-  loading: boolean
-  loadError: boolean
-  onRetryLoad: () => void
   paints: PaintPart[]
   amountRefs: MutableRefObject<AmountInputMap>
   totalAmount: number
+  displayHex: string
+  displayLab: { l: number; a: number; b: number } | null
+  coatHexes: string[]
+  isWet: boolean
+  setIsWet: (v: boolean) => void
+  illuminant: IlluminantId
+  setIlluminant: (v: IlluminantId) => void
+  coats: number
+  setCoats: (v: number) => void
+  substrateId: string
+  substrateHex: string
+  substrateDisplayHex?: string
+  onSelectSubstrate: (id: string, hex: string) => void
+  targetHex: string | null
+  deltaE: number | null
+  onClearTarget: () => void
+  copied: boolean
+  onCopyRecipe: () => void
+  onScaleVolume: (targetMl: number) => void
   onAddPaint: () => void
   onRemovePaint: (id: string) => void
   onUpdatePaint: (id: string, field: keyof PaintPart, value: string) => void
-  onClearAmounts: () => void
-  onScaleToVolume: (targetMl: number) => void
-  isWet: boolean
-  onToggleWet: () => void
-  illuminant: IlluminantType
-  onIlluminantChange: (ill: IlluminantType) => void
-  substrateId: SubstratePresetId | 'custom'
-  customSubstrateHex: string
-  substrateDisplayHex?: string
-  onSelectSubstrate: (id: SubstratePresetId) => void
-  onCustomSubstrateChange: (hex: string) => void
-  layerSwatches: LayerSwatchItem[] | null
-  selectedCoatIdx: number
-  onSelectCoat: (idx: number) => void
-  displayHex: string | null
-  activeLab: LabColor | null
-  activeTarget: string | null
-  onClearTarget: () => void
-  liveDeltaE: number | null
-  copied: boolean
-  onCopyHex: () => void
-  isAutoAdjusting: boolean
-  onAutoAdjust: () => void
-  onInspectPigment: (id: string) => void
-  onOpenGuide: () => void
-}
-
-const ILLUMINANT_ORDER: IlluminantType[] = ['D65', 'A', 'cool', 'twilight']
-const BATCH_PRESETS = [10, 20, 25, 50, 100] as const
-
-const SUBSTRATE_COPY: Record<
-  Lang,
-  {
-    title: string
-    custom: string
-    raw: string
-    dryShort: string
-    wetShort: string
-    fullShort: string
-    batchLabel: string
-    batchLimit: string
-    copyRecipe: string
-  }
-> = {
-  ru: {
-    title: 'Кожа-подложка',
-    custom: 'Своя',
-    raw: 'Кожа до',
-    dryShort: 'Сухая',
-    wetShort: 'Мокрая',
-    fullShort: 'Полн. ∞',
-    batchLabel: 'Объём партии',
-    batchLimit: 'до 1000 мл',
-    copyRecipe: 'Рецепт',
-  },
-  uk: {
-    title: 'Шкіра-підкладка',
-    custom: 'Своя',
-    raw: 'Шкіра до',
-    dryShort: 'Суха',
-    wetShort: 'Мокра',
-    fullShort: 'Повн. ∞',
-    batchLabel: 'Обʼєм партії',
-    batchLimit: 'до 1000 мл',
-    copyRecipe: 'Рецепт',
-  },
-  de: {
-    title: 'Grundleder',
-    custom: 'Eigene',
-    raw: 'Vorher',
-    dryShort: 'Trocken',
-    wetShort: 'Nass',
-    fullShort: 'Voll ∞',
-    batchLabel: 'Zielmenge',
-    batchLimit: 'bis 1000 ml',
-    copyRecipe: 'Rezept',
-  },
-}
-
-const ILLUMINANT_GLOW: Record<IlluminantType, string> = {
-  D65: 'radial-gradient(ellipse at 26% 18%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.16) 100%)',
-  A: 'radial-gradient(ellipse at 26% 18%, rgba(255,222,168,0.22) 0%, rgba(255,198,120,0.03) 50%, rgba(20,10,0,0.2) 100%)',
-  cool: 'radial-gradient(ellipse at 26% 18%, rgba(240,248,255,0.18) 0%, rgba(220,236,255,0.02) 50%, rgba(0,8,20,0.16) 100%)',
-  twilight: 'radial-gradient(ellipse at 26% 18%, rgba(186,214,255,0.2) 0%, rgba(130,170,255,0.03) 50%, rgba(4,10,28,0.22) 100%)',
-}
-
-const MAX_MANUAL_ML = 1000
-const SLIDER_TICKS = [
-  { ml: 0, pct: 0, label: '0' },
-  { ml: 5, pct: 35, label: '5' },
-  { ml: 30, pct: 70, label: '30' },
-  { ml: 100, pct: 100, label: '100' },
-] as const
-
-function mlToSliderPos(ml: number): number {
-  if (!Number.isFinite(ml) || ml <= 0) return 0
-  if (ml <= 5) return Math.round((ml / 5) * 350)
-  if (ml <= 30) return Math.round(350 + ((ml - 5) / 25) * 350)
-  if (ml <= 100) return Math.round(700 + ((ml - 30) / 70) * 300)
-  return 1000
-}
-
-function sliderPosToMl(pos: number): number {
-  if (!Number.isFinite(pos) || pos <= 0) return 0
-  if (pos <= 350) return Math.round((pos / 350) * 5 * 10) / 10
-  if (pos <= 700) return Math.round((5 + ((pos - 350) / 350) * 25) * 2) / 2
-  return Math.round(30 + ((pos - 700) / 300) * 70)
-}
-
-function getMicroStep(currentMl: number, deltaDir: -1 | 1): number {
-  if (deltaDir < 0) {
-    if (currentMl <= 5) return 0.1
-    if (currentMl <= 30) return 0.5
-    return 1
-  }
-  if (currentMl < 5) return 0.1
-  if (currentMl < 30) return 0.5
-  return 1
-}
-
-function formatMlValue(ml: number): string {
-  if (!Number.isFinite(ml) || ml <= 0) return ''
-  return String(Math.round(ml * 10) / 10)
+  onResetFormula: () => void
+  onInspectPigment: (pigmentId: string) => void
+  onOpenGuide: (tab?: 'science' | 'guide') => void
+  isLoadingPigments: boolean
 }
 
 export function FormulaPanel({
   lang,
   dict,
   pigments,
-  loading,
-  loadError,
-  onRetryLoad,
   paints,
   amountRefs,
   totalAmount,
+  displayHex,
+  displayLab,
+  coatHexes,
+  isWet,
+  setIsWet,
+  illuminant,
+  setIlluminant,
+  coats,
+  setCoats,
+  substrateId,
+  substrateHex,
+  substrateDisplayHex,
+  onSelectSubstrate,
+  targetHex,
+  deltaE,
+  onClearTarget,
+  copied,
+  onCopyRecipe,
+  onScaleVolume,
   onAddPaint,
   onRemovePaint,
   onUpdatePaint,
-  onClearAmounts,
-  onScaleToVolume,
-  isWet,
-  onToggleWet,
-  illuminant,
-  onIlluminantChange,
-  substrateId,
-  customSubstrateHex,
-  substrateDisplayHex,
-  onSelectSubstrate,
-  onCustomSubstrateChange,
-  layerSwatches,
-  selectedCoatIdx,
-  onSelectCoat,
-  displayHex,
-  activeLab,
-  activeTarget,
-  onClearTarget,
-  liveDeltaE,
-  copied,
-  onCopyHex,
-  isAutoAdjusting,
-  onAutoAdjust,
+  onResetFormula,
   onInspectPigment,
   onOpenGuide,
+  isLoadingPigments,
 }: FormulaPanelProps) {
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [showNotes, setShowNotes] = useState(false)
-  const [showStickySwatch, setShowStickySwatch] = useState(false)
-  const [splitPct, setSplitPct] = useState(28)
-  const [isDraggingSplit, setIsDraggingSplit] = useState(false)
+  const [splitPct, setSplitPct] = useState(50)
+  const [showFloatingSwatch, setShowFloatingSwatch] = useState(false)
   const [customBatchMl, setCustomBatchMl] = useState('')
-
   const stageRef = useRef<HTMLDivElement | null>(null)
-  const lastTickTimeRef = useRef<number>(0)
-  const lastValuesRef = useRef<NumberRecord>({})
-  const splitSnappedRef = useRef<boolean>(false)
-  const sliderGestureRef = useRef<SliderGestureState | null>(null)
+  const customSubInputRef = useRef<HTMLInputElement | null>(null)
 
-  const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
-  const squareColor = displayHex || '#1E1B19'
-  const activeIllInfo = dict.illuminants[illuminant]
-  const subCopy = SUBSTRATE_COPY[lang] || SUBSTRATE_COPY.ru
-  const hairline = 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)'
+  const hasMix = totalAmount > 0 && Boolean(displayHex)
+  const leftHex = targetHex || substrateDisplayHex || substrateHex
+  const rightHex = hasMix ? displayHex : '#1b1a18'
 
-  const rawSubstrateHex =
-    substrateDisplayHex ||
-    (substrateId === 'custom'
-      ? customSubstrateHex
-      : SUBSTRATE_PRESETS.find((p) => p.id === substrateId)?.fallbackHex || '#D4BE9E')
-
-  const hasComparisonCurtain = Boolean(activeTarget) || Boolean(layerSwatches && displayHex)
-  const leftCompareHex = activeTarget || rawSubstrateHex
-  const leftCompareLabel = activeTarget ? `${dict.target} · ${activeTarget}` : subCopy.raw
-
-  useEffect(() => {
-    setSplitPct(activeTarget ? 50 : 28)
-  }, [activeTarget])
-
-  // Плавающая плашка появляется СРАЗУ, как только сам образец цвета (stageRef) скрывается сверху
   useEffect(() => {
     const el = stageRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0]
-        setShowStickySwatch(!entry.isIntersecting && entry.boundingClientRect.bottom <= 48)
+        if (!entry) return
+        setShowFloatingSwatch(!entry.isIntersecting && entry.boundingClientRect.top < 40)
       },
       { threshold: 0.05 }
     )
@@ -256,683 +268,545 @@ export function FormulaPanel({
     return () => observer.disconnect()
   }, [])
 
-  const updateSplitFromClientX = (clientX: number) => {
-    const rect = stageRef.current?.getBoundingClientRect()
-    if (!rect || rect.width <= 0) return
-    const raw = ((clientX - rect.left) / rect.width) * 100
-    const clamped = Math.max(8, Math.min(92, Math.round(raw)))
-    setSplitPct(clamped)
+  const illuminantList: { id: IlluminantId; label: string; badge: string }[] = [
+    { id: 'D65', label: dict.illumD65, badge: 'D65 · 6500K' },
+    { id: 'A', label: dict.illumA, badge: 'Бутик · 2856K' },
+    { id: 'cool', label: dict.illumCool, badge: 'Студия · 4200K' },
+    { id: 'twilight', label: dict.illumTwilight, badge: 'Сумерки · 9000K' },
+  ]
+  const activeIllum =
+    illuminantList.find((x) => x.id === illuminant) || illuminantList[0]
 
-    const nearCenter = Math.abs(clamped - 50) <= 2
-    if (nearCenter && !splitSnappedRef.current) {
-      splitSnappedRef.current = true
-      hapticSelect()
-    } else if (!nearCenter) {
-      splitSnappedRef.current = false
-    }
-  }
+  const coatLabels =
+    lang === 'uk'
+      ? ['1 шар', '2 шари', '3 шари', 'Повн. ∞']
+      : lang === 'de'
+        ? ['1 Schicht', '2 Sch.', '3 Sch.', 'Voll ∞']
+        : ['1 слой', '2 слоя', '3 слоя', 'Полн. ∞']
 
-  const handleSliderChange = (paintId: string, rawPos: number) => {
-    const nextMl = sliderPosToMl(rawPos)
-    const prevMl = lastValuesRef.current[paintId] ?? -1
+  const uiCopy =
+    lang === 'uk'
+      ? {
+          scienceBtn: 'Методика',
+          guideBtn: 'Шпаргалка',
+          resetBtn: 'Скинути',
+          copyRecipeBtn: 'Скопіювати · Рецепт',
+          copiedBtn: 'Скопійовано',
+          batchTitle: 'Об’єм партії (до 1000 мл)',
+          leatherBefore: 'Шкіра до',
+          targetLabel: 'Еталон',
+          customLeather: '+ Своя',
+          recipeShort: 'Рецепт',
+          unmixed: 'Зразок · UNMIXED',
+        }
+      : lang === 'de'
+        ? {
+            scienceBtn: 'Methodik',
+            guideBtn: 'Leitfaden',
+            resetBtn: 'Zurücksetzen',
+            copyRecipeBtn: 'Rezept kopieren',
+            copiedBtn: 'Kopiert',
+            batchTitle: 'Chargenmenge (bis 1000 ml)',
+            leatherBefore: 'Leder vorher',
+            targetLabel: 'Referenz',
+            customLeather: '+ Eigene',
+            recipeShort: 'Rezept',
+            unmixed: 'Probe · UNMIXED',
+          }
+        : {
+            scienceBtn: 'Методика',
+            guideBtn: 'Шпаргалка',
+            resetBtn: 'Сбросить',
+            copyRecipeBtn: 'Скопировать · Рецепт',
+            copiedBtn: 'Скопировано',
+            batchTitle: 'Объём партии (до 1000 мл)',
+            leatherBefore: 'Кожа до',
+            targetLabel: 'Эталон',
+            customLeather: '+ Своя',
+            recipeShort: 'Рецепт',
+            unmixed: 'Образец · UNMIXED',
+          }
 
-    if (nextMl !== prevMl) {
-      lastValuesRef.current[paintId] = nextMl
-      onUpdatePaint(paintId, 'amount', formatMlValue(nextMl))
+  const deltaVerdict =
+    deltaE === null
+      ? null
+      : deltaE <= 2
+        ? {
+            text:
+              lang === 'uk'
+                ? 'Еталонний допуск Haute Couture (ΔE ≤ 2.0)'
+                : lang === 'de'
+                  ? 'Haute-Couture-Referenz (ΔE ≤ 2.0)'
+                  : 'Эталонный допуск Haute Couture (ΔE ≤ 2.0)',
+            cls: 'text-emerald-700 dark:text-emerald-400',
+          }
+        : deltaE <= 5
+          ? {
+              text:
+                lang === 'uk'
+                  ? 'Комерційний допуск (ΔE 2.0 – 5.0)'
+                  : lang === 'de'
+                    ? 'Kommerzielle Toleranz (ΔE 2.0 – 5.0)'
+                    : 'Коммерческий допуск (ΔE 2.0 – 5.0)',
+              cls: 'text-amber-700 dark:text-amber-400',
+            }
+          : {
+              text:
+                lang === 'uk'
+                  ? 'Потрібне коригування тону (ΔE > 5.0)'
+                  : lang === 'de'
+                    ? 'Tonkorrektur erforderlich (ΔE > 5.0)'
+                    : 'Требуется корректировка тона (ΔE > 5.0)',
+              cls: 'text-rose-700 dark:text-rose-400',
+            }
 
-      const now = Date.now()
-      const hitDetent =
-        nextMl === 0 ||
-        nextMl === 5 ||
-        nextMl === 30 ||
-        nextMl === 100 ||
-        (prevMl >= 0 &&
-          ((prevMl < 5 && nextMl >= 5) ||
-            (prevMl > 5 && nextMl <= 5) ||
-            (prevMl < 30 && nextMl >= 30) ||
-            (prevMl > 30 && nextMl <= 30)))
-
-      if (hitDetent) {
-        hapticConfirm()
-        lastTickTimeRef.current = now
-      } else if (now - lastTickTimeRef.current >= 55) {
-        hapticSelect()
-        lastTickTimeRef.current = now
-      }
-    }
-  }
-
-  const handleStep = (paintId: string, currentMl: number, dir: -1 | 1) => {
-    const step = getMicroStep(currentMl, dir)
-    const nextMl = Math.max(0, Math.min(MAX_MANUAL_ML, Math.round((currentMl + dir * step) * 10) / 10))
-    lastValuesRef.current[paintId] = nextMl
-    onUpdatePaint(paintId, 'amount', formatMlValue(nextMl))
-    hapticTap()
+  const clampAmountInput = (raw: string): string => {
+    if (raw === '') return ''
+    const cleaned = raw.replace(',', '.')
+    const num = parseFloat(cleaned)
+    if (isNaN(num) || num < 0) return ''
+    if (num > MAX_ML_INPUT) return String(MAX_ML_INPUT)
+    return cleaned
   }
 
   const applyCustomBatch = () => {
-    const num = parseFloat(customBatchMl.replace(',', '.'))
-    if (!Number.isFinite(num) || num <= 0) return
-    onScaleToVolume(Math.max(1, Math.min(MAX_MANUAL_ML, num)))
+    const val = parseFloat(customBatchMl.replace(',', '.'))
+    if (isNaN(val) || val <= 0) return
+    const clamped = Math.min(MAX_ML_INPUT, Math.max(1, val))
+    hapticSelect()
+    onScaleVolume(clamped)
     setCustomBatchMl('')
   }
 
-  const activeSegments = paints
-    .map((p) => {
-      const val = parseFloat(p.amount) || 0
-      const pig = pigments.find((item) => item.id === p.pigmentId)
-      return {
-        id: p.id,
-        pct: totalAmount > 0 ? (val / totalAmount) * 100 : 0,
-        hex: pig?.hex || '#C9A86A',
-      }
-    })
-    .filter((s) => s.pct > 0)
-
   return (
-    <div className="flex flex-col gap-6 relative">
-      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА (лёгкая, без backdrop-blur — мгновенная на Android) */}
-      <AnimatePresence>
-        {showStickySwatch && (
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.14 }}
-            className="fixed left-4 right-4 z-40 max-w-[680px] mx-auto px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 shadow-lg"
-            style={{
-              top: 'calc(10px + env(safe-area-inset-top, 0px))',
-              background: 'var(--color-surface, #141416)',
-              borderColor: 'color-mix(in srgb, var(--color-accent, #C9A86A) 38%, transparent)',
-            }}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div
-                className="w-10 h-10 rounded-xl shrink-0 relative overflow-hidden border border-black/20"
-                style={{ backgroundColor: squareColor }}
-              >
-                <div className="absolute inset-0 pointer-events-none" style={{ background: ILLUMINANT_GLOW[illuminant] }} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-serif text-[20px] leading-none tabular-nums">
-                    {displayHex || '#------'}
-                  </span>
-                  {liveDeltaE !== null && (
-                    <span
-                      className="px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold whitespace-nowrap"
-                      style={{
-                        backgroundColor: 'rgba(0,0,0,0.68)',
-                        color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
-                      }}
-                    >
-                      ΔE {liveDeltaE.toFixed(1)}
-                    </span>
-                  )}
-                </div>
-                <span className="block text-[12px] font-sans opacity-65 truncate mt-0.5 tabular-nums">
-                  {activeCoat ? (activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label) : dict.mix} ·{' '}
-                  {totalAmount >= 1000
-                    ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
-                    : `${totalAmount.toFixed(1)} ${dict.ml}`}
+    <div className="space-y-4">
+      {/* Fixed Floating Live Swatch Bar */}
+      {showFloatingSwatch && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-[680px] rounded-2xl border border-[#141413]/14 dark:border-white/15 bg-[#faf8f4] dark:bg-[#191816] shadow-lg px-3 py-2 flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-10 h-10 rounded-xl border border-[#141413]/15 dark:border-white/15 shrink-0"
+              style={{ backgroundColor: rightHex }}
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[14px] font-semibold text-[#141413] dark:text-[#f5f3ee]">
+                  {hasMix ? displayHex.toUpperCase() : '#------'}
                 </span>
+                {deltaE !== null && hasMix && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-[#141413] text-[#faf8f4] dark:bg-white/15 font-mono text-[10.5px] font-semibold">
+                    ΔE {deltaE.toFixed(1)}
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-[#736f68] dark:text-[#9a968e] truncate">
+                {coatLabels[coats - 1]} · {formatMl(totalAmount)} мл
               </div>
             </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={onCopyHex}
-              disabled={!displayHex}
-              className="h-9 px-3.5 rounded-xl text-[12px] font-sans font-semibold border shrink-0 cursor-pointer disabled:opacity-30"
-              style={{
-                borderColor: 'var(--color-accent, #C9A86A)',
-                background: copied ? 'var(--color-accent, #C9A86A)' : 'transparent',
-                color: copied ? 'var(--color-bg, #0B0B0C)' : 'var(--color-accent, #C9A86A)',
-              }}
-            >
-              {copied ? dict.copied : subCopy.copyRecipe}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <button
+            type="button"
+            disabled={!hasMix}
+            onClick={onCopyRecipe}
+            className={`px-3 py-2 rounded-xl text-[12px] font-semibold border transition-colors shrink-0 ${
+              hasMix
+                ? 'border-[#9a723c]/35 bg-[#f3ece0] dark:bg-[#9a723c]/20 text-[#6e4f24] dark:text-[#e6c48f]'
+                : 'border-[#141413]/8 text-[#a39f97] opacity-50'
+            }`}
+          >
+            {copied ? uiCopy.copiedBtn : uiCopy.recipeShort}
+          </button>
+        </div>
+      )}
 
-      {/* СЦЕНА ВЫКРАСКИ КОЖИ */}
-      <section
-        className="rounded-2xl border overflow-hidden"
-        style={{
-          background: 'var(--color-surface, #141416)',
-          borderColor: hairline,
-        }}
-      >
-        <div
-          className="px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-3 border-b"
-          style={{ borderColor: hairline }}
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="text-[12px] font-sans uppercase tracking-[0.12em] font-semibold opacity-80">
-              {dict.result}
+      {/* Swatch Stage Card */}
+      <div className="rounded-2xl border border-[#141413]/10 dark:border-white/10 bg-white dark:bg-[#141413] p-4 sm:p-5">
+        {/* Header Row */}
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[#736f68] dark:text-[#9a968e]">
+              {dict.swatchCardTitle}
             </span>
             <button
               type="button"
               onClick={() => {
-                setShowNotes((v) => !v)
                 hapticTap()
+                onOpenGuide('science')
               }}
-              className="w-6 h-6 rounded-full text-[12px] font-serif italic flex items-center justify-center border cursor-pointer"
-              style={{
-                borderColor: showNotes ? 'var(--color-accent, #C9A86A)' : hairline,
-                color: showNotes ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
-              }}
-              aria-label="Info"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-[#9a723c]/30 bg-[#9a723c]/8 text-[11px] font-medium text-[#8a632f] dark:text-[#d9b57d]"
             >
-              i
+              <span>ⓘ</span>
+              <span>{uiCopy.scienceBtn}</span>
             </button>
             <button
               type="button"
-              onClick={onOpenGuide}
-              className="text-[12px] font-sans underline underline-offset-4 cursor-pointer bg-transparent border-none p-0 opacity-85"
-              style={{ color: 'var(--color-accent, #C9A86A)' }}
+              onClick={() => {
+                hapticTap()
+                onOpenGuide('guide')
+              }}
+              className="text-[11.5px] font-medium text-[#736f68] dark:text-[#9a968e] underline underline-offset-4 decoration-[#141413]/20 dark:decoration-white/20"
             >
-              {dict.guideBtn}
+              {uiCopy.guideBtn}
             </button>
-            {activeTarget && (
-              <button
-                type="button"
-                onClick={onClearTarget}
-                className="text-[12px] font-sans font-medium px-2 py-0.5 rounded-md cursor-pointer bg-transparent border-none"
-                style={{ color: 'var(--color-danger, #f87171)' }}
-              >
-                ✕ {dict.reset}
-              </button>
-            )}
           </div>
 
-          <div
-            className="inline-flex p-0.5 rounded-xl border"
-            style={{
-              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
-              borderColor: hairline,
-            }}
-          >
+          {targetHex && (
             <button
               type="button"
               onClick={() => {
-                if (isWet) onToggleWet()
+                hapticTap()
+                onClearTarget()
               }}
-              className="px-3 py-1 rounded-lg text-[12px] font-sans font-medium cursor-pointer"
-              style={{
-                background: !isWet ? 'var(--color-ink, #F4F0E8)' : 'transparent',
-                color: !isWet ? 'var(--color-bg, #0B0B0C)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 65%, transparent)',
-              }}
+              className="text-[11.5px] font-medium text-rose-700 dark:text-rose-400"
             >
-              {subCopy.dryShort}
+              ✕ {dict.clearTarget}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!isWet) onToggleWet()
-              }}
-              className="px-3 py-1 rounded-lg text-[12px] font-sans font-medium cursor-pointer"
-              style={{
-                background: isWet ? 'var(--color-accent, #C9A86A)' : 'transparent',
-                color: isWet ? 'var(--color-bg, #0B0B0C)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 65%, transparent)',
-              }}
-            >
-              {subCopy.wetShort}
-            </button>
-          </div>
+          )}
         </div>
 
-        {showNotes && (
-          <div
-            className="px-5 py-3 text-[13px] leading-relaxed font-sans opacity-80 border-b flex flex-col gap-1.5"
-            style={{
-              borderColor: hairline,
-              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 2.5%, transparent)',
+        {/* Dry / Wet 2-segment toggle */}
+        <div className="inline-flex rounded-xl bg-[#f3f0ea] dark:bg-white/[0.06] p-1 border border-[#141413]/8 dark:border-white/10 mb-3">
+          <button
+            type="button"
+            onClick={() => {
+              hapticSelect()
+              setIsWet(false)
             }}
+            className={`px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+              !isWet
+                ? 'bg-[#141413] text-[#faf8f4] dark:bg-[#f5f3ee] dark:text-[#141413]'
+                : 'text-[#6c6861] dark:text-[#9a968e]'
+            }`}
           >
-            <span>{isWet ? dict.wetExplain : dict.dryExplain}</span>
-            {layerSwatches && (
-              <span className="opacity-85">{dict.coatExplanations[selectedCoatIdx]}</span>
-            )}
-          </div>
-        )}
+            {dict.dry}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              hapticSelect()
+              setIsWet(true)
+            }}
+            className={`px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+              isWet
+                ? 'bg-[#141413] text-[#faf8f4] dark:bg-[#f5f3ee] dark:text-[#141413]'
+                : 'text-[#6c6861] dark:text-[#9a968e]'
+            }`}
+          >
+            {dict.wet}
+          </button>
+        </div>
 
-        {/* ГЛАВНАЯ ВЫКРАСКА (без тяжёлого CPU feTurbulence — 60fps на Android) */}
+        {/* Interactive Leather Split Swatch (zero feTurbulence / zero backdrop-blur) */}
         <div
           ref={stageRef}
-          onPointerDown={(e) => {
-            if (!hasComparisonCurtain) return
-            e.currentTarget.setPointerCapture(e.pointerId)
-            setIsDraggingSplit(true)
-            hapticTap()
-            updateSplitFromClientX(e.clientX)
-          }}
+          style={{ touchAction: 'pan-y' }}
           onPointerMove={(e) => {
-            if (!isDraggingSplit || !hasComparisonCurtain) return
-            updateSplitFromClientX(e.clientX)
+            if (e.buttons !== 1) return
+            const rect = e.currentTarget.getBoundingClientRect()
+            if (rect.width <= 0) return
+            const pct = ((e.clientX - rect.left) / rect.width) * 100
+            setSplitPct(Math.max(12, Math.min(88, pct)))
           }}
-          onPointerUp={() => setIsDraggingSplit(false)}
-          onPointerCancel={() => setIsDraggingSplit(false)}
-          className="relative w-full overflow-hidden select-none touch-none"
-          style={{
-            height: 200,
-            cursor: hasComparisonCurtain ? 'ew-resize' : 'default',
-          }}
+          className="relative h-48 sm:h-52 rounded-2xl overflow-hidden border border-[#141413]/12 dark:border-white/12 select-none"
         >
-          <div className="absolute inset-0" style={{ backgroundColor: squareColor }} />
-
-          {hasComparisonCurtain && (
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundColor: leftCompareHex,
-                clipPath: `inset(0 ${100 - splitPct}% 0 0)`,
-              }}
-            />
-          )}
-
-          {/* Лёгкая GPU-текстура кожи без CPU-тормозов */}
+          {/* Right (Mixed Paint) */}
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0"
             style={{
-              opacity: isWet ? 0.08 : 0.14,
-              backgroundImage:
-                'radial-gradient(rgba(0,0,0,0.45) 0.75px, transparent 0.75px), radial-gradient(rgba(255,255,255,0.28) 0.65px, transparent 0.65px)',
-              backgroundSize: '7px 7px',
-              backgroundPosition: '0 0, 3.5px 3.5px',
+              backgroundColor: rightHex,
+              backgroundImage: isWet
+                ? 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.03) 38%, rgba(0,0,0,0.14) 100%)'
+                : 'radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px)',
+              backgroundSize: isWet ? '100% 100%' : '6px 6px',
             }}
           />
 
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: ILLUMINANT_GLOW[illuminant] }}
-          />
-
-          {isWet && (
+          {/* Left (Substrate Before or Target Reference) */}
+          {(hasMix || targetHex) && (
             <div
-              className="absolute inset-0 pointer-events-none"
+              className="absolute inset-y-0 left-0 border-r border-white/60"
               style={{
-                background:
-                  'linear-gradient(125deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.05) 30%, rgba(255,255,255,0) 52%, rgba(0,0,0,0.12) 100%)',
+                width: `${splitPct}%`,
+                backgroundColor: leftHex,
+                backgroundImage:
+                  'radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)',
+                backgroundSize: '6px 6px',
               }}
             />
           )}
 
-          {hasComparisonCurtain && (
+          {/* Split Handle */}
+          {(hasMix || targetHex) && (
             <div
-              className="absolute top-0 bottom-0 pointer-events-none z-20"
               style={{ left: `${splitPct}%` }}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }}
+              onPointerMove={(e) => {
+                if (e.buttons !== 1) return
+                const parent = stageRef.current
+                if (!parent) return
+                const rect = parent.getBoundingClientRect()
+                if (rect.width <= 0) return
+                const pct = ((e.clientX - rect.left) / rect.width) * 100
+                setSplitPct(Math.max(12, Math.min(88, pct)))
+              }}
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-[#141413]/85 text-white border border-white/50 flex items-center justify-center text-[11px] font-bold cursor-ew-resize shadow"
             >
-              <div
-                className="w-[1.5px] h-full -translate-x-1/2"
-                style={{ background: 'rgba(255,255,255,0.82)' }}
-              />
-              <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full flex items-center justify-center border"
-                style={{
-                  transform: `translate(-50%, -50%) scale(${isDraggingSplit ? 1.1 : 1})`,
-                  background: 'rgba(18,18,20,0.78)',
-                  borderColor: 'rgba(255,255,255,0.7)',
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l-3 3 3 3M16 9l3 3-3 3" />
-                </svg>
-              </div>
+              ‹›
             </div>
           )}
 
-          <div className="relative z-10 p-3.5 flex items-center justify-between w-full gap-2 pointer-events-none">
-            <span
-              className="px-2.5 py-1 rounded-md text-[11px] font-mono tracking-[0.04em] text-white"
-              style={{ backgroundColor: 'rgba(0,0,0,0.54)' }}
-            >
-              {activeIllInfo.short} · {activeIllInfo.temp}
-            </span>
-
-            {liveDeltaE !== null && (
-              <span
-                className="px-2.5 py-1 rounded-md text-[12px] font-mono font-semibold whitespace-nowrap"
-                style={{
-                  backgroundColor: 'rgba(0,0,0,0.68)',
-                  color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
-                }}
-              >
-                ΔE₀₀ {liveDeltaE.toFixed(1)}
-              </span>
-            )}
+          {/* Top Left Illuminant Pill */}
+          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#141413]/75 text-[#faf8f4] font-mono text-[11px]">
+            {activeIllum.badge}
           </div>
 
-          <div className="absolute bottom-3 left-3.5 right-3.5 z-10 flex items-end justify-between gap-2 pointer-events-none">
-            {hasComparisonCurtain ? (
-              <span
-                className="px-2.5 py-1 rounded-md text-[11px] font-mono text-white truncate max-w-[46%]"
-                style={{ backgroundColor: 'rgba(0,0,0,0.54)' }}
-              >
-                {leftCompareLabel}
-              </span>
-            ) : (
-              <span />
-            )}
+          {/* Top Right DeltaE Pill */}
+          {deltaE !== null && hasMix && (
+            <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-[#141413]/80 font-mono text-[11.5px] font-semibold text-emerald-300">
+              ΔE₀₀ {deltaE.toFixed(1)}
+            </div>
+          )}
 
-            <span
-              className="px-2.5 py-1 rounded-md text-[11px] font-mono text-white whitespace-nowrap"
-              style={{ backgroundColor: 'rgba(0,0,0,0.58)' }}
-            >
-              {activeCoat ? (activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label) : dict.mix} ·{' '}
-              {displayHex || 'UNMIXED'}
-            </span>
+          {/* Bottom Left Label */}
+          {(hasMix || targetHex) && (
+            <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-[#141413]/70 text-[#faf8f4] text-[11px] font-medium">
+              {targetHex
+                ? `${uiCopy.targetLabel} · ${targetHex.toUpperCase()}`
+                : uiCopy.leatherBefore}
+            </div>
+          )}
+
+          {/* Bottom Right Label */}
+          <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg bg-[#141413]/75 text-[#faf8f4] font-mono text-[11px]">
+            {hasMix
+              ? `${coatLabels[coats - 1]} · ${displayHex.toUpperCase()}`
+              : uiCopy.unmixed}
           </div>
         </div>
 
-        {/* ГЛАВНЫЕ ЦИФРЫ (только цвет HEX + CIELAB + Скопировать рецепт, без лишнего объёма здесь) */}
-        <div
-          className="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b"
-          style={{ borderColor: hairline }}
-        >
+        {/* HEX + CIELAB + Copy Recipe Row */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="flex items-baseline gap-3">
-              <span className="font-serif text-[32px] leading-none tracking-tight tabular-nums">
-                {displayHex || '#------'}
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="font-serif text-[28px] leading-none tracking-tight text-[#141413] dark:text-[#f5f3ee]">
+                {hasMix ? displayHex.toUpperCase() : '#------'}
               </span>
-              {activeLab && (
-                <span className="font-mono text-[12px] opacity-60 tabular-nums">
-                  L*{activeLab.L.toFixed(0)} a*{activeLab.a.toFixed(0)} b*{activeLab.b.toFixed(0)}
+              {displayLab && hasMix && (
+                <span className="font-mono text-[12px] text-[#736f68] dark:text-[#9a968e]">
+                  L*{Math.round(displayLab.l)} a*{Math.round(displayLab.a)} b*
+                  {Math.round(displayLab.b)}
                 </span>
               )}
             </div>
-            {liveDeltaE !== null && (
-              <p className="text-[12px] font-sans opacity-70 mt-1">
-                {liveDeltaE <= 2
-                  ? dict.ciePerfect
-                  : liveDeltaE <= 5
-                  ? dict.cieAcceptable
-                  : dict.cieBad}
-              </p>
+            {deltaVerdict && hasMix && (
+              <div className={`text-[12px] font-medium mt-1 ${deltaVerdict.cls}`}>
+                {deltaVerdict.text}
+              </div>
             )}
           </div>
 
           <button
             type="button"
-            onClick={onCopyHex}
-            disabled={!displayHex}
-            className="h-10 px-4 rounded-xl text-[12.5px] font-sans font-semibold border disabled:opacity-30 cursor-pointer"
-            style={{
-              borderColor: 'var(--color-accent, #C9A86A)',
-              background: copied ? 'var(--color-accent, #C9A86A)' : 'transparent',
-              color: copied ? 'var(--color-bg, #0B0B0C)' : 'var(--color-accent, #C9A86A)',
-            }}
+            disabled={!hasMix}
+            onClick={onCopyRecipe}
+            className={`px-4 py-2.5 rounded-xl text-[12.5px] font-semibold border transition-colors ${
+              hasMix
+                ? copied
+                  ? 'bg-[#8a632f] text-white border-[#8a632f]'
+                  : 'border-[#9a723c]/40 bg-[#faf5ec] dark:bg-[#9a723c]/15 text-[#6e4f24] dark:text-[#e6c48f]'
+                : 'border-[#141413]/10 text-[#a39f97] opacity-50'
+            }`}
           >
-            {copied ? dict.copied : `${dict.copy} · ${subCopy.copyRecipe}`}
+            {copied ? uiCopy.copiedBtn : uiCopy.copyRecipeBtn}
           </button>
         </div>
 
-        {/* ШКАЛА ОСВЕЩЕНИЯ */}
-        <div
-          className="grid grid-cols-4 border-b divide-x"
-          style={{ borderColor: hairline }}
-        >
-          {ILLUMINANT_ORDER.map((ill) => {
-            const active = illuminant === ill
-            const info = dict.illuminants[ill]
+        {/* 4-Column Illuminant Selector */}
+        <div className="grid grid-cols-4 gap-1.5 p-1 mt-4 rounded-xl bg-[#f3f0ea] dark:bg-white/[0.05] border border-[#141413]/8 dark:border-white/10">
+          {illuminantList.map((il) => {
+            const active = illuminant === il.id
             return (
               <button
-                key={ill}
+                key={il.id}
                 type="button"
-                onClick={() => onIlluminantChange(ill)}
-                className="py-2.5 px-1 text-[12px] font-sans font-medium cursor-pointer text-center"
-                style={{
-                  borderColor: hairline,
-                  background: active
-                    ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 14%, transparent)'
-                    : 'transparent',
-                  color: active ? 'var(--color-accent, #C9A86A)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 68%, transparent)',
+                onClick={() => {
+                  hapticSelect()
+                  setIlluminant(il.id)
                 }}
-                title={`${info.label} (${info.temp})`}
+                className={`py-2 rounded-lg text-[12px] font-medium transition-colors ${
+                  active
+                    ? 'bg-white dark:bg-[#232220] text-[#141413] dark:text-[#f5f3ee] shadow-xs'
+                    : 'text-[#6c6861] dark:text-[#9a968e]'
+                }`}
               >
-                {info.short}
+                {il.label}
               </button>
             )
           })}
         </div>
 
-        {/* ПОДЛОЖКА КОЖИ + 4 СЛОЯ */}
-        {layerSwatches && (
-          <div className="flex flex-col">
-            <div
-              className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b"
-              style={{ borderColor: hairline }}
-            >
-              <span className="text-[12px] font-sans opacity-60">{subCopy.title}</span>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                {SUBSTRATE_PRESETS.map((preset) => {
-                  const active = substrateId === preset.id
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => onSelectSubstrate(preset.id)}
-                      className="inline-flex items-center gap-1.5 text-[12px] font-sans cursor-pointer bg-transparent border-none p-0"
-                      style={{
-                        color: active ? 'var(--color-ink, #F4F0E8)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 62%, transparent)',
-                        fontWeight: active ? 600 : 400,
-                      }}
-                    >
-                      <span
-                        className="w-4 h-4 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: preset.fallbackHex,
-                          boxShadow: active
-                            ? '0 0 0 2px var(--color-surface, #141416), 0 0 0 3.5px var(--color-accent, #C9A86A)'
-                            : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
-                        }}
-                      />
-                      <span>{preset.label[lang]}</span>
-                    </button>
-                  )
-                })}
-
-                <label
-                  className="relative inline-flex items-center gap-1.5 text-[12px] font-sans cursor-pointer"
-                  style={{
-                    color: substrateId === 'custom' ? 'var(--color-accent, #C9A86A)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 62%, transparent)',
-                    fontWeight: substrateId === 'custom' ? 600 : 400,
+        {/* Leather Substrate Selector */}
+        <div className="mt-4 pt-3.5 border-t border-[#141413]/8 dark:border-white/8">
+          <div className="text-[11.5px] font-medium text-[#736f68] dark:text-[#9a968e] mb-2">
+            {dict.substrateTitle}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {SUBSTRATE_PRESETS.map((sub) => {
+              const active = substrateId === sub.id
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => {
+                    hapticSelect()
+                    onSelectSubstrate(sub.id, sub.hex)
                   }}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] border transition-colors ${
+                    active
+                      ? 'border-[#141413] dark:border-[#f5f3ee] bg-[#faf8f4] dark:bg-white/10 text-[#141413] dark:text-[#f5f3ee] font-semibold'
+                      : 'border-transparent text-[#57544e] dark:text-[#a8a39a]'
+                  }`}
                 >
                   <span
-                    className="w-4 h-4 rounded-full shrink-0"
-                    style={{
-                      backgroundColor: customSubstrateHex,
-                      boxShadow:
-                        substrateId === 'custom'
-                          ? '0 0 0 2px var(--color-surface, #141416), 0 0 0 3.5px var(--color-accent, #C9A86A)'
-                          : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
-                    }}
+                    className="w-4 h-4 rounded-full border border-[#141413]/20 dark:border-white/20"
+                    style={{ backgroundColor: sub.hex }}
                   />
-                  <span>+ {subCopy.custom}</span>
-                  <input
-                    type="color"
-                    value={customSubstrateHex}
-                    onChange={(e) => onCustomSubstrateChange(e.target.value.toUpperCase())}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    aria-label={subCopy.custom}
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 divide-x" style={{ borderColor: hairline }}>
-              {layerSwatches.map((ls, idx) => {
-                const isSelectedCoat = selectedCoatIdx === idx
-                const displayLabel = ls.short === '∞' ? subCopy.fullShort : ls.label
-                return (
-                  <button
-                    key={ls.short}
-                    type="button"
-                    onClick={() => onSelectCoat(idx)}
-                    className="relative pt-3 pb-2.5 px-1 text-center cursor-pointer"
-                    style={{
-                      borderColor: hairline,
-                      background: isSelectedCoat
-                        ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 11%, transparent)'
-                        : 'transparent',
-                    }}
-                  >
-                    <span
-                      className="block h-1.5 w-10 mx-auto rounded-full mb-1.5 border border-black/15"
-                      style={{ backgroundColor: ls.hex }}
-                    />
-                    <span
-                      className="block text-[12px] font-sans whitespace-nowrap"
-                      style={{
-                        fontWeight: isSelectedCoat ? 600 : 400,
-                        color: isSelectedCoat
-                          ? 'var(--color-accent, #C9A86A)'
-                          : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 72%, transparent)',
-                      }}
-                    >
-                      {displayLabel}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ПРОПОРЦИИ КОМПОНЕНТОВ */}
-      <section
-        className="rounded-2xl border overflow-hidden"
-        style={{
-          background: 'var(--color-surface, #141416)',
-          borderColor: hairline,
-        }}
-      >
-        <div
-          className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-2 border-b"
-          style={{ borderColor: hairline }}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span
-              className="w-3.5 h-3.5 rounded-full inline-block border border-black/20 shrink-0"
-              style={{ backgroundColor: squareColor }}
+                  <span>{sub.label[lang]}</span>
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => customSubInputRef.current?.click()}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[12px] border ${
+                substrateId === 'custom'
+                  ? 'border-[#9a723c] text-[#8a632f] font-semibold'
+                  : 'border-transparent text-[#8a632f] dark:text-[#d9b57d]'
+              }`}
+            >
+              {uiCopy.customLeather}
+            </button>
+            <input
+              ref={customSubInputRef}
+              type="color"
+              value={substrateHex}
+              onChange={(e) => onSelectSubstrate('custom', e.target.value)}
+              className="sr-only"
             />
-            <h2 className="text-[12px] font-sans uppercase tracking-[0.12em] font-semibold opacity-85 truncate">
-              {dict.mixComposition}
-            </h2>
-            {totalAmount > 0 && (
-              <span className="font-mono text-[13px] font-semibold tabular-nums opacity-75 shrink-0">
-                ·{' '}
-                {totalAmount >= 1000
-                  ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
-                  : `${totalAmount.toFixed(1)} ${dict.ml}`}
+          </div>
+        </div>
+
+        {/* 4-Coat Thickness Strip */}
+        <div className="grid grid-cols-4 gap-2 mt-4">
+          {[1, 2, 3, 4].map((c, idx) => {
+            const active = coats === c
+            const barColor = coatHexes[idx] || displayHex || '#c9c2b6'
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => {
+                  hapticSelect()
+                  setCoats(c)
+                }}
+                className={`rounded-xl px-2 py-2.5 border text-center transition-colors ${
+                  active
+                    ? 'border-[#9a723c] bg-[#faf4e8] dark:bg-[#9a723c]/15 text-[#141413] dark:text-[#f5f3ee] font-semibold'
+                    : 'border-[#141413]/10 dark:border-white/10 bg-[#faf8f4] dark:bg-white/[0.03] text-[#6c6861] dark:text-[#9a968e]'
+                }`}
+              >
+                <div
+                  className="h-1.5 w-8 mx-auto rounded-full mb-1.5 border border-[#141413]/10"
+                  style={{ backgroundColor: barColor }}
+                />
+                <div className="text-[11.5px] whitespace-nowrap">
+                  {coatLabels[idx]}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Proportions & Batch Card */}
+      <div className="rounded-2xl border border-[#141413]/10 dark:border-white/10 bg-white dark:bg-[#141413] p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-2 pb-3 border-b border-[#141413]/8 dark:border-white/8">
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="w-3 h-3 rounded-full border border-[#141413]/15 shrink-0"
+              style={{ backgroundColor: rightHex }}
+            />
+            <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#141413] dark:text-[#f5f3ee] truncate">
+              {dict.proportionsTitle}
+            </h3>
+            {hasMix && (
+              <span className="font-mono text-[12px] font-semibold text-[#736f68] dark:text-[#9a968e] shrink-0">
+                · {formatMl(totalAmount)} мл
               </span>
             )}
           </div>
 
-          {totalAmount > 0 && (
+          {(hasMix || targetHex) && (
             <button
               type="button"
-              onClick={onClearAmounts}
-              className="text-[12.5px] font-sans font-medium opacity-80 hover:opacity-100 cursor-pointer bg-transparent border-none p-0 shrink-0"
-              style={{ color: 'var(--color-danger, #f87171)' }}
+              onClick={onResetFormula}
+              className="text-[12px] font-medium text-rose-700 dark:text-rose-400 shrink-0"
             >
-              {dict.clear}
+              {uiCopy.resetBtn}
             </button>
           )}
         </div>
 
-        <div className="h-1.5 w-full flex" style={{ background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 6%, transparent)' }}>
-          {activeSegments.map((seg) => (
-            <div
-              key={seg.id}
-              className="h-full"
-              style={{ width: `${seg.pct}%`, backgroundColor: seg.hex }}
-            />
-          ))}
-        </div>
-
-        {/* Линейка масштабирования партии + кнопка копирования готового рецепта */}
-        {totalAmount > 0 && (
-          <div
-            className="px-4 sm:px-5 py-3 border-b flex flex-col gap-2.5"
-            style={{
-              borderColor: hairline,
-              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 2%, transparent)',
-            }}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[12px] font-sans opacity-65">
-                {subCopy.batchLabel} <span className="opacity-70">({subCopy.batchLimit})</span>
+        {/* Batch Volume Scaler */}
+        {hasMix && (
+          <div className="mt-3.5 pb-3.5 border-b border-[#141413]/8 dark:border-white/8">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[12px] text-[#736f68] dark:text-[#9a968e]">
+                {uiCopy.batchTitle}
               </span>
               <button
                 type="button"
-                onClick={onCopyHex}
-                className="text-[12px] font-sans font-medium underline underline-offset-4 cursor-pointer bg-transparent border-none p-0"
-                style={{ color: 'var(--color-accent, #C9A86A)' }}
+                onClick={onCopyRecipe}
+                className="text-[12px] font-semibold text-[#8a632f] dark:text-[#d9b57d]"
               >
-                {copied ? dict.copied : `${dict.copy} ${subCopy.copyRecipe.toLowerCase()}`}
+                {copied ? uiCopy.copiedBtn : dict.copyRecipe}
               </button>
             </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {BATCH_PRESETS.map((vol) => {
-                const isCurrent = Math.abs(totalAmount - vol) < 0.2
-                return (
-                  <button
-                    key={vol}
-                    type="button"
-                    onClick={() => onScaleToVolume(vol)}
-                    className="h-8 px-2.5 rounded-lg text-[12px] font-mono font-medium cursor-pointer tabular-nums"
-                    style={{
-                      background: isCurrent
-                        ? 'var(--color-accent, #C9A86A)'
-                        : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 6%, transparent)',
-                      color: isCurrent ? 'var(--color-bg, #0B0B0C)' : 'var(--color-ink, #F4F0E8)',
-                    }}
-                  >
-                    {vol}
-                  </button>
-                )
-              })}
-
-              <div
-                className="inline-flex items-center h-8 rounded-lg border pl-2.5 pr-1 ml-auto"
-                style={{ borderColor: hairline }}
-              >
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  enterKeyHint="done"
-                  maxLength={6}
-                  value={customBatchMl}
-                  onChange={(e) => {
-                    let v = e.target.value.replace(',', '.')
-                    if (v === '' || /^\d*\.?\d*$/.test(v)) {
-                      const num = parseFloat(v)
-                      if (!isNaN(num) && num > MAX_MANUAL_ML) v = String(MAX_MANUAL_ML)
-                      setCustomBatchMl(v)
-                    }
+            <div className="flex flex-wrap items-center gap-1.5">
+              {BATCH_PRESETS.map((vol) => (
+                <button
+                  key={vol}
+                  type="button"
+                  onClick={() => {
+                    hapticSelect()
+                    onScaleVolume(vol)
                   }}
+                  className="px-2.5 py-1.5 rounded-lg border border-[#141413]/12 dark:border-white/12 bg-[#faf8f4] dark:bg-white/[0.04] font-mono text-[12px] font-medium text-[#141413] dark:text-[#f5f3ee]"
+                >
+                  {vol}
+                </button>
+              ))}
+              <div className="flex items-center gap-1 ml-auto">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={1}
+                  max={MAX_ML_INPUT}
+                  value={customBatchMl}
+                  onChange={(e) => setCustomBatchMl(clampAmountInput(e.target.value))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') applyCustomBatch()
                   }}
                   placeholder="1–1000"
-                  className="w-14 bg-transparent text-[12px] font-mono focus:outline-none tabular-nums"
-                  style={{ color: 'var(--color-ink, #F4F0E8)' }}
+                  className="w-20 px-2 py-1.5 rounded-lg border border-[#141413]/12 dark:border-white/12 bg-[#faf8f4] dark:bg-white/[0.04] font-mono text-[12px] text-center text-[#141413] dark:text-[#f5f3ee]"
                 />
                 <button
                   type="button"
                   onClick={applyCustomBatch}
-                  disabled={!customBatchMl}
-                  className="h-6 px-2 rounded-md text-[11px] font-sans font-semibold cursor-pointer disabled:opacity-30"
-                  style={{
-                    background: 'var(--color-accent, #C9A86A)',
-                    color: 'var(--color-bg, #0B0B0C)',
-                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#141413]/10 dark:bg-white/10 text-[12px] font-semibold text-[#141413] dark:text-[#f5f3ee]"
                 >
                   OK
                 </button>
@@ -941,51 +815,34 @@ export function FormulaPanel({
           </div>
         )}
 
-        {loading ? (
-          <div className="py-12 text-center text-[13px] font-sans opacity-50">
-            {dict.loading}
-          </div>
-        ) : loadError ? (
-          <div className="py-8 flex flex-col items-center gap-3">
-            <p className="text-[13px]" style={{ color: 'var(--color-danger, #f87171)' }}>
-              {dict.loadError}
-            </p>
-            <button
-              type="button"
-              onClick={onRetryLoad}
-              className="h-10 px-5 rounded-xl text-[13px] font-sans font-medium border cursor-pointer"
-              style={{ borderColor: 'var(--color-accent, #C9A86A)', color: 'var(--color-accent, #C9A86A)' }}
-            >
-              {dict.retry}
-            </button>
+        {/* Paint Component Rows */}
+        {isLoadingPigments ? (
+          <div className="py-10 text-center text-[13px] text-[#736f68]">
+            {dict.loadingArchive}
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: hairline }}>
-            {paints.map((paint, idx) => {
-              const currentAmount = parseFloat(paint.amount) || 0
-              const sliderPos = mlToSliderPos(currentAmount)
-              const fillPct = sliderPos / 10
-              const isDragging = draggingId === paint.id
-              const pct = totalAmount > 0 ? Math.round((currentAmount / totalAmount) * 100) : 0
-              const selectedPigment = pigments.find((p) => p.id === paint.pigmentId)
-              const lore = getPigmentLore(selectedPigment, lang)
+          <div className="divide-y divide-[#141413]/8 dark:divide-white/8 mt-2">
+            {paints.map((paint, index) => {
+              const pigment = pigments.find((p) => p.id === paint.pigmentId)
+              const lore = getPigmentLore(pigment, lang)
+              const val = parseFloat(paint.amount) || 0
+              const pct = totalAmount > 0 ? Math.round((val / totalAmount) * 100) : 0
+
+              const stepAmount = (delta: number) => {
+                const next = Math.max(
+                  0,
+                  Math.min(MAX_ML_INPUT, Math.round((val + delta) * 10) / 10)
+                )
+                hapticTap()
+                onUpdatePaint(paint.id, 'amount', next === 0 ? '' : String(next))
+              }
 
               return (
-                <div
-                  key={paint.id}
-                  className="px-4 sm:px-5 py-4"
-                  style={{
-                    borderColor: hairline,
-                    background: isDragging
-                      ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 4%, transparent)'
-                      : 'transparent',
-                  }}
-                >
-                  <div className="flex items-center gap-2.5 w-full">
-                    <span className="font-serif text-[15px] opacity-45 w-5 shrink-0 tabular-nums">
-                      0{idx + 1}
+                <div key={paint.id} className="py-4 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11.5px] text-[#8a857d] w-5 shrink-0">
+                      {String(index + 1).padStart(2, '0')}
                     </span>
-
                     <div className="flex-1 min-w-0">
                       <PigmentSelector
                         pigments={pigments}
@@ -995,269 +852,108 @@ export function FormulaPanel({
                         onInspect={onInspectPigment}
                       />
                     </div>
-
-                    <div className="hidden sm:flex items-center px-1 shrink-0">
-                      <SpectralSparkline
-                        spectrum={selectedPigment?.spectrum}
-                        strokeColor={selectedPigment?.hex || '#C9A86A'}
-                        width={56}
-                        height={24}
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => onRemovePaint(paint.id)}
-                      disabled={paints.length <= 1}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center opacity-45 hover:opacity-100 disabled:opacity-15 shrink-0 cursor-pointer"
-                      aria-label="Remove"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
-                      </svg>
-                    </button>
+                    {paints.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          hapticTap()
+                          onRemovePaint(paint.id)
+                        }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#736f68] dark:text-[#9a968e] hover:text-rose-600"
+                        aria-label="Remove"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
 
-                  {/* Дозирование: scroll-safe ползунок (touch-action: pan-y) */}
-                  <div className="pl-7 mt-3.5">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleStep(paint.id, currentAmount, -1)}
-                          disabled={currentAmount <= 0}
-                          className="w-8 h-8 rounded-lg border flex items-center justify-center text-[16px] leading-none font-mono disabled:opacity-25 cursor-pointer"
-                          style={{ borderColor: hairline, color: 'var(--color-ink, #F4F0E8)' }}
-                          aria-label="Decrease"
-                        >
-                          −
-                        </button>
-
-                        <div className="flex items-baseline gap-1 px-1.5">
-                          <input
-                            ref={(el) => {
-                              if (el) amountRefs.current.set(paint.id, el)
-                              else amountRefs.current.delete(paint.id)
-                            }}
-                            type="text"
-                            inputMode="decimal"
-                            enterKeyHint="done"
-                            maxLength={6}
-                            value={paint.amount}
-                            onChange={(e) => {
-                              let val = e.target.value.replace(',', '.')
-                              if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                const num = parseFloat(val)
-                                if (!isNaN(num) && num > MAX_MANUAL_ML) val = String(MAX_MANUAL_ML)
-                                onUpdatePaint(paint.id, 'amount', val)
-                              }
-                            }}
-                            onBlur={(e) => {
-                              const val = e.target.value.replace(',', '.')
-                              if (val === '.' || val === '') onUpdatePaint(paint.id, 'amount', '')
-                              else {
-                                const num = parseFloat(val)
-                                if (!isNaN(num)) {
-                                  const clamped = Math.max(0, Math.min(num, MAX_MANUAL_ML))
-                                  onUpdatePaint(paint.id, 'amount', formatMlValue(clamped))
-                                }
-                              }
-                            }}
-                            className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[16px] font-semibold focus:outline-none p-0 w-[54px] tabular-nums"
-                            placeholder="0.0"
-                            style={{ color: 'var(--color-ink, #F4F0E8)' }}
-                          />
-                          <span className="text-[12px] font-sans opacity-55">{dict.ml}</span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleStep(paint.id, currentAmount, 1)}
-                          disabled={currentAmount >= MAX_MANUAL_ML}
-                          className="w-8 h-8 rounded-lg border flex items-center justify-center text-[16px] leading-none font-mono disabled:opacity-25 cursor-pointer"
-                          style={{ borderColor: hairline, color: 'var(--color-ink, #F4F0E8)' }}
-                          aria-label="Increase"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <span
-                        className="font-mono text-[13px] font-semibold tabular-nums"
-                        style={{
-                          color: isDragging ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
-                          opacity: isDragging ? 1 : 0.65,
-                        }}
+                  {/* Stepper + Input + % */}
+                  <div className="flex items-center justify-between gap-2 pl-7">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => stepAmount(val > 10 ? -1 : -0.5)}
+                        className="w-8 h-8 rounded-lg bg-[#f3f0ea] dark:bg-white/[0.06] text-[15px] font-semibold text-[#141413] dark:text-[#f5f3ee]"
                       >
-                        {pct}%
-                      </span>
-                    </div>
-
-                    {/* Защищённый от вертикального скролла трек ползунка */}
-                    <div
-                      onPointerDown={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect()
-                        sliderGestureRef.current = {
-                          paintId: paint.id,
-                          pointerId: e.pointerId,
-                          startX: e.clientX,
-                          startY: e.clientY,
-                          rectLeft: rect.left,
-                          rectWidth: Math.max(1, rect.width),
-                          locked: 'none',
-                        }
-                      }}
-                      onPointerMove={(e) => {
-                        const g = sliderGestureRef.current
-                        if (!g || g.paintId !== paint.id || g.pointerId !== e.pointerId) return
-                        if (g.locked === 'vertical') return
-
-                        const dx = e.clientX - g.startX
-                        const dy = e.clientY - g.startY
-                        if (g.locked === 'none') {
-                          if (Math.hypot(dx, dy) < 7) return
-                          if (Math.abs(dy) > Math.abs(dx) * 1.15) {
-                            g.locked = 'vertical'
-                            return
-                          }
-                          g.locked = 'horizontal'
-                          try {
-                            e.currentTarget.setPointerCapture(e.pointerId)
-                          } catch {
-                            // ignore
-                          }
-                          setDraggingId(paint.id)
-                        }
-
-                        const pos = Math.max(
-                          0,
-                          Math.min(1000, ((e.clientX - g.rectLeft) / g.rectWidth) * 1000)
-                        )
-                        handleSliderChange(paint.id, pos)
-                      }}
-                      onPointerUp={(e) => {
-                        const g = sliderGestureRef.current
-                        if (g && g.paintId === paint.id && g.pointerId === e.pointerId) {
-                          if (g.locked === 'none') {
-                            const pos = Math.max(
-                              0,
-                              Math.min(1000, ((e.clientX - g.rectLeft) / g.rectWidth) * 1000)
+                        −
+                      </button>
+                      <div className="flex items-baseline gap-1">
+                        <input
+                          ref={(el) => {
+                            if (el) amountRefs.current.set(paint.id, el)
+                            else amountRefs.current.delete(paint.id)
+                          }}
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          max={MAX_ML_INPUT}
+                          step="0.1"
+                          value={paint.amount}
+                          onChange={(e) =>
+                            onUpdatePaint(
+                              paint.id,
+                              'amount',
+                              clampAmountInput(e.target.value)
                             )
-                            handleSliderChange(paint.id, pos)
-                            hapticTap()
                           }
-                          sliderGestureRef.current = null
-                        }
-                        setDraggingId(null)
-                      }}
-                      onPointerCancel={() => {
-                        sliderGestureRef.current = null
-                        setDraggingId(null)
-                      }}
-                      className="relative h-8 flex items-center select-none cursor-pointer"
-                      style={{ touchAction: 'pan-y' }}
-                      role="slider"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={Math.min(100, Math.round(currentAmount))}
-                      aria-label={`${selectedPigment?.name?.[lang] || paint.pigmentId} ${dict.ml}`}
-                    >
-                      <div
-                        className="w-full h-1.5 rounded-full overflow-hidden relative pointer-events-none"
-                        style={{ background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)' }}
-                      >
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${fillPct}%`, background: 'var(--color-accent, #C9A86A)' }}
+                          placeholder="0.0"
+                          className="w-16 text-center font-mono text-[15px] font-semibold bg-transparent text-[#141413] dark:text-[#f5f3ee] focus:outline-none border-b border-transparent focus:border-[#9a723c]"
                         />
+                        <span className="text-[12px] text-[#736f68]">мл</span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => stepAmount(val >= 10 ? 1 : 0.5)}
+                        className="w-8 h-8 rounded-lg bg-[#f3f0ea] dark:bg-white/[0.06] text-[15px] font-semibold text-[#141413] dark:text-[#f5f3ee]"
+                      >
+                        +
+                      </button>
+                    </div>
 
-                      {SLIDER_TICKS.map((tick) => {
-                        const passed = fillPct >= tick.pct - 0.5
-                        return (
-                          <span
-                            key={tick.ml}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-2.5 rounded-full pointer-events-none"
-                            style={{
-                              left: `${tick.pct}%`,
-                              background: passed
-                                ? 'var(--color-accent, #C9A86A)'
-                                : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 26%, transparent)',
-                            }}
-                          />
+                    <span className="font-mono text-[12.5px] font-semibold text-[#736f68] dark:text-[#9a968e]">
+                      {pct}%
+                    </span>
+                  </div>
+
+                  {/* Scroll-Safe Piecewise Slider */}
+                  <div className="pl-7">
+                    <HorizontalIntentSlider
+                      valueMl={val}
+                      accentHex={pigment?.hex || '#9a723c'}
+                      onChangeMl={(nextMl) =>
+                        onUpdatePaint(
+                          paint.id,
+                          'amount',
+                          nextMl === 0 ? '' : String(nextMl)
                         )
-                      })}
+                      }
+                    />
+                    <div className="flex justify-between font-mono text-[10px] text-[#8a857d] -mt-1">
+                      <span>0</span>
+                      <span>5</span>
+                      <span>30</span>
+                      <span>100 мл</span>
+                    </div>
+                  </div>
 
-                      <span
-                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full pointer-events-none"
-                        style={{
-                          left: `${fillPct}%`,
-                          width: 20,
-                          height: 20,
-                          transform: `translate(-50%, -50%) scale(${isDragging ? 1.15 : 1})`,
-                          background: 'var(--color-accent, #C9A86A)',
-                          border: '2px solid var(--color-surface, #141416)',
-                          boxShadow: isDragging
-                            ? '0 0 0 5px color-mix(in srgb, var(--color-accent, #C9A86A) 22%, transparent)'
-                            : '0 1px 3px rgba(0,0,0,0.3)',
+                  {/* Lore + Passport Row */}
+                  <div className="flex items-center justify-between gap-2 pl-7 text-[11.5px] text-[#736f68] dark:text-[#9a968e]">
+                    <span className="truncate">
+                      {lore.opacity}
+                      {lore.brandAnalogue ? ` · ${lore.brandAnalogue}` : ''}
+                    </span>
+                    {pigment && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          hapticTap()
+                          onInspectPigment(pigment.id)
                         }}
-                      />
-                    </div>
-
-                    <div className="relative h-4 mt-1 text-[11px] font-mono tabular-nums select-none">
-                      {SLIDER_TICKS.map((tick) => {
-                        const isNear =
-                          (tick.ml === 0 && currentAmount === 0) ||
-                          (tick.ml === 5 && currentAmount >= 4.5 && currentAmount <= 5.5) ||
-                          (tick.ml === 30 && currentAmount >= 28 && currentAmount <= 32) ||
-                          (tick.ml === 100 && currentAmount >= 98)
-                        const alignStyle =
-                          tick.pct === 0
-                            ? { left: '0%', transform: 'translateX(0%)' }
-                            : tick.pct === 100
-                            ? { left: '100%', transform: 'translateX(-100%)' }
-                            : { left: `${tick.pct}%`, transform: 'translateX(-50%)' }
-                        return (
-                          <span
-                            key={tick.ml}
-                            className="absolute top-0 whitespace-nowrap"
-                            style={{
-                              ...alignStyle,
-                              color: isNear ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
-                              opacity: isNear ? 1 : 0.45,
-                              fontWeight: isNear ? 600 : 400,
-                            }}
-                          >
-                            {tick.label}
-                            {tick.ml === 100 ? ` ${dict.ml}` : ''}
-                          </span>
-                        )
-                      })}
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 mt-3 text-[12px]">
-                      <button
-                        type="button"
-                        onClick={onOpenGuide}
-                        className="opacity-65 truncate min-w-0 flex-1 text-left bg-transparent border-none p-0 text-inherit cursor-pointer"
-                        title={dict.opacityDesc[lore.opacity]}
+                        className="shrink-0 font-medium text-[#8a632f] dark:text-[#d9b57d] underline underline-offset-4 decoration-[#9a723c]/35"
                       >
-                        <span className="underline decoration-dotted underline-offset-4">
-                          {dict.opacityLabels[lore.opacity]}
-                        </span>
-                        {' · '}
-                        <span>{lore.whereToBuy.leatherBrands[0]}</span>
+                        {dict.passportBtn}
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => onInspectPigment(paint.pigmentId)}
-                        className="shrink-0 font-medium underline underline-offset-4 whitespace-nowrap bg-transparent border-none p-0 cursor-pointer"
-                        style={{ color: 'var(--color-accent, #C9A86A)' }}
-                      >
-                        {dict.pigmentInfoBtn}
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
               )
@@ -1265,39 +961,17 @@ export function FormulaPanel({
           </div>
         )}
 
-        <div
-          className="px-4 sm:px-5 py-4 border-t flex flex-col sm:flex-row gap-2.5"
-          style={{ borderColor: hairline }}
+        <button
+          type="button"
+          onClick={() => {
+            hapticTap()
+            onAddPaint()
+          }}
+          className="mt-3 w-full py-3 rounded-xl border border-dashed border-[#141413]/20 dark:border-white/20 text-[13px] font-medium text-[#4f4c46] dark:text-[#c7c2b8] hover:border-[#9a723c]"
         >
-          <button
-            type="button"
-            onClick={onAddPaint}
-            disabled={loading || loadError}
-            className="flex-1 h-11 rounded-xl text-[13px] font-sans font-medium border disabled:opacity-40 cursor-pointer"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 22%, transparent)',
-              color: 'var(--color-ink, #F4F0E8)',
-            }}
-          >
-            {dict.addPigment}
-          </button>
-
-          {activeTarget && paints.some((p) => p.pigmentId !== 'acrylic_binder') && (
-            <button
-              type="button"
-              onClick={onAutoAdjust}
-              disabled={isAutoAdjusting || loading}
-              className="flex-1 h-11 rounded-xl text-[13px] font-sans font-semibold disabled:opacity-40 cursor-pointer"
-              style={{
-                background: 'var(--color-accent, #C9A86A)',
-                color: 'var(--color-bg, #0B0B0C)',
-              }}
-            >
-              {isAutoAdjusting ? dict.adjusting : dict.autoAdjust}
-            </button>
-          )}
-        </div>
-      </section>
+          + {dict.addComponent}
+        </button>
+      </div>
     </div>
   )
 }
