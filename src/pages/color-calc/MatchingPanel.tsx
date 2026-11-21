@@ -103,16 +103,16 @@ export function MatchingPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ЦЕЛЕВОЙ ОБРАЗЕЦ (HEX + Палитра + Классические тона кожи) */}
+      {/* ЦЕЛЕВОЙ ОБРАЗЕЦ */}
       <section
-        className="border p-4"
+        className="rounded-3xl border p-4"
         style={{
-          background: 'var(--color-surface, #1C1917)',
-          borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
+          background: 'var(--color-surface, #141416)',
+          borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
         }}
       >
         <div className="flex items-center justify-between mb-3.5">
-          <h2 className="text-[11px] uppercase tracking-[0.22em] font-semibold opacity-75">
+          <h2 className="text-[11px] font-sans uppercase tracking-[0.18em] font-semibold opacity-80">
             {dict.targetColor}
           </h2>
           <span className="font-mono text-[10px] opacity-45">CIEDE2000 ENGINE</span>
@@ -120,10 +120,10 @@ export function MatchingPanel({
 
         <div className="flex items-stretch gap-3 mb-4">
           <label
-            className="relative w-20 h-14 border shrink-0 cursor-pointer block overflow-hidden"
+            className="relative w-20 h-14 rounded-2xl border shrink-0 cursor-pointer block overflow-hidden"
             style={{
               backgroundColor: validColorValue,
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 18%, transparent)',
             }}
           >
             <input
@@ -145,20 +145,19 @@ export function MatchingPanel({
                 onTargetHexChange(v.toUpperCase())
               }
             }}
-            className="flex-1 px-4 font-mono tracking-[0.15em] text-[16px] border focus:outline-none min-w-0"
+            className="flex-1 px-4 rounded-2xl font-mono tracking-[0.15em] text-[16px] border focus:outline-none min-w-0"
             style={{
-              background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 4%, transparent)',
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
-              color: 'var(--color-ink, #F5F1EA)',
+              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
+              color: 'var(--color-ink, #F4F0E8)',
             }}
             placeholder="#RRGGBB"
             maxLength={7}
           />
         </div>
 
-        {/* Быстрые пресеты классических оттенков кожи */}
         <div>
-          <div className="text-[9px] uppercase tracking-[0.18em] opacity-45 mb-2">
+          <div className="text-[10px] font-sans uppercase tracking-[0.14em] opacity-50 mb-2">
             {dict.targetPresetsLabel}
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -169,19 +168,19 @@ export function MatchingPanel({
                   key={preset.hex}
                   type="button"
                   onClick={() => onTargetHexChange(preset.hex)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] border transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-sans font-medium border transition-colors cursor-pointer"
                   style={{
                     borderColor: active
-                      ? 'var(--color-accent, #D8A35C)'
-                      : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)',
+                      ? 'var(--color-accent, #C9A86A)'
+                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)',
                     background: active
-                      ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 16%, transparent)'
-                      : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2%, transparent)',
-                    color: 'var(--color-ink, #F5F1EA)',
+                      ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
+                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
+                    color: 'var(--color-ink, #F4F0E8)',
                   }}
                 >
                   <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/25"
+                    className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/20"
                     style={{ backgroundColor: preset.hex }}
                   />
                   <span>{preset.label[lang]}</span>
@@ -194,15 +193,18 @@ export function MatchingPanel({
 
       {/* ПАРАМЕТРЫ СИНТЕЗА */}
       <section
-        className="border p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+        className="rounded-3xl border p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5"
         style={{
-          background: 'var(--color-surface, #1C1917)',
-          borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
+          background: 'var(--color-surface, #141416)',
+          borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
         }}
       >
         <div
-          className="flex border"
-          style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)' }}
+          className="flex p-1 rounded-full border"
+          style={{
+            background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
+          }}
         >
           {([3, 4] as const).map((num) => {
             const active = maxComponents === num
@@ -211,12 +213,10 @@ export function MatchingPanel({
                 key={num}
                 type="button"
                 onClick={() => onMaxComponentsChange(num)}
-                className="flex-1 py-2 text-[11px] uppercase tracking-[0.14em] font-semibold transition-colors cursor-pointer"
+                className="flex-1 py-2 rounded-full text-[11px] font-sans uppercase tracking-[0.1em] font-semibold transition-colors cursor-pointer"
                 style={{
-                  background: active
-                    ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)'
-                    : 'transparent',
-                  color: active ? 'var(--color-accent, #D8A35C)' : 'var(--color-ink, #F5F1EA)',
+                  background: active ? 'var(--color-ink, #F4F0E8)' : 'transparent',
+                  color: active ? 'var(--color-bg, #0B0B0C)' : 'var(--color-ink, #F4F0E8)',
                 }}
               >
                 ≤ {num} {dict.maxPigments}
@@ -226,8 +226,11 @@ export function MatchingPanel({
         </div>
 
         <div
-          className="flex border"
-          style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)' }}
+          className="flex p-1 rounded-full border"
+          style={{
+            background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
+          }}
         >
           {(['acrylic', 'aniline'] as const).map((sys) => {
             const active = system === sys
@@ -236,12 +239,10 @@ export function MatchingPanel({
                 key={sys}
                 type="button"
                 onClick={() => onSystemChange(sys)}
-                className="flex-1 py-2 text-[11px] uppercase tracking-[0.12em] font-semibold transition-colors cursor-pointer"
+                className="flex-1 py-2 rounded-full text-[11px] font-sans uppercase tracking-[0.08em] font-semibold transition-colors cursor-pointer"
                 style={{
-                  background: active
-                    ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)'
-                    : 'transparent',
-                  color: active ? 'var(--color-accent, #D8A35C)' : 'var(--color-ink, #F5F1EA)',
+                  background: active ? 'var(--color-ink, #F4F0E8)' : 'transparent',
+                  color: active ? 'var(--color-bg, #0B0B0C)' : 'var(--color-ink, #F4F0E8)',
                 }}
               >
                 {sys === 'acrylic' ? dict.acrylic : dict.aniline}
@@ -251,38 +252,38 @@ export function MatchingPanel({
         </div>
       </section>
 
-      {/* ПАЛИТРА АТЕЛЬЕ (ИНВЕНТАРЬ) */}
+      {/* ПАЛИТРА АТЕЛЬЕ */}
       <section
-        className="border p-4"
+        className="rounded-3xl border p-4"
         style={{
-          background: 'var(--color-surface, #1C1917)',
-          borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
+          background: 'var(--color-surface, #141416)',
+          borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
         }}
       >
         <div className="flex items-center justify-between mb-3 gap-2">
-          <h2 className="text-[11px] uppercase tracking-[0.22em] font-semibold opacity-75">
+          <h2 className="text-[11px] font-sans uppercase tracking-[0.18em] font-semibold opacity-80">
             {dict.inventory} ({inventoryIds.length})
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={onResetInventoryDefaults}
-              className="text-[10px] uppercase tracking-[0.14em] px-2 py-1 border cursor-pointer"
-              style={{ borderColor: 'var(--color-accent, #D8A35C)', color: 'var(--color-accent, #D8A35C)' }}
+              className="text-[10.5px] font-sans font-medium px-2.5 py-1 rounded-full border cursor-pointer"
+              style={{ borderColor: 'var(--color-accent, #C9A86A)', color: 'var(--color-accent, #C9A86A)' }}
             >
               {dict.default}
             </button>
             <button
               type="button"
               onClick={onSelectAllInventory}
-              className="text-[10px] uppercase tracking-[0.14em] px-2 py-1 opacity-65 hover:opacity-100 cursor-pointer"
+              className="text-[10.5px] font-sans px-2 py-1 opacity-70 hover:opacity-100 cursor-pointer"
             >
               {dict.all}
             </button>
             <button
               type="button"
               onClick={onClearInventory}
-              className="text-[10px] uppercase tracking-[0.14em] px-2 py-1 cursor-pointer"
+              className="text-[11px] px-2 py-1 cursor-pointer"
               style={{ color: 'var(--color-danger, #f87171)' }}
               title={dict.clearInventory}
             >
@@ -293,7 +294,7 @@ export function MatchingPanel({
 
         <div
           className="flex gap-1.5 overflow-x-auto pb-2.5 mb-3 border-b"
-          style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
+          style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
         >
           {categories.map((cat) => {
             const active = activeCategory === cat
@@ -302,12 +303,13 @@ export function MatchingPanel({
                 key={cat}
                 type="button"
                 onClick={() => setActiveCategory(cat)}
-                className="px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] whitespace-nowrap border transition-colors cursor-pointer"
+                className="px-3 py-1 rounded-full text-[10.5px] font-sans font-medium whitespace-nowrap border transition-colors cursor-pointer"
                 style={{
-                  borderColor: active ? 'var(--color-ink, #F5F1EA)' : 'transparent',
-                  background: active
-                    ? 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)'
-                    : 'transparent',
+                  borderColor: active
+                    ? 'var(--color-ink, #F4F0E8)'
+                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 12%, transparent)',
+                  background: active ? 'var(--color-ink, #F4F0E8)' : 'transparent',
+                  color: active ? 'var(--color-bg, #0B0B0C)' : 'var(--color-ink, #F4F0E8)',
                 }}
               >
                 {cat === 'ALL' ? dict.all : cat}
@@ -322,28 +324,28 @@ export function MatchingPanel({
             return (
               <div
                 key={p.id}
-                className="flex items-center border transition-colors"
+                className="flex items-center rounded-full border transition-colors overflow-hidden"
                 style={{
                   background: on
-                    ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)'
-                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
+                    ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)'
+                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 3%, transparent)',
                   borderColor: on
-                    ? 'var(--color-accent, #D8A35C)'
-                    : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
+                    ? 'var(--color-accent, #C9A86A)'
+                    : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
                 }}
               >
                 <button
                   type="button"
                   onClick={() => onToggleInventory(p.id)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] cursor-pointer"
+                  className="flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 text-[11px] font-sans cursor-pointer"
                   style={{
                     color: on
-                      ? 'var(--color-ink, #F5F1EA)'
-                      : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 55%, transparent)',
+                      ? 'var(--color-ink, #F4F0E8)'
+                      : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 60%, transparent)',
                   }}
                 >
                   <span
-                    className="w-2.5 h-2.5 rounded-full border border-white/20 shrink-0"
+                    className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
                     style={{ backgroundColor: p.hex || '#444' }}
                   />
                   <span>{pigmentName(p)}</span>
@@ -353,8 +355,8 @@ export function MatchingPanel({
                   onClick={() => onInspectPigment(p.id)}
                   className="px-2 py-1.5 text-[11px] border-l cursor-pointer"
                   style={{
-                    borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
-                    color: 'var(--color-accent, #D8A35C)',
+                    borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)',
+                    color: 'var(--color-accent, #C9A86A)',
                   }}
                   title={dict.pigmentInfoBtn}
                 >
@@ -376,10 +378,10 @@ export function MatchingPanel({
           !/^#[0-9A-Fa-f]{6}$/.test(targetHex) ||
           inventoryIds.length === 0
         }
-        className="w-full py-4 text-[12px] uppercase tracking-[0.24em] font-semibold transition-opacity disabled:opacity-35 cursor-pointer"
+        className="w-full py-3.5 rounded-full text-[12px] font-sans uppercase tracking-[0.18em] font-semibold transition-opacity disabled:opacity-35 cursor-pointer"
         style={{
-          background: 'var(--color-accent, #D8A35C)',
-          color: 'var(--color-bg, #141210)',
+          background: 'var(--color-ink, #F4F0E8)',
+          color: 'var(--color-bg, #0B0B0C)',
         }}
       >
         {recipeLoading ? dict.picking : dict.pickRecipe}
@@ -398,41 +400,40 @@ export function MatchingPanel({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="border overflow-hidden"
+            className="rounded-3xl border overflow-hidden"
             style={{
-              background: 'var(--color-surface, #1C1917)',
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
+              background: 'var(--color-surface, #141416)',
+              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
             }}
           >
-            <div
-              className="grid grid-cols-2 h-28 border-b"
-              style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)' }}
-            >
-              <div className="p-3 flex flex-col justify-between" style={{ backgroundColor: targetHex }}>
-                <span className="text-[9px] uppercase tracking-[0.2em] font-mono bg-black/55 text-white px-2 py-0.5 w-fit">
-                  {dict.target}
-                </span>
-                <span className="font-mono text-[12px] text-white bg-black/55 px-2 py-0.5 w-fit">
-                  {targetHex}
-                </span>
-              </div>
-              <div
-                className="p-3 flex flex-col justify-between"
-                style={{ backgroundColor: recipeResult.resultHex || '#333' }}
-              >
-                <span className="text-[9px] uppercase tracking-[0.2em] font-mono bg-black/55 text-white px-2 py-0.5 w-fit">
-                  {dict.recipe}
-                </span>
-                <span className="font-mono text-[12px] text-white bg-black/55 px-2 py-0.5 w-fit">
-                  {(recipeResult.resultHex || '').toUpperCase()} · ΔE₀₀ {recipeResult.deltaE.toFixed(1)}
-                </span>
+            <div className="p-3 pb-0">
+              <div className="grid grid-cols-2 h-28 rounded-2xl overflow-hidden">
+                <div className="p-3 flex flex-col justify-between" style={{ backgroundColor: targetHex }}>
+                  <span className="text-[9.5px] uppercase tracking-[0.16em] font-mono bg-black/55 text-white px-2.5 py-0.5 rounded-full w-fit">
+                    {dict.target}
+                  </span>
+                  <span className="font-mono text-[11.5px] text-white bg-black/55 px-2.5 py-0.5 rounded-full w-fit">
+                    {targetHex}
+                  </span>
+                </div>
+                <div
+                  className="p-3 flex flex-col justify-between"
+                  style={{ backgroundColor: recipeResult.resultHex || '#333' }}
+                >
+                  <span className="text-[9.5px] uppercase tracking-[0.16em] font-mono bg-black/55 text-white px-2.5 py-0.5 rounded-full w-fit">
+                    {dict.recipe}
+                  </span>
+                  <span className="font-mono text-[11.5px] text-white bg-black/55 px-2.5 py-0.5 rounded-full w-fit">
+                    {(recipeResult.resultHex || '').toUpperCase()} · ΔE₀₀ {recipeResult.deltaE.toFixed(1)}
+                  </span>
+                </div>
               </div>
             </div>
 
             <div className="p-4">
               <div
                 className="flex flex-col divide-y mb-4"
-                style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
+                style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
               >
                 {recipeResult.recipe.map((item, i) => {
                   const lore = getPigmentLore(item.pigment, lang)
@@ -440,22 +441,22 @@ export function MatchingPanel({
                     <div
                       key={`${item.pigment.id}-${i}`}
                       className="py-2.5"
-                      style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}
+                      style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 8%, transparent)' }}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0 pr-2">
                           <span
-                            className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0"
+                            className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
                             style={{ backgroundColor: item.pigment.hex || '#888' }}
                           />
-                          <span className="text-[13px] font-medium truncate">
+                          <span className="text-[13px] font-sans font-medium truncate">
                             {item.isBinder ? dict.binder : pigmentName(item.pigment)}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <SpectralSparkline
                             spectrum={item.pigment.spectrum}
-                            strokeColor={item.pigment.hex || '#D8A35C'}
+                            strokeColor={item.pigment.hex || '#C9A86A'}
                             width={46}
                             height={18}
                           />
@@ -466,14 +467,14 @@ export function MatchingPanel({
                       </div>
 
                       <div className="flex items-center justify-between gap-2 pl-6 mt-1 text-[11px]">
-                        <span className="opacity-60 truncate">
+                        <span className="opacity-65 truncate">
                           {dict.opacityLabels[lore.opacity]} · {lore.whereToBuy.leatherBrands[0]}
                         </span>
                         <button
                           type="button"
                           onClick={() => onInspectPigment(item.pigment.id)}
                           className="font-semibold underline shrink-0 bg-transparent border-none p-0 cursor-pointer"
-                          style={{ color: 'var(--color-accent, #D8A35C)' }}
+                          style={{ color: 'var(--color-accent, #C9A86A)' }}
                         >
                           ⓘ {dict.pigmentInfoBtn}
                         </button>
@@ -486,11 +487,11 @@ export function MatchingPanel({
               <button
                 type="button"
                 onClick={onSendRecipeToMix}
-                className="w-full py-3.5 text-[11px] uppercase tracking-[0.2em] font-semibold border transition-colors cursor-pointer"
+                className="w-full py-3 rounded-full text-[11.5px] font-sans uppercase tracking-[0.16em] font-semibold border transition-colors cursor-pointer"
                 style={{
-                  borderColor: 'var(--color-accent, #D8A35C)',
-                  background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 16%, transparent)',
-                  color: 'var(--color-accent, #D8A35C)',
+                  borderColor: 'var(--color-accent, #C9A86A)',
+                  background: 'color-mix(in srgb, var(--color-accent, #C9A86A) 16%, transparent)',
+                  color: 'var(--color-accent, #C9A86A)',
                 }}
               >
                 {dict.moveToMix}
@@ -502,4 +503,3 @@ export function MatchingPanel({
     </div>
   )
 }
-
