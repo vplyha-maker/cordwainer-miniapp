@@ -63,7 +63,6 @@ export interface FavoriteItem {
 
 function getIsDarkTheme(): boolean {
   try {
-    // Сначала проверяем актуальный ключ темы студии (day / night / auto)
     const studioMode = localStorage.getItem('cordwainer_theme_mode_v1')
     if (studioMode === 'night') return true
     if (studioMode === 'day') return false
@@ -312,7 +311,6 @@ export default function App() {
 
   const isWideStudioScreen = screen === 'colors' || screen === 'color-calc'
 
-
   const appContent = (
     <div
       className={
@@ -337,7 +335,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Без mode="wait" — исключает зависание на чёрном экране при быстром нажатии Назад */}
       <AnimatePresence>
         {screen === 'welcome' && (
           <WelcomePage
@@ -346,6 +343,8 @@ export default function App() {
             onOpenMaterials={() => setScreen('materials')}
             onOpenStyles={() => setScreen('styles')}
             onOpenCalc={() => setScreen('size-calc')}
+            onOpenColors={() => setScreen('colors')}
+            onOpenColorCalc={() => setScreen('color-calc')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
