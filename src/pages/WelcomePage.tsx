@@ -6,6 +6,8 @@ type WelcomePageProps = {
   onOpenMaterials?: () => void
   onOpenStyles?: () => void
   onOpenCalc?: () => void
+  onOpenColors?: () => void
+  onOpenColorCalc?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -98,7 +100,6 @@ const THE_ITALIC_PATH_D =
 const DIAMOND_RULES_PATH_D =
   'M-92.00 -24.85L-25.80 -24.85L-24.00 -26.55L-22.20 -24.85L-22.20 -24.15L-24.00 -22.45L-25.80 -24.15L-92.00 -24.15ZM92.00 -24.85L25.80 -24.85L24.00 -26.55L22.20 -24.85L22.20 -24.15L24.00 -22.45L25.80 -24.15L92.00 -24.15Z'
 
-// Symmetrical tapered gold-leaf underline centered beneath Cormorant Garamond Medium
 const CENTER_UNDER_SWASH_PATH_D =
   'M-96.0 25.0Q-48.0 27.6 0.0 27.2Q48.0 26.8 96.0 25.0Q48.0 25.6 0.0 25.6Q-48.0 25.6 -96.0 25.0Z'
 
@@ -122,7 +123,6 @@ function getCompiledPaths(): CompiledPaths | null {
 
 // ---------------------------------------------------------------------------
 // 2. PROCEDURAL BESPOKE ATELIER SOUND ENGINE + MASTER COMPRESSOR
-// Clean organic intro (no button-click ticks during logo writing)
 // ---------------------------------------------------------------------------
 class SoundEngine {
   private ctx: AudioContext | null = null
@@ -333,7 +333,6 @@ class SoundEngine {
     } catch {}
   }
 
-  // Strictly for UI button taps (never called during intro writing)
   public softTick(pitch = 1): void {
     if (!this.enabled) return
     const c = this.getContext()
@@ -361,7 +360,7 @@ class SoundEngine {
 const sound = new SoundEngine()
 
 // ---------------------------------------------------------------------------
-// 3. GENTLE HAPTIC ENGINE (Strictly for Interactive Buttons Only)
+// 3. GENTLE HAPTIC ENGINE
 // ---------------------------------------------------------------------------
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
   const tgStyle: 'light' | 'medium' =
@@ -570,6 +569,8 @@ export function WelcomePage({
   onOpenMaterials,
   onOpenStyles,
   onOpenCalc,
+  onOpenColors,
+  onOpenColorCalc,
   lang,
   setLang,
 }: WelcomePageProps) {
@@ -615,6 +616,8 @@ export function WelcomePage({
       ch1: 'Cardio',
       ch2: 'Силуэты',
       ch3: 'Расчёты',
+      ch4: '3D Цвет',
+      ch5: 'Пигменты',
       enter: 'Войти',
       atelierSub: 'Bespoke Shoemaking Archive',
     },
@@ -624,6 +627,8 @@ export function WelcomePage({
       ch1: 'Cardio',
       ch2: 'Силуети',
       ch3: 'Розрахунки',
+      ch4: '3D Колір',
+      ch5: 'Пігменти',
       enter: 'Увійти',
       atelierSub: 'Bespoke Shoemaking Archive',
     },
@@ -633,15 +638,13 @@ export function WelcomePage({
       ch1: 'Cardio',
       ch2: 'Silhouetten',
       ch3: 'Rechner',
+      ch4: '3D Farbe',
+      ch5: 'Pigmente',
       enter: 'Eintreten',
       atelierSub: 'Bespoke Shoemaking Archive',
     },
   }[lang]
 
-  // -------------------------------------------------------------------------
-  // SINGLE-CANVAS BESPOKE SIGNATURE ENGINE (Cormorant Garamond Medium 500)
-  // Zero haptics & zero button-click ticks during intro writing
-  // -------------------------------------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -680,7 +683,6 @@ export function WelcomePage({
     let simTime = 0.0
     let waitTimeForFont = 0.0
 
-    // Cormorant Garamond Medium (500) for refined bespoke shoemaking elegance
     const FONT_SPEC = `500 62px "${BRAND_FONT_FAMILY}", Georgia, serif`
 
     const measureWordBounds = () => {
@@ -731,7 +733,6 @@ export function WelcomePage({
       }
       const elapsed = simTime
 
-      // Pure organic audio cues during intro (NO softTick button clicks, NO haptics)
       if (!skipRequestedRef.current) {
         if (!mCrown && elapsed >= 0.08) {
           mCrown = true
@@ -762,7 +763,7 @@ export function WelcomePage({
 
       const bounds = measureWordBounds()
       const centerX = viewW * 0.5
-      const centerY = viewH * 0.445
+      const centerY = viewH * 0.435
       const logoMasterScale = Math.min((viewW * 0.82) / bounds.totalSpan, 1.32)
 
       const haloIn = easeOutCubic(clamp01((elapsed - 0.15) / 1.1))
@@ -799,7 +800,6 @@ export function WelcomePage({
         }
       }
 
-      // Upper Crown: italic "the" & diamond-tipped hairline dividers balanced above Cormorant Garamond
       const crownP = easeOutCubic(clamp01((elapsed - 0.14) / 0.72))
       if (crownP > 0) {
         ctx.save()
@@ -822,7 +822,6 @@ export function WelcomePage({
         ctx.restore()
       }
 
-      // Live Golden Reveal of "Cordwaine" in Cormorant Garamond Medium
       const writeRaw = clamp01((elapsed - 0.46) / 1.72)
       const writeP = easeInOutCubic(writeRaw)
 
@@ -880,7 +879,6 @@ export function WelcomePage({
         }
       }
 
-      // Centered tapered gold-leaf underline beneath "Cordwaine"
       const swashP = easeOutCubic(clamp01((elapsed - 2.12) / 0.58))
       if (swashP > 0) {
         ctx.save()
@@ -894,7 +892,6 @@ export function WelcomePage({
         ctx.restore()
       }
 
-      // Golden Specular Light Sweep across the completed wordmark
       const sweepP = clamp01((elapsed - 2.48) / 0.74)
       if (sweepP > 0 && sweepP < 1) {
         const sweepHalf = Math.max(bounds.padLeft, bounds.padRight) + 25
@@ -985,7 +982,6 @@ export function WelcomePage({
         touchAction: 'manipulation',
       }}
     >
-      {/* Hidden DOM font-preloader for Cormorant Garamond Medium & Inter */}
       <span
         aria-hidden="true"
         className="fixed -top-96 left-0 opacity-0 pointer-events-none select-none"
@@ -994,14 +990,13 @@ export function WelcomePage({
         {BRAND_WORDMARK}
       </span>
 
-      {/* Single Hardware-Accelerated Canvas */}
       <canvas
         ref={canvasRef}
         aria-label="The Cordwaine"
         className="fixed inset-0 w-full h-full pointer-events-none block"
       />
 
-      {/* Top Bar (Inter UI Typography) */}
+      {/* Top Bar */}
       <header
         className="relative z-20 flex items-center justify-between px-5 sm:px-8"
         style={{
@@ -1037,7 +1032,6 @@ export function WelcomePage({
           </button>
         </div>
 
-        {/* Luminous Pearl Segmented Language Switcher (Inter) */}
         <div
           role="tablist"
           aria-label="Language switcher"
@@ -1083,7 +1077,7 @@ export function WelcomePage({
       <div
         aria-live="polite"
         className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center justify-center text-center px-6"
-        style={{ top: '55.5%' }}
+        style={{ top: '54.5%' }}
       >
         {isComplete && (
           <>
@@ -1100,7 +1094,7 @@ export function WelcomePage({
         )}
       </div>
 
-      {/* Bottom Typographic Navigation & Primary Entry CTA (Inter) */}
+      {/* Bottom Typographic Navigation & Primary Entry CTA */}
       {isComplete && (
         <footer
           className="fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 pointer-events-auto"
@@ -1110,41 +1104,59 @@ export function WelcomePage({
         >
           <nav
             aria-label="Atelier chapters"
-            className="flex items-center justify-center gap-6 sm:gap-9 mb-6 will-change-[transform,opacity] animate-[cordwaineFloatUp_950ms_cubic-bezier(0.22,1,0.36,1)_60ms_both]"
+            className="flex flex-col items-center gap-y-2.5 mb-5 will-change-[transform,opacity] animate-[cordwaineFloatUp_950ms_cubic-bezier(0.22,1,0.36,1)_60ms_both]"
           >
-            <button
-              type="button"
-              onClick={() => handleAction(onOpenMaterials ?? onStart)}
-              className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
-            >
-              {t.ch1}
-            </button>
+            {/* Строка 1: Cardio · Силуэты · Расчёты */}
+            <div className="flex items-center justify-center gap-5 sm:gap-8">
+              <button
+                type="button"
+                onClick={() => handleAction(onOpenMaterials ?? onStart)}
+                className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+              >
+                {t.ch1}
+              </button>
 
-            <span
-              aria-hidden="true"
-              className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
-            />
+              <span aria-hidden="true" className="w-1 h-1 rounded-full bg-[#7A5A2F]/60" />
 
-            <button
-              type="button"
-              onClick={() => handleAction(onOpenStyles ?? onStart)}
-              className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
-            >
-              {t.ch2}
-            </button>
+              <button
+                type="button"
+                onClick={() => handleAction(onOpenStyles ?? onStart)}
+                className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+              >
+                {t.ch2}
+              </button>
 
-            <span
-              aria-hidden="true"
-              className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
-            />
+              <span aria-hidden="true" className="w-1 h-1 rounded-full bg-[#7A5A2F]/60" />
 
-            <button
-              type="button"
-              onClick={() => handleAction(onOpenCalc ?? onStart)}
-              className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
-            >
-              {t.ch3}
-            </button>
+              <button
+                type="button"
+                onClick={() => handleAction(onOpenCalc ?? onStart)}
+                className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+              >
+                {t.ch3}
+              </button>
+            </div>
+
+            {/* Строка 2: 3D Цвет · Пигменты */}
+            <div className="flex items-center justify-center gap-5 sm:gap-8">
+              <button
+                type="button"
+                onClick={() => handleAction(onOpenColors ?? onStart)}
+                className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+              >
+                {t.ch4}
+              </button>
+
+              <span aria-hidden="true" className="w-1 h-1 rounded-full bg-[#7A5A2F]/60" />
+
+              <button
+                type="button"
+                onClick={() => handleAction(onOpenColorCalc ?? onStart)}
+                className="text-[13.5px] sm:text-[14.5px] font-medium tracking-[0.04em] text-[#7A5A2F] hover:text-[#141210] active:scale-95 transition-colors duration-300 cursor-pointer"
+              >
+                {t.ch5}
+              </button>
+            </div>
           </nav>
 
           <button
@@ -1156,10 +1168,7 @@ export function WelcomePage({
               {t.enter}
             </span>
             <span className="relative w-[1px] h-7 bg-[#141210]/25 overflow-hidden">
-              <span className="
-                absolute inset-x-0 top-0 h-3.5 bg-[#7A5A2F]
-                animate-[cordwainePulseLine_2.2s_ease-in-out_infinite]
-              " />
+              <span className="absolute inset-x-0 top-0 h-3.5 bg-[#7A5A2F] animate-[cordwainePulseLine_2.2s_ease-in-out_infinite]" />
             </span>
           </button>
         </footer>
