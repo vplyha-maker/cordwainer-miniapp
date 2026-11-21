@@ -52,6 +52,7 @@ import {
   saveHapticsEnabled,
   saveStudioBg,
   saveThemeMode,
+  setActiveStudioBg,
   triggerHaptic,
 } from './colors/themeSystem'
 
@@ -169,6 +170,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
   const tokens = useMemo(() => getThemeTokens(isDark), [isDark])
 
   const [studioBg, setStudioBg] = useState<StudioBgConfig>(loadStudioBg)
+  setActiveStudioBg(studioBg)
   const studioBgHex = useMemo(() => resolveStudioBgHex(studioBg), [studioBg])
   const darkCanvas = useMemo(
     () => (studioBg.autoContrast ? isStudioBgDark(studioBgHex) : isDark),
@@ -519,8 +521,10 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
       preset,
       false
     )
+    void studioBgHex
+    void studioBg.autoContrast
     return applySoleColorToFootwear(honestBase, soleConfig)
-  }, [harmonyPalette, baseHue, tintWhite, shadeBlack, chromaScale, modelMode, preset, soleConfig])
+  }, [harmonyPalette, baseHue, tintWhite, shadeBlack, chromaScale, modelMode, preset, soleConfig, studioBgHex, studioBg.autoContrast])
 
   const contrast = useMemo(
     () => evaluateHarmonyContrast(harmonyPalette, sneakerColors),
@@ -711,7 +715,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
 
   const swatchStrip = (
     <div
-      className="shrink-0 px-4 py-2.5 border-t"
+      className="shrink-0 px-4 py-2 border-t"
       style={{
         backgroundColor: tokens.pageBg,
         borderColor: tokens.border,
@@ -722,7 +726,10 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
           <button
             key={slot.key}
             type="button"
-            onClick={() => copyText(slot.key, slot.hex)}
+            onClick={() => {
+              copyText(slot.key, slot.hex)
+              showToast(slot.hex + ' · ' + t.copied)
+            }}
             className={`${slot.flex} min-w-0 text-left`}
             title={t.copyHex}
           >
@@ -742,7 +749,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 {slot.share}
               </span>
             </div>
-            <div className="mt-1 text-[10.5px] font-mono tabular-nums font-medium leading-none" style={{ color: tokens.ink }}>
+            <div className="hidden md:block mt-1 text-[10.5px] font-mono tabular-nums font-medium leading-none" style={{ color: tokens.ink }}>
               {copiedKey === slot.key ? t.copied : slot.hex}
             </div>
           </button>
