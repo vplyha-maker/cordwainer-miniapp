@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { ChevronUp, ChevronDown, RotateCcw, Check, Sparkles, Sliders, X } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { RotateCcw, Check, BookOpen, X } from 'lucide-react'
 import type { Lang } from '../../App'
 import {
   ColorModelMode,
@@ -46,8 +46,6 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
     onChangeShade,
     onChangeChroma,
   }) => {
-    const [collapsed, setCollapsed] = useState(false)
-
     const stepHue = (delta: number) => {
       triggerHaptic('select', hapticsEnabled)
       onChangeHue((Math.round(baseHue) + delta + 360) % 360)
@@ -106,109 +104,88 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
     ]
 
     return (
-      <div
-        className="rounded-3xl border px-4 pb-4 pt-3 transition-colors duration-200"
-        style={{
-          backgroundColor: tokens.cardBg,
-          borderColor: tokens.border,
-          boxShadow: tokens.shadowCard,
-        }}
-      >
-        <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="space-y-4">
+        <div
+          className="flex items-center justify-between gap-3 pb-3 border-b"
+          style={{ borderColor: tokens.border }}
+        >
           <div className="flex items-center gap-3 min-w-0">
-            <div
-              className="w-[50px] h-[50px] rounded-2xl shrink-0 border"
+            <span
+              className="w-8 h-8 rounded-lg shrink-0 border"
               style={{
                 backgroundColor: primaryHex,
                 borderColor: tokens.strongBorder,
               }}
             />
             <div className="min-w-0">
-              <div className="text-[14px] font-semibold tracking-tight truncate" style={{ color: tokens.ink }}>
+              <div className="text-[14px] font-medium tracking-tight" style={{ color: tokens.ink }}>
                 {t.toneTitle}
               </div>
-              <div className="text-[11px] font-mono truncate" style={{ color: tokens.muted }}>
+              <div className="text-[12px] font-mono tabular-nums truncate" style={{ color: tokens.muted }}>
                 {primaryHex} · {formatOklch(primaryHex)}
               </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic('tap', hapticsEnabled)
-              setCollapsed((prev) => !prev)
-            }}
-            aria-label={t.toneTitle}
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-colors"
-            style={{
-              backgroundColor: tokens.elevatedBg,
-              borderColor: tokens.border,
-              color: tokens.muted,
-            }}
-          >
-            {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-          </button>
         </div>
 
-        {!collapsed && (
-          <div className="space-y-3">
-            {rows.map((row) => (
-              <div key={row.label} className="min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1.5 min-w-0">
+        <div className="space-y-4">
+          {rows.map((row) => (
+            <div key={row.label} className="min-w-0">
+              <div className="flex items-center justify-between gap-3 mb-2 min-w-0">
+                <span className="text-[13px] font-medium" style={{ color: tokens.ink }}>
+                  {row.label}
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className="text-[11px] font-medium uppercase tracking-wider truncate"
+                    className="text-[13px] font-mono tabular-nums w-11 text-right"
                     style={{ color: tokens.muted }}
                   >
-                    {row.label}
+                    {row.valueText}
                   </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[12px] font-mono font-semibold tabular-nums" style={{ color: tokens.ink }}>
-                      {row.valueText}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={row.onMinus}
-                      className="w-7 h-7 rounded-full border text-[15px] leading-none flex items-center justify-center transition-colors"
-                      style={{
-                        backgroundColor: tokens.elevatedBg,
-                        borderColor: tokens.border,
-                        color: tokens.ink,
-                      }}
-                    >
-                      −
-                    </button>
-                    <button
-                      type="button"
-                      onClick={row.onPlus}
-                      className="w-7 h-7 rounded-full border text-[15px] leading-none flex items-center justify-center transition-colors"
-                      style={{
-                        backgroundColor: tokens.elevatedBg,
-                        borderColor: tokens.border,
-                        color: tokens.ink,
-                      }}
-                    >
-                      +
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={row.onMinus}
+                    aria-label={row.label + ' -'}
+                    className="w-8 h-8 rounded-lg border text-[16px] leading-none flex items-center justify-center transition-colors"
+                    style={{
+                      backgroundColor: tokens.cardBg,
+                      borderColor: tokens.border,
+                      color: tokens.ink,
+                    }}
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    onClick={row.onPlus}
+                    aria-label={row.label + ' +'}
+                    className="w-8 h-8 rounded-lg border text-[16px] leading-none flex items-center justify-center transition-colors"
+                    style={{
+                      backgroundColor: tokens.cardBg,
+                      borderColor: tokens.border,
+                      color: tokens.ink,
+                    }}
+                  >
+                    +
+                  </button>
                 </div>
-                <input
-                  type="range"
-                  min={row.min}
-                  max={row.max}
-                  step={row.step}
-                  value={row.value}
-                  onChange={(e) => row.onSlider(Number(e.target.value))}
-                  className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    backgroundColor: tokens.trackBg,
-                    accentColor: tokens.activeTintBorder,
-                  }}
-                />
               </div>
-            ))}
-          </div>
-        )}
+              <input
+                type="range"
+                min={row.min}
+                max={row.max}
+                step={row.step}
+                value={row.value}
+                onChange={(e) => row.onSlider(Number(e.target.value))}
+                className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                style={{
+                  backgroundColor: tokens.trackBg,
+                  accentColor: tokens.activeTintBorder,
+                }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -223,6 +200,8 @@ type SoleColorCardProps = {
   onResetSole: () => void
 }
 
+const EXTRA_SOLE_TONES = ['#F0EAE0', '#D8CFC2', '#7A746B', '#4A3728']
+
 export const SoleColorCard: React.FC<SoleColorCardProps> = ({
   t,
   tokens,
@@ -233,29 +212,27 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
 }) => {
   const [hexDraft, setHexDraft] = useState(soleConfig.customHex)
 
+  useEffect(() => {
+    setHexDraft(soleConfig.customHex)
+  }, [soleConfig.customHex])
+
   const handleCustomHex = (raw: string) => {
-    setHexDraft(raw)
-    const normalized = normalizeHex(raw, '')
+    const cleaned = raw.startsWith('#') ? raw : '#' + raw
+    setHexDraft(cleaned.toUpperCase())
+    const normalized = normalizeHex(cleaned, '')
     if (normalized) {
       onChangeSole({ presetId: 'custom', customHex: normalized })
     }
   }
 
   return (
-    <div
-      className="rounded-3xl border p-4 transition-colors duration-200"
-      style={{
-        backgroundColor: tokens.cardBg,
-        borderColor: tokens.border,
-        boxShadow: tokens.shadowCard,
-      }}
-    >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="min-w-0">
-          <div className="text-[14px] font-semibold tracking-tight" style={{ color: tokens.ink }}>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[15px] font-medium tracking-tight" style={{ color: tokens.ink }}>
             {t.soleTitle}
           </div>
-          <div className="text-[11px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
+          <div className="text-[13px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
             {t.soleSubtitle}
           </div>
         </div>
@@ -267,20 +244,20 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
               setHexDraft('#FAF8F4')
               onResetSole()
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-[11px] font-medium shrink-0 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium shrink-0 transition-colors"
             style={{
-              backgroundColor: tokens.elevatedBg,
+              backgroundColor: tokens.cardBg,
               borderColor: tokens.border,
               color: tokens.ink,
             }}
           >
-            <RotateCcw className="w-3 h-3" />
+            <RotateCcw className="w-3.5 h-3.5" />
             {t.soleReset}
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {SOLE_PRESETS.map((preset) => {
           const active = soleConfig.presetId === preset.id
           return (
@@ -291,15 +268,15 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
                 triggerHaptic('select', hapticsEnabled)
                 onChangeSole({ presetId: preset.id, customHex: preset.midsole })
               }}
-              className="flex items-center gap-2 p-2.5 rounded-2xl border text-left transition-colors min-w-0"
+              className="flex items-center gap-3 px-3.5 py-3 rounded-xl border text-left transition-colors"
               style={{
-                backgroundColor: active ? tokens.activeTintBg : tokens.elevatedBg,
+                backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
                 borderColor: active ? tokens.activeTintBorder : tokens.border,
                 color: tokens.ink,
               }}
             >
               <span
-                className="w-6 h-6 rounded-full shrink-0 border flex items-center justify-center"
+                className="w-7 h-7 rounded-full shrink-0 border flex items-center justify-center"
                 style={{
                   background: `linear-gradient(180deg, ${preset.midsole} 62%, ${preset.outsole} 62%)`,
                   borderColor: tokens.strongBorder,
@@ -307,54 +284,72 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
               >
                 {active && (
                   <Check
-                    className="w-3 h-3"
+                    className="w-3.5 h-3.5"
                     style={{
-                      color: preset.id === 'black' || preset.id === 'graphite' ? '#FAF8F4' : '#1C1A17',
+                      color: preset.id === 'black' || preset.id === 'graphite' ? '#F4F0E8' : '#181613',
                     }}
                   />
                 )}
               </span>
-              <span className="text-[11px] font-medium truncate">{t.solePresets[preset.id]}</span>
+              <span className="text-[13px] font-medium leading-tight">
+                {t.solePresets[preset.id]}
+              </span>
             </button>
           )
         })}
       </div>
 
       <div
-        className="mt-3 pt-3 border-t flex items-center justify-between gap-2"
+        className="pt-4 border-t flex flex-wrap items-center justify-between gap-3"
         style={{ borderColor: tokens.border }}
       >
-        <span className="text-[11px] font-medium" style={{ color: tokens.muted }}>
-          {t.soleCustom}
-        </span>
         <div className="flex items-center gap-2">
-          <label
-            className="w-7 h-7 rounded-full border overflow-hidden cursor-pointer shrink-0 block"
+          <span className="text-[13px] font-medium" style={{ color: tokens.muted }}>
+            {t.soleCustom}
+          </span>
+          <div className="flex items-center gap-1.5">
+            {EXTRA_SOLE_TONES.map((tone) => {
+              const active = soleConfig.presetId === 'custom' && soleConfig.customHex === tone
+              return (
+                <button
+                  key={tone}
+                  type="button"
+                  aria-label={tone}
+                  onClick={() => {
+                    triggerHaptic('select', hapticsEnabled)
+                    setHexDraft(tone)
+                    onChangeSole({ presetId: 'custom', customHex: tone })
+                  }}
+                  className="w-6 h-6 rounded-full border transition-transform"
+                  style={{
+                    backgroundColor: tone,
+                    borderColor: active ? tokens.activeTintBorder : tokens.strongBorder,
+                    boxShadow: active ? `0 0 0 2px ${tokens.activeTintBorder}` : 'none',
+                  }}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span
+            className="w-7 h-7 rounded-lg border shrink-0"
             style={{
-              backgroundColor: soleConfig.customHex,
-              borderColor: soleConfig.presetId === 'custom' ? tokens.activeTintBorder : tokens.strongBorder,
+              backgroundColor: normalizeHex(soleConfig.customHex, '#FAF8F4'),
+              borderColor: tokens.strongBorder,
             }}
-          >
-            <input
-              type="color"
-              value={normalizeHex(soleConfig.customHex, '#FAF8F4')}
-              onChange={(e) => {
-                const nextHex = e.target.value.toUpperCase()
-                setHexDraft(nextHex)
-                onChangeSole({ presetId: 'custom', customHex: nextHex })
-              }}
-              className="opacity-0 w-full h-full cursor-pointer"
-            />
-          </label>
+          />
           <input
             type="text"
             value={hexDraft}
             onChange={(e) => handleCustomHex(e.target.value)}
             maxLength={7}
-            className="w-[84px] px-2.5 py-1.5 rounded-xl border text-[12px] font-mono uppercase focus:outline-none"
+            spellCheck={false}
+            className="w-[96px] px-3 py-1.5 rounded-lg border text-[13px] font-mono uppercase tracking-wider focus:outline-none"
             style={{
               backgroundColor: tokens.elevatedBg,
-              borderColor: soleConfig.presetId === 'custom' ? tokens.activeTintBorder : tokens.border,
+              borderColor: soleConfig.presetId === 'custom' ? tokens.activeTintBorder : tokens.strongBorder,
               color: tokens.ink,
             }}
           />
@@ -372,6 +367,8 @@ type StudioBgCardProps = {
   onChangeStudioBg: (next: StudioBgConfig) => void
 }
 
+const EXTRA_BG_TONES = ['#EDE8DF', '#D6D2C9', '#383633', '#191B1E']
+
 export const StudioBgCard: React.FC<StudioBgCardProps> = ({
   t,
   tokens,
@@ -381,33 +378,31 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
 }) => {
   const [hexDraft, setHexDraft] = useState(studioBg.customHex)
 
+  useEffect(() => {
+    setHexDraft(studioBg.customHex)
+  }, [studioBg.customHex])
+
   const handleCustomHex = (raw: string) => {
-    setHexDraft(raw)
-    const normalized = normalizeHex(raw, '')
+    const cleaned = raw.startsWith('#') ? raw : '#' + raw
+    setHexDraft(cleaned.toUpperCase())
+    const normalized = normalizeHex(cleaned, '')
     if (normalized) {
       onChangeStudioBg({ ...studioBg, id: 'custom', customHex: normalized })
     }
   }
 
   return (
-    <div
-      className="rounded-3xl border p-4 transition-colors duration-200"
-      style={{
-        backgroundColor: tokens.cardBg,
-        borderColor: tokens.border,
-        boxShadow: tokens.shadowCard,
-      }}
-    >
-      <div className="mb-3">
-        <div className="text-[14px] font-semibold tracking-tight" style={{ color: tokens.ink }}>
+    <div className="space-y-4">
+      <div>
+        <div className="text-[15px] font-medium tracking-tight" style={{ color: tokens.ink }}>
           {t.bgTitle}
         </div>
-        <div className="text-[11px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
+        <div className="text-[13px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
           {t.bgSubtitle}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {STUDIO_BG_PRESETS.map((preset) => {
           const active = studioBg.id === preset.id
           return (
@@ -418,15 +413,15 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
                 triggerHaptic('select', hapticsEnabled)
                 onChangeStudioBg({ ...studioBg, id: preset.id, customHex: preset.hex })
               }}
-              className="flex items-center gap-2 p-2.5 rounded-2xl border text-left transition-colors min-w-0"
+              className="flex items-center gap-3 px-3.5 py-3 rounded-xl border text-left transition-colors"
               style={{
-                backgroundColor: active ? tokens.activeTintBg : tokens.elevatedBg,
+                backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
                 borderColor: active ? tokens.activeTintBorder : tokens.border,
                 color: tokens.ink,
               }}
             >
               <span
-                className="w-6 h-6 rounded-full shrink-0 border flex items-center justify-center"
+                className="w-7 h-7 rounded-full shrink-0 border flex items-center justify-center"
                 style={{
                   backgroundColor: preset.hex,
                   borderColor: tokens.strongBorder,
@@ -434,62 +429,75 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
               >
                 {active && (
                   <Check
-                    className="w-3 h-3"
+                    className="w-3.5 h-3.5"
                     style={{
-                      color: preset.id === 'black' || preset.id === 'graphite' ? '#FAF8F4' : '#1C1A17',
+                      color: preset.id === 'black' || preset.id === 'graphite' ? '#F4F0E8' : '#181613',
                     }}
                   />
                 )}
               </span>
-              <span className="text-[11px] font-medium truncate">{t.bgPresets[preset.id]}</span>
+              <span className="text-[13px] font-medium leading-tight">
+                {t.bgPresets[preset.id]}
+              </span>
             </button>
           )
         })}
 
-        <label
-          className="flex items-center gap-2 p-2.5 rounded-2xl border text-left cursor-pointer transition-colors min-w-0"
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('select', hapticsEnabled)
+            onChangeStudioBg({ ...studioBg, id: 'custom' })
+          }}
+          className="flex items-center gap-3 px-3.5 py-3 rounded-xl border text-left transition-colors"
           style={{
-            backgroundColor: studioBg.id === 'custom' ? tokens.activeTintBg : tokens.elevatedBg,
+            backgroundColor: studioBg.id === 'custom' ? tokens.activeTintBg : tokens.cardBg,
             borderColor: studioBg.id === 'custom' ? tokens.activeTintBorder : tokens.border,
             color: tokens.ink,
           }}
         >
           <span
-            className="w-6 h-6 rounded-full shrink-0 border relative overflow-hidden"
+            className="w-7 h-7 rounded-full shrink-0 border"
             style={{
-              backgroundColor: studioBg.customHex,
+              backgroundColor: normalizeHex(studioBg.customHex, '#F4F1EA'),
               borderColor: tokens.strongBorder,
             }}
-          >
-            <input
-              type="color"
-              value={normalizeHex(studioBg.customHex, '#F5F1EB')}
-              onChange={(e) => {
-                const nextHex = e.target.value.toUpperCase()
-                setHexDraft(nextHex)
-                onChangeStudioBg({ ...studioBg, id: 'custom', customHex: nextHex })
-              }}
-              className="opacity-0 inset-0 absolute w-full h-full cursor-pointer"
-            />
-          </span>
-          <span className="text-[11px] font-medium truncate">{t.bgCustom}</span>
-        </label>
+          />
+          <span className="text-[13px] font-medium leading-tight">{t.bgCustom}</span>
+        </button>
       </div>
 
       {studioBg.id === 'custom' && (
         <div
-          className="mt-3 pt-3 border-t flex items-center justify-between gap-2"
+          className="pt-3 border-t flex flex-wrap items-center justify-between gap-3"
           style={{ borderColor: tokens.border }}
         >
-          <span className="text-[11px] font-medium" style={{ color: tokens.muted }}>
-            HEX
-          </span>
+          <div className="flex items-center gap-1.5">
+            {EXTRA_BG_TONES.map((tone) => (
+              <button
+                key={tone}
+                type="button"
+                aria-label={tone}
+                onClick={() => {
+                  triggerHaptic('select', hapticsEnabled)
+                  setHexDraft(tone)
+                  onChangeStudioBg({ ...studioBg, id: 'custom', customHex: tone })
+                }}
+                className="w-6 h-6 rounded-full border"
+                style={{
+                  backgroundColor: tone,
+                  borderColor: studioBg.customHex === tone ? tokens.activeTintBorder : tokens.strongBorder,
+                }}
+              />
+            ))}
+          </div>
           <input
             type="text"
             value={hexDraft}
             onChange={(e) => handleCustomHex(e.target.value)}
             maxLength={7}
-            className="w-[92px] px-2.5 py-1.5 rounded-xl border text-[12px] font-mono uppercase focus:outline-none"
+            spellCheck={false}
+            className="w-[96px] px-3 py-1.5 rounded-lg border text-[13px] font-mono uppercase tracking-wider focus:outline-none"
             style={{
               backgroundColor: tokens.elevatedBg,
               borderColor: tokens.activeTintBorder,
@@ -500,14 +508,14 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
       )}
 
       <div
-        className="mt-3 pt-3 border-t flex items-center justify-between gap-3"
+        className="pt-4 border-t flex items-center justify-between gap-4"
         style={{ borderColor: tokens.border }}
       >
         <div className="min-w-0">
-          <div className="text-[12px] font-medium" style={{ color: tokens.ink }}>
+          <div className="text-[14px] font-medium" style={{ color: tokens.ink }}>
             {t.bgAutoContrast}
           </div>
-          <div className="text-[11px] leading-snug" style={{ color: tokens.muted }}>
+          <div className="text-[12px] leading-snug mt-0.5" style={{ color: tokens.muted }}>
             {t.bgAutoContrastDesc}
           </div>
         </div>
@@ -519,7 +527,7 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
             triggerHaptic('select', hapticsEnabled)
             onChangeStudioBg({ ...studioBg, autoContrast: !studioBg.autoContrast })
           }}
-          className="w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 relative"
+          className="w-12 h-7 rounded-full p-0.5 transition-colors shrink-0"
           style={{
             backgroundColor: studioBg.autoContrast ? tokens.activeTintBorder : tokens.trackBg,
           }}
@@ -570,44 +578,40 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
   onOpenGuide,
 }) => {
   return (
-    <div className="space-y-3.5 pb-6">
-      <StudioBgCard
-        t={t}
-        tokens={tokens}
-        studioBg={studioBg}
-        hapticsEnabled={hapticsEnabled}
-        onChangeStudioBg={onChangeStudioBg}
-      />
+    <div className="space-y-7 pb-8">
+      <section>
+        <StudioBgCard
+          t={t}
+          tokens={tokens}
+          studioBg={studioBg}
+          hapticsEnabled={hapticsEnabled}
+          onChangeStudioBg={onChangeStudioBg}
+        />
+      </section>
 
-      <SoleColorCard
-        t={t}
-        tokens={tokens}
-        soleConfig={soleConfig}
-        hapticsEnabled={hapticsEnabled}
-        onChangeSole={onChangeSole}
-        onResetSole={onResetSole}
-      />
+      <section className="pt-6 border-t" style={{ borderColor: tokens.border }}>
+        <SoleColorCard
+          t={t}
+          tokens={tokens}
+          soleConfig={soleConfig}
+          hapticsEnabled={hapticsEnabled}
+          onChangeSole={onChangeSole}
+          onResetSole={onResetSole}
+        />
+      </section>
 
-      <div
-        className="rounded-3xl border p-4 space-y-4"
-        style={{
-          backgroundColor: tokens.cardBg,
-          borderColor: tokens.border,
-          boxShadow: tokens.shadowCard,
-        }}
-      >
-        <div className="flex items-center gap-2 text-[14px] font-semibold" style={{ color: tokens.ink }}>
-          <Sliders className="w-4 h-4" style={{ color: tokens.activeTintBorder }} />
+      <section className="pt-6 border-t space-y-4" style={{ borderColor: tokens.border }}>
+        <div className="text-[15px] font-medium tracking-tight" style={{ color: tokens.ink }}>
           {t.interfaceBlock}
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[12px] font-medium" style={{ color: tokens.ink }}>
+          <span className="text-[13px] font-medium" style={{ color: tokens.ink }}>
             {t.wheelModelLabel}
           </span>
           <div
-            className="inline-flex p-1 rounded-full border"
-            style={{ backgroundColor: tokens.elevatedBg, borderColor: tokens.border }}
+            className="inline-flex p-0.5 rounded-lg border"
+            style={{ backgroundColor: tokens.cardBg, borderColor: tokens.border }}
           >
             {(['ryb', 'oklch'] as const).map((m) => {
               const active = modelMode === m || (m === 'oklch' && modelMode === 'hsl')
@@ -619,7 +623,7 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
                     triggerHaptic('select', hapticsEnabled)
                     onChangeModelMode(m)
                   }}
-                  className="px-3 py-1 rounded-full text-[11px] font-semibold uppercase transition-colors"
+                  className="px-3.5 py-1.5 rounded-md text-[12px] font-medium uppercase transition-colors"
                   style={{
                     backgroundColor: active ? tokens.activeTintBg : 'transparent',
                     color: active ? tokens.activeTintInk : tokens.muted,
@@ -633,14 +637,14 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
         </div>
 
         <div
-          className="pt-3 border-t flex items-center justify-between gap-3"
+          className="pt-4 border-t flex items-center justify-between gap-3"
           style={{ borderColor: tokens.border }}
         >
           <div className="min-w-0">
-            <div className="text-[12px] font-medium" style={{ color: tokens.ink }}>
+            <div className="text-[13px] font-medium" style={{ color: tokens.ink }}>
               {t.hapticsLabel}
             </div>
-            <div className="text-[11px]" style={{ color: tokens.muted }}>
+            <div className="text-[12px] mt-0.5" style={{ color: tokens.muted }}>
               {t.hapticsDesc}
             </div>
           </div>
@@ -664,15 +668,15 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
         </div>
 
         <div
-          className="pt-3 border-t flex items-center justify-between gap-3"
+          className="pt-4 border-t flex items-center justify-between gap-3"
           style={{ borderColor: tokens.border }}
         >
-          <span className="text-[12px] font-medium" style={{ color: tokens.ink }}>
+          <span className="text-[13px] font-medium" style={{ color: tokens.ink }}>
             {t.langLabel}
           </span>
           <div
-            className="inline-flex p-1 rounded-full border"
-            style={{ backgroundColor: tokens.elevatedBg, borderColor: tokens.border }}
+            className="inline-flex p-0.5 rounded-lg border"
+            style={{ backgroundColor: tokens.cardBg, borderColor: tokens.border }}
           >
             {(['ru', 'uk', 'de'] as Lang[]).map((code) => {
               const active = lang === code
@@ -684,7 +688,7 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
                     triggerHaptic('select', hapticsEnabled)
                     onChangeLang(code)
                   }}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase transition-colors"
+                  className="px-3 py-1.5 rounded-md text-[12px] font-medium uppercase transition-colors"
                   style={{
                     backgroundColor: active ? tokens.activeTintBg : 'transparent',
                     color: active ? tokens.activeTintInk : tokens.muted,
@@ -703,17 +707,17 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
             triggerHaptic('tap', hapticsEnabled)
             onOpenGuide()
           }}
-          className="w-full py-2.5 px-4 rounded-2xl border text-[12px] font-semibold flex items-center justify-center gap-2 transition-colors"
+          className="w-full py-3 px-4 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
           style={{
-            backgroundColor: tokens.elevatedBg,
+            backgroundColor: tokens.cardBg,
             borderColor: tokens.border,
             color: tokens.ink,
           }}
         >
-          <Sparkles className="w-3.5 h-3.5" style={{ color: tokens.activeTintBorder }} />
+          <BookOpen className="w-4 h-4" style={{ color: tokens.activeTintBorder }} />
           {t.guideSections.title}
         </button>
-      </div>
+      </section>
     </div>
   )
 }
@@ -727,29 +731,32 @@ type GuideModalProps = {
 export const GuideModal: React.FC<GuideModalProps> = ({ t, tokens, onClose }) => {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6"
-      style={{ backgroundColor: 'rgba(10, 10, 12, 0.56)' }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+      style={{ backgroundColor: 'rgba(8, 8, 10, 0.64)' }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-3xl border p-5 max-h-[82vh] overflow-y-auto"
+        className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl border p-6 max-h-[84vh] overflow-y-auto"
         style={{
-          backgroundColor: tokens.cardBg,
+          backgroundColor: tokens.pageBg,
           borderColor: tokens.strongBorder,
-          boxShadow: tokens.shadowCard,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <h3 className="text-[16px] font-semibold tracking-tight" style={{ color: tokens.ink }}>
+        <div className="flex items-center justify-between gap-3 pb-4 border-b" style={{ borderColor: tokens.border }}>
+          <h3
+            className="text-[20px] font-medium tracking-tight"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif", color: tokens.ink }}
+          >
             {t.guideSections.title}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full border flex items-center justify-center"
+            aria-label={t.guideSections.close}
+            className="w-9 h-9 rounded-full border flex items-center justify-center"
             style={{
-              backgroundColor: tokens.elevatedBg,
+              backgroundColor: tokens.cardBg,
               borderColor: tokens.border,
               color: tokens.muted,
             }}
@@ -758,20 +765,13 @@ export const GuideModal: React.FC<GuideModalProps> = ({ t, tokens, onClose }) =>
           </button>
         </div>
 
-        <div className="space-y-3.5">
+        <div className="divide-y" style={{ borderColor: tokens.border }}>
           {t.guideSections.items.map((item) => (
-            <div
-              key={item.heading}
-              className="rounded-2xl border p-3.5"
-              style={{
-                backgroundColor: tokens.elevatedBg,
-                borderColor: tokens.border,
-              }}
-            >
-              <div className="text-[13px] font-semibold mb-1" style={{ color: tokens.ink }}>
+            <div key={item.heading} className="py-4" style={{ borderColor: tokens.border }}>
+              <div className="text-[14px] font-semibold mb-1.5" style={{ color: tokens.ink }}>
                 {item.heading}
               </div>
-              <p className="text-[12px] leading-relaxed" style={{ color: tokens.muted }}>
+              <p className="text-[13px] leading-relaxed" style={{ color: tokens.muted }}>
                 {item.body}
               </p>
             </div>
@@ -781,7 +781,7 @@ export const GuideModal: React.FC<GuideModalProps> = ({ t, tokens, onClose }) =>
         <button
           type="button"
           onClick={onClose}
-          className="mt-4 w-full py-3 rounded-2xl text-[13px] font-semibold transition-colors"
+          className="mt-4 w-full py-3 rounded-xl text-[13px] font-semibold transition-colors"
           style={{
             backgroundColor: tokens.primaryBtnBg,
             color: tokens.primaryBtnInk,
@@ -793,4 +793,3 @@ export const GuideModal: React.FC<GuideModalProps> = ({ t, tokens, onClose }) =>
     </div>
   )
 }
-
