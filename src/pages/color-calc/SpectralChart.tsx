@@ -378,7 +378,7 @@ export function SpectralChart({
             fontSize: 9.5,
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
           },
-          data: [{ coord: peakPoint }],
+          data: [{ name: 'Peak', coord: peakPoint }],
         },
         markLine: {
           silent: true,
