@@ -134,10 +134,20 @@ function normalizeFavoriteImage(src: string): string {
   return src.replace('/blog-hero.png', '/blog-hero.webp')
 }
 
+function getInitialStyleId(): string | null {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('style')?.trim() || null
+  } catch {
+    return null
+  }
+}
+
 function getInitialScreen(): Screen {
   try {
     const path = window.location.pathname.replace(/\/+$/, '') || '/'
     if (path === '/forward-ortho-converter') return 'seo-width'
+    if (getInitialStyleId()) return 'styles'
   } catch {}
   return 'welcome'
 }
@@ -145,6 +155,7 @@ function getInitialScreen(): Screen {
 export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
   const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome')
+  const [pendingStyleId, setPendingStyleId] = useState<string | null>(getInitialStyleId)
 
   const [isMobileWebView] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -302,6 +313,12 @@ export default function App() {
             window.history.replaceState({}, '', newUrl.toString())
           }
           setScreen('sneakers')
+        } else if (param.startsWith('style_')) {
+          const styleId = param.replace('style_', '').trim()
+          if (styleId) {
+            setPendingStyleId(styleId)
+            setScreen('styles')
+          }
         }
       }
     } catch (e) {
@@ -309,7 +326,7 @@ export default function App() {
     }
   }, [])
 
-  const isWideStudioScreen = screen === 'colors' || screen === 'color-calc'
+  const isWideStudioScreen = screen === 'colors' || screen === 'color-calc' || screen === 'styles'
 
   const appContent = (
     <div
@@ -403,7 +420,24 @@ export default function App() {
         {screen === 'heel-calc' && <HeelCalcPage key="heel-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
         {screen === 'color-calc' && <ColorCalcPage key="color-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
         {screen === 'colors' && <ColorsPage key="colors" onBack={() => setScreen('home')} lang={lang} setLang={handleSetLang} />}
-        {screen === 'styles' && <StylesPage key="styles" onBack={() => setScreen('home')} lang={lang} />}
+        {screen === 'styles' && (
+          <StylesPage
+            key="styles"
+            lang={lang}
+            initialStyleId={pendingStyleId}
+            onBack={() => {
+              setPendingStyleId(null)
+              try {
+                const url = new URL(window.location.href)
+                if (url.searchParams.has('style')) {
+                  url.searchParams.delete('style')
+                  window.history.replaceState(null, '', url.pathname + url.search)
+                }
+              } catch {}
+              setScreen('home')
+            }}
+          />
+        )}
         {screen === 'glossary' && <GlossaryPage key="glossary" lang={lang} initialTermId={selectedGlossaryTermId} onBack={() => { setSelectedGlossaryTermId(null); setScreen('home') }} />}
         {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
         {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
