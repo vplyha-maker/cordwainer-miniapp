@@ -1,381 +1,610 @@
-import type { Lang as AppLang } from '../../App'
-import type { FootwearMappingPreset } from './colorEngine'
+import type { Lang } from '../../App'
+import type { FootwearMappingPreset, Scheme, SneakerZoneKey, SolePresetId } from './colorEngine'
+import type { StudioBgId, ThemeMode } from './themeSystem'
 
-export const PRO_COLORS_PRICE_STARS = 250
-
-export type SupportedLang = 'ru' | 'uk' | 'de'
-
-const APP_NATIVE_LANGS: readonly ('ru' | 'uk')[] = ['ru', 'uk']
-
-export function normalizeSupportedLang(input: unknown): SupportedLang {
-  if (input === 'ru' || input === 'uk' || input === 'de') return input
-  return 'ru'
+export type ColorsTranslation = {
+  title: string
+  settingsTitle: string
+  back: string
+  guide: string
+  tabs: {
+    colors: string
+    models: string
+    harmonies: string
+    palette: string
+  }
+  subTabs: {
+    tone: string
+    sole: string
+    bg: string
+  }
+  themeModes: Record<ThemeMode, string>
+  honestBadge: string
+  honestSubtext: string
+  soleTitle: string
+  soleSubtitle: string
+  soleReset: string
+  soleCustom: string
+  solePresets: Record<Exclude<SolePresetId, 'custom'>, string>
+  bgTitle: string
+  bgSubtitle: string
+  bgCustom: string
+  bgAutoContrast: string
+  bgAutoContrastDesc: string
+  bgPresets: Record<Exclude<StudioBgId, 'custom'>, string>
+  toneTitle: string
+  hueLabel: string
+  tintLabel: string
+  shadeLabel: string
+  chromaLabel: string
+  wheelModelLabel: string
+  hapticsLabel: string
+  hapticsDesc: string
+  langLabel: string
+  interfaceBlock: string
+  slots: {
+    primary: string
+    primaryDesc: string
+    secondary: string
+    secondaryDesc: string
+    accent: string
+    accentDesc: string
+  }
+  contrastLabel: string
+  contrastLevels: {
+    soft: string
+    optimal: string
+    high: string
+  }
+  copyHex: string
+  copied: string
+  copySpec: string
+  specTitle: string
+  savePalette: string
+  savedToast: string
+  savedEmpty: string
+  applyPalette: string
+  deletePalette: string
+  confirmDelete: string
+  cancel: string
+  proBadge: string
+  proTitle: string
+  proDesc: string
+  proBuyBtn: string
+  proProcessing: string
+  proActive: string
+  schemes: Record<Scheme, { name: string; short: string; desc: string }>
+  presets: Record<FootwearMappingPreset, string>
+  zones: Record<SneakerZoneKey, string>
+  modelNotes: Record<'aerostrap' | 'nexus' | 'monolith', string>
+  guideSections: {
+    title: string
+    items: { heading: string; body: string }[]
+    close: string
+  }
 }
 
-export function isAppNativeLang(input: SupportedLang): input is AppLang & ('ru' | 'uk') {
-  return APP_NATIVE_LANGS.includes(input as 'ru' | 'uk')
-}
-
-export const TRANSLATIONS = {
+export const COLORS_TRANSLATIONS: Record<Lang, ColorsTranslation> = {
   ru: {
     title: 'Цвета',
-    complementary: 'Комплементарная',
-    analogous: 'Аналогичная',
-    triadic: 'Триадная',
-    tetradic: 'Тетрада (квадрат)',
-    rectangular: 'Тетрада (прямоуг.)',
-    'split-complementary': 'Контрастная триада',
-    monochromatic: 'Монохромная',
-    main60: '60%',
-    secondary30: '30%',
-    accent10: '10%',
-    main55: '55%',
-    secondary20: '20%',
-    secondary15: '15%',
-    roleClassicUpper: 'Верх • Пятка',
-    roleClassicDetailsAll: 'Обвод • Волна • Ремень',
-    roleClassicDetails: 'Обвод • Волна • Ремень',
-    roleClassicLining: 'Канты • Подкладка',
-    roleClassicAccent: 'Штрихи • Air блок',
-    roleToeMain: 'Верх • Пятка',
-    roleToeSecondary: 'Волна • Ремень • Air',
-    roleToeLining: 'Канты • Подкладка',
-    roleToeAccent: 'Мысок • Штрихи',
-    roleSplitMain: 'Верх • Пятка • Штрихи',
-    roleSplitSecondary: 'Обвод • Язычок • Air',
-    roleSplitLining: 'Канты • Подкладка',
-    roleSplitAccent: 'Ремень • Боковая волна',
-    roleNeutralAccent: 'Штрихи • Задняя петля',
-    specTitle: 'Техкарта 13 зон (нажмите для копирования HEX)',
-    exportSpecBtn: 'Копировать техкарту',
-    exportCopied: 'Техкарта скопирована',
-    zone_vamp: 'Верх',
-    zone_toeBox: 'Обвод',
-    zone_quarters: 'Волна',
-    zone_eyestays: 'Ремень',
-    zone_heel: 'Пятка',
-    zone_collar: 'Канты',
-    zone_tongue: 'Язычок',
-    zone_lining: 'Подкладка',
-    zone_swoosh: 'Штрихи',
-    zone_midsole: 'EVA база',
-    zone_encap: 'Air блок',
-    zone_outsole: 'Протектор',
-    zone_laces: 'Пряжка',
-    quote: '«Цвет — это душа обуви.»',
-    white: 'Белила (Tint)',
-    black: 'Тень (Shade)',
-    chroma: 'Насыщенность',
-    pure: 'Пигмент',
-    ittenLabel: 'Круг Иттена (RYB)',
-    hslLabel: 'Цифровой (HSL)',
-    presetClassic: '60/30/10 База',
-    presetToe: 'Акцент мыска',
-    presetSplit: 'Сплит-берцы',
-    presetNeutral: 'Нейтр. подошва',
-    contrastOptimal: 'Оптимальный контраст',
-    contrastSoft: 'Мягкий нюанс',
-    contrastHigh: 'Высокий контраст',
+    settingsTitle: 'Настройки студии',
+    back: 'Назад',
+    guide: 'Гид',
+    tabs: {
+      colors: 'Цвета',
+      models: 'Модели',
+      harmonies: 'Гармонии',
+      palette: 'Палитра',
+    },
+    subTabs: {
+      tone: 'Тон',
+      sole: 'Подошва',
+      bg: 'Фон',
+    },
+    themeModes: {
+      day: 'День',
+      night: 'Ночь',
+      auto: 'Авто',
+    },
+    honestBadge: 'Честная гармония Иттена',
+    honestSubtext: 'Верх, берцы и акценты рассчитываются строго по кругу Иттена 60/30/10. Независимо настраиваются только фон и подошва.',
+    soleTitle: 'Цвет подошвы',
+    soleSubtitle: 'Нейтральная база — не влияет на схемы гармонии',
+    soleReset: 'Сбросить',
+    soleCustom: 'Свой HEX',
+    solePresets: {
+      white: 'Белая EVA',
+      cream: 'Кремовая',
+      stone: 'Серая',
+      graphite: 'Графит',
+      black: 'Чёрная',
+      gum: 'Каучук',
+    },
+    bgTitle: 'Фон студии',
+    bgSubtitle: 'Меняет только фон 3D-сцены, не затрагивая обувь',
+    bgCustom: 'Свой фон',
+    bgAutoContrast: 'Авто-контраст сцены',
+    bgAutoContrastDesc: 'Адаптирует подписи и 360° под яркость фона',
+    bgPresets: {
+      cream: 'Кремовый',
+      white: 'Белый',
+      'light-gray': 'Светло-серый',
+      graphite: 'Графит',
+      black: 'Чёрный',
+    },
+    toneTitle: 'Тон и насыщенность',
+    hueLabel: 'Оттенок',
+    tintLabel: 'Белила (Tint)',
+    shadeLabel: 'Тень (Shade)',
+    chromaLabel: 'Насыщенность',
+    wheelModelLabel: 'Цветовая модель круга',
+    hapticsLabel: 'Виброотклик',
+    hapticsDesc: 'Тактильная отдача кнопок и круга',
+    langLabel: 'Язык интерфейса',
+    interfaceBlock: 'Отображение и интерфейс',
+    slots: {
+      primary: '60% База',
+      primaryDesc: 'Верх · Пятка',
+      secondary: '30% Вторичный',
+      secondaryDesc: 'Берцы · Язычок',
+      accent: '10% Акцент',
+      accentDesc: 'Лого · Детали',
+    },
+    contrastLabel: 'Контраст',
+    contrastLevels: {
+      soft: 'Мягкий',
+      optimal: 'Оптимальный',
+      high: 'Высокий',
+    },
+    copyHex: 'Копировать HEX',
     copied: 'Скопировано',
-    resetBtn: '360° • Сброс',
-    loading3D: 'Загрузка 3D • CORDWAINE AEROSTRAP...',
-    webglFallback: 'WebGL недоступен • Режим палитры',
-    guideBtn: 'Гид',
-    guideTitle: 'Цвет в дизайне',
-    guideClose: 'Закрыть',
-    paywallTitle: 'PRO: Палитры Studio',
-    paywallDesc:
-      'Пожизненный доступ ко всем профессиональным схемам Иттена: триады, тетрады, монохром и полная техкарта 13 деталей кроя.',
-    paywallBtn: 'ОТКРЫТЬ ДОСТУП • ' + PRO_COLORS_PRICE_STARS + ' ⭐️',
-    loading: 'СОЗДАНИЕ СЧЁТА...',
-    verifying: 'ПРОВЕРКА ТРАНЗАКЦИИ...',
-    paymentTelegramOnly: 'Откройте приложение внутри Telegram для оплаты Stars.',
-    paymentVerifyFailed:
-      'Оплата ещё не подтверждена сервером. Подождите пару секунд и нажмите снова.',
-    paymentPendingMsg:
-      'Платёж обрабатывается Telegram. Доступ откроется автоматически после подтверждения.',
-    paymentGenericFailed: 'Оплата не была завершена. Попробуйте снова.',
-    paymentInvoiceError: 'Сбой создания счёта',
-    guideIntro:
-      'Круг Иттена (RYB) — классический художественный инструмент гармонизации цвета. В отличие от экранной модели RGB/HSL, в круге Иттена комплементарными парами выступают Красный–Зелёный, Синий–Оранжевый и Жёлтый–Фиолетовый, что создаёт благородные материальные сочетания для кожи и замши.',
-    guideBalanceTitle: 'Правило баланса',
-    guideBalance:
-      '60 % — основной цвет (верх и пятка, всегда привязаны к базовому углу круга).\n30 % — поддерживающий цвет (боковые панели, ремень, язычок).\n10 % — акцент (штрихи, мысок или капсула Air).\nНейтрали (EVA, протектор, фурнитура) не нарушают гармонику Иттена.',
-    guideSchemesTitle: 'Схемы и применение',
-    guideComplementary:
-      'Комплементарная — два противоположных цвета. Даёт сильный, энергичный контраст. Хороша для спортивной и fashion-обуви, где нужен яркий акцент на нейтральном фоне.',
-    guideAnalogous:
-      'Аналогичная — соседние цвета на круге. Создаёт мягкий, спокойный переход. Идеальна для классической и повседневной обуви, когда хочется богатства тона без резкости.',
-    guideTriadic:
-      'Триадная — три цвета через 120°. Живая и сбалансированная. Подходит для капсульных коллекций и сезонных цветовых историй.',
-    guideTetradic:
-      'Тетрада (квадрат) — четыре цвета через 90°. Самая яркая схема. Используйте один доминирующий тон, два поддерживающих и один чистый акцент, иначе композиция станет пёстрой.',
-    guideRectangular:
-      'Тетрада (прямоугольник) — две комплементарные пары со сдвигом. Мягче квадрата, даёт больше пространства для нюансов. Отлично работает в премиальной и дизайнерской обуви.',
-    guideSplit:
-      'Контрастная триада — основной цвет + два соседних к его комплементу. Контраст есть, но мягче чистой комплементарной. Универсальный выбор для большинства моделей.',
-    guideMono:
-      'Монохромная — один цвет в разных тонах и насыщенностях. Самая элегантная и «дорогая» схема. Идеальна для минимализма, вечерней обуви и когда кожа сама по себе выразительна.',
-    guideFootwearTitle: 'Специфика обуви',
-    guideFootwear:
-      '• Верх: основной цвет (60–70 %).\n• Подкладка и стелька: поддерживающий или более светлый тон.\n• Подошва и каблук: часто нейтраль или акцент.\n• Фурнитура и строчка: самый чистый и яркий акцент (5–10 %).\n• Чёрный и белый — не «отсутствие цвета», а мощные инструменты контраста и формы.',
-    guideTip:
-      'Совет: нажмите на любой цветовой свотч или чип в техкарте зон внизу экрана, чтобы мгновенно скопировать точный HEX-код для спецификации производства.',
+    copySpec: 'Копировать техкарту',
+    specTitle: 'Техкарта 13 зон',
+    savePalette: 'Сохранить палитру',
+    savedToast: 'Палитра сохранена',
+    savedEmpty: 'Пока нет сохранённых палитр. Настройте гармонию на вкладке «Цвета» и нажмите «Сохранить палитру».',
+    applyPalette: 'Применить',
+    deletePalette: 'Удалить',
+    confirmDelete: 'Удалить?',
+    cancel: 'Отмена',
+    proBadge: 'PRO',
+    proTitle: 'Cordwaine Color Lab PRO',
+    proDesc: 'Откройте все 7 классических гармоний Иттена (триада, тетрада, прямоугольник, сплит-комплементарная и монохром) и безлимитное сохранение техкарт.',
+    proBuyBtn: 'Открыть за {stars} ★',
+    proProcessing: 'Открываем оплату…',
+    proActive: 'PRO активен',
+    schemes: {
+      complementary: {
+        name: 'Комплементарная',
+        short: 'Комплемент.',
+        desc: 'Противоположные цвета на круге (180°). Максимально выразительный акцент.',
+      },
+      analogous: {
+        name: 'Аналогичная',
+        short: 'Аналогичная',
+        desc: 'Соседние оттенки (±30°). Спокойный, цельный и благородный силуэт.',
+      },
+      triadic: {
+        name: 'Триада',
+        short: 'Триада',
+        desc: 'Равносторонний треугольник (120°). Сбалансированный энергичный контраст.',
+      },
+      'split-complementary': {
+        name: 'Сплит-комплементарная',
+        short: 'Сплит-компл.',
+        desc: 'Базовый цвет + два соседа противоположного (±150°). Мягче прямой комплементарной.',
+      },
+      tetradic: {
+        name: 'Тетрада (квадрат)',
+        short: 'Тетрада',
+        desc: 'Четыре равноудалённых оттенка (90°). Богатое распределение по слоям.',
+      },
+      rectangular: {
+        name: 'Прямоугольная',
+        short: 'Прямоуг.',
+        desc: 'Две комплементарные пары (60°/180°/240°). Гибкий студийный баланс.',
+      },
+      monochromatic: {
+        name: 'Монохромная',
+        short: 'Монохром',
+        desc: 'Один оттенок в разных тонах светлоты и тени. Чистый минимализм.',
+      },
+    },
+    presets: {
+      classic: '60/30/10 База',
+      'toe-focus': 'Акцент мыска',
+      'split-quarter': 'Сплит-берцы',
+      'neutral-sole': 'Нейтральная',
+    },
+    zones: {
+      vamp: 'Верх (Союзка)',
+      quarters: 'Берцы',
+      tongue: 'Язычок',
+      lining: 'Подкладка',
+      toeBox: 'Мысок / Обвод',
+      heel: 'Пятка',
+      collar: 'Воротник',
+      midsole: 'Основная подошва',
+      encap: 'Вставка / Цилиндры',
+      outsole: 'Протектор',
+      laces: 'Шнурки',
+      eyestays: 'Планка шнуровки',
+      swoosh: 'Логотип / Акцент',
+    },
+    modelNotes: {
+      aerostrap: 'Модульный беговой силуэт с центральной фиксирующей стропой',
+      nexus: 'Футуристичный высокий силуэт — акцент 10% на логотипах и цилиндрах воротника',
+      monolith: 'Объёмная скульптурная подошва с рельефными боковыми панелями',
+    },
+    guideSections: {
+      title: 'Как работает студия Cordwaine',
+      items: [
+        {
+          heading: '1. Честная система Иттена 60/30/10',
+          body: 'Все три цвета палитры (60% База, 30% Вторичный, 10% Акцент) вычисляются математически по выбранной схеме гармонии и положению на круге RYB или OKLCH. Мы намеренно не ломаем формулу ручной перекраской верха — любая выбранная схема остаётся настоящей колористической гармоникой.',
+        },
+        {
+          heading: '2. Независимые Фон и Подошва',
+          body: 'Фон 3D-студии и цвет подошвы (EVA / каучук / графит) полностью отделены от темы интерфейса и расчёта гармоний. Белая подошва остаётся белой в ночном режиме, а смена подошвы никогда не искажает баланс 60/30/10.',
+        },
+        {
+          heading: '3. Пресеты распределения и 3D-модели',
+          body: 'Переключайте AEROSTRAP, NEXUS X1 и MONOLITH V, а также 4 схемы раскладки по деталям (60/30/10 База, Акцент мыска, Сплит-берцы, Нейтральная). Верх и пятка всегда держат 60% силуэта.',
+        },
+        {
+          heading: '4. Экспорт техкарты',
+          body: 'Нажмите на любую цветную карточку, чтобы скопировать HEX, или скопируйте полную 13-зонную техкарту с углами Иттена и параметрами OKLCH для передачи в производство.',
+        },
+      ],
+      close: 'Понятно',
+    },
   },
   uk: {
     title: 'Кольори',
-    complementary: 'Комплементарна',
-    analogous: 'Аналогічна',
-    triadic: 'Тріадна',
-    tetradic: 'Тетрада (квадрат)',
-    rectangular: 'Тетрада (прямокут.)',
-    'split-complementary': 'Контрастна тріада',
-    monochromatic: 'Монохромна',
-    main60: '60%',
-    secondary30: '30%',
-    accent10: '10%',
-    main55: '55%',
-    secondary20: '20%',
-    secondary15: '15%',
-    roleClassicUpper: 'Верх • П’ята',
-    roleClassicDetailsAll: 'Обвід • Хвиля • Ремінь',
-    roleClassicDetails: 'Обвід • Хвиля • Ремінь',
-    roleClassicLining: 'Канти • Підкладка',
-    roleClassicAccent: 'Штрихи • Air блок',
-    roleToeMain: 'Верх • П’ята',
-    roleToeSecondary: 'Хвиля • Ремінь • Air',
-    roleToeLining: 'Канти • Підкладка',
-    roleToeAccent: 'Мисок • Штрихи',
-    roleSplitMain: 'Верх • П’ята • Штрихи',
-    roleSplitSecondary: 'Обвід • Язичок • Air',
-    roleSplitLining: 'Канти • Підкладка',
-    roleSplitAccent: 'Ремінь • Бічна хвиля',
-    roleNeutralAccent: 'Штрихи • Задня петля',
-    specTitle: 'Техкарта 13 зон (натисніть для копіювання HEX)',
-    exportSpecBtn: 'Копіювати техкарту',
-    exportCopied: 'Техкарту скопійовано',
-    zone_vamp: 'Верх',
-    zone_toeBox: 'Обвід',
-    zone_quarters: 'Хвиля',
-    zone_eyestays: 'Ремінь',
-    zone_heel: 'П’ята',
-    zone_collar: 'Канти',
-    zone_tongue: 'Язичок',
-    zone_lining: 'Підкладка',
-    zone_swoosh: 'Штрихи',
-    zone_midsole: 'EVA база',
-    zone_encap: 'Air блок',
-    zone_outsole: 'Протектор',
-    zone_laces: 'Пряжка',
-    quote: '«Колір — це душа взуття.»',
-    white: 'Білила (Tint)',
-    black: 'Тінь (Shade)',
-    chroma: 'Насиченість',
-    pure: 'Пігмент',
-    ittenLabel: 'Коло Іттена (RYB)',
-    hslLabel: 'Цифровий (HSL)',
-    presetClassic: '60/30/10 База',
-    presetToe: 'Акцент миска',
-    presetSplit: 'Спліт-берці',
-    presetNeutral: 'Нейтр. підошва',
-    contrastOptimal: 'Оптимальний контраст',
-    contrastSoft: 'М’який нюанс',
-    contrastHigh: 'Високий контраст',
+    settingsTitle: 'Налаштування студії',
+    back: 'Назад',
+    guide: 'Гід',
+    tabs: {
+      colors: 'Кольори',
+      models: 'Моделі',
+      harmonies: 'Гармонії',
+      palette: 'Палітра',
+    },
+    subTabs: {
+      tone: 'Тон',
+      sole: 'Підошва',
+      bg: 'Фон',
+    },
+    themeModes: {
+      day: 'День',
+      night: 'Ніч',
+      auto: 'Авто',
+    },
+    honestBadge: 'Чесна гармонія Іттена',
+    honestSubtext: 'Верх, берці та акценти розраховуються строго за колом Іттена 60/30/10. Незалежно налаштовуються лише фон і підошва.',
+    soleTitle: 'Колір підошви',
+    soleSubtitle: 'Нейтральна база — не впливає на схеми гармонії',
+    soleReset: 'Скинути',
+    soleCustom: 'Свій HEX',
+    solePresets: {
+      white: 'Біла EVA',
+      cream: 'Кремова',
+      stone: 'Сіра',
+      graphite: 'Графіт',
+      black: 'Чорна',
+      gum: 'Каучук',
+    },
+    bgTitle: 'Фон студії',
+    bgSubtitle: 'Змінює лише фон 3D-сцени, не зачіпаючи взуття',
+    bgCustom: 'Свій фон',
+    bgAutoContrast: 'Авто-контраст сцени',
+    bgAutoContrastDesc: 'Адаптує підписи та 360° під яскравість фону',
+    bgPresets: {
+      cream: 'Кремовий',
+      white: 'Білий',
+      'light-gray': 'Світло-сірий',
+      graphite: 'Графіт',
+      black: 'Чорний',
+    },
+    toneTitle: 'Тон і насиченість',
+    hueLabel: 'Відтінок',
+    tintLabel: 'Білила (Tint)',
+    shadeLabel: 'Тінь (Shade)',
+    chromaLabel: 'Насиченість',
+    wheelModelLabel: 'Колірна модель кола',
+    hapticsLabel: 'Вібровідгук',
+    hapticsDesc: 'Тактильна віддача кнопок і кола',
+    langLabel: 'Мова інтерфейсу',
+    interfaceBlock: 'Відображення та інтерфейс',
+    slots: {
+      primary: '60% База',
+      primaryDesc: 'Верх · П’ята',
+      secondary: '30% Вторинний',
+      secondaryDesc: 'Берці · Язичок',
+      accent: '10% Акцент',
+      accentDesc: 'Лого · Деталі',
+    },
+    contrastLabel: 'Контраст',
+    contrastLevels: {
+      soft: 'М’який',
+      optimal: 'Оптимальний',
+      high: 'Високий',
+    },
+    copyHex: 'Копіювати HEX',
     copied: 'Скопійовано',
-    resetBtn: '360° • Скидання',
-    loading3D: 'Завантаження 3D • CORDWAINE AEROSTRAP...',
-    webglFallback: 'WebGL недоступний • Режим палітри',
-    guideBtn: 'Гід',
-    guideTitle: 'Колір у дизайні',
-    guideClose: 'Закрити',
-    paywallTitle: 'PRO: Палітри Studio',
-    paywallDesc:
-      'Довічний доступ до всіх професійних колірних схем Іттена: тріади, тетради, монохром та повна техкарта 13 деталей крою.',
-    paywallBtn: 'ВІДКРИТИ ДОСТУП • ' + PRO_COLORS_PRICE_STARS + ' ⭐️',
-    loading: 'СТВОРЕННЯ РАХУНКУ...',
-    verifying: 'ПЕРЕВІРКА ТРАНЗАКЦІЇ...',
-    paymentTelegramOnly: 'Відкрийте застосунок усередині Telegram для оплати Stars.',
-    paymentVerifyFailed:
-      'Оплату ще не підтверджено сервером. Зачекайте кілька секунд і спробуйте знову.',
-    paymentPendingMsg:
-      'Платіж обробляється Telegram. Доступ відкриється автоматично після підтвердження.',
-    paymentGenericFailed: 'Оплату не завершено. Спробуйте знову.',
-    paymentInvoiceError: 'Збій створення рахунку',
-    guideIntro:
-      'Коло Іттена (RYB) — класичний художній інструмент гармонізації кольору. На відміну від екранної моделі RGB/HSL, у колі Іттена комплементарними парами виступають Червоний–Зелений, Синій–Помаранчевий та Жовтий–Фіолетовий, що створює благородні поєднання для шкіри та замші.',
-    guideBalanceTitle: 'Правило балансу',
-    guideBalance:
-      '60 % — основний колір (верх і п’ята, завжди прив’язані до базового кута кола).\n30 % — підтримуючий колір (бічні панелі, ремінь, язичок).\n10 % — акцент (штрихи, мисок або капсула Air).\nНейтралі (EVA, протектор, фурнітура) не порушують гармоніку Іттена.',
-    guideSchemesTitle: 'Схеми і застосування',
-    guideComplementary:
-      'Комплементарна — два протилежні кольори. Дає сильний, енергійний контраст. Добре працює у спортивному та fashion-взутті, де потрібен яскравий акцент на нейтральному тлі.',
-    guideAnalogous:
-      'Аналогічна — сусідні кольори на колі. Створює м’який, спокійний перехід. Ідеальна для класичного та повсякденного взуття, коли хочеться багатства тону без різкості.',
-    guideTriadic:
-      'Тріадна — три кольори через 120°. Жива і збалансована. Підходить для капсульних колекцій і сезонних кольорових історій.',
-    guideTetradic:
-      'Тетрада (квадрат) — чотири кольори через 90°. Найяскравіша схема. Використовуйте один домінуючий тон, два підтримуючих і один чистий акцент, інакше композиція стане строкатою.',
-    guideRectangular:
-      'Тетрада (прямокутник) — дві комплементарні пари зі зсувом. М’якша за квадрат, дає більше простору для нюансів. Відмінно працює в преміальному та дизайнерському взутті.',
-    guideSplit:
-      'Контрастна тріада — основний колір + два сусідні до його комплементу. Контраст є, але м’якший за чисту комплементарну. Універсальний вибір для більшості моделей.',
-    guideMono:
-      'Монохромна — один колір у різних тонах і насиченостях. Найелегантніша і «дорога» схема. Ідеальна для мінімалізму, вечірнього взуття і коли шкіра сама по собі виразна.',
-    guideFootwearTitle: 'Специфіка взуття',
-    guideFootwear:
-      '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
-    guideTip:
-      'Порада: натисніть на будь-який колірний свотч або чіп у техкарті зон внизу екрана, щоб миттєво скопіювати точний HEX-код для технологічної карти виробництва.',
+    copySpec: 'Копіювати техкарту',
+    specTitle: 'Техкарта 13 зон',
+    savePalette: 'Зберегти палітру',
+    savedToast: 'Палітру збережено',
+    savedEmpty: 'Поки немає збережених палітр. Налаштуйте гармонію на вкладці «Кольори» і натисніть «Зберегти палітру».',
+    applyPalette: 'Застосувати',
+    deletePalette: 'Видалити',
+    confirmDelete: 'Видалити?',
+    cancel: 'Скасувати',
+    proBadge: 'PRO',
+    proTitle: 'Cordwaine Color Lab PRO',
+    proDesc: 'Відкрийте всі 7 класичних гармоній Іттена та безлімітне збереження техкарт.',
+    proBuyBtn: 'Відкрити за {stars} ★',
+    proProcessing: 'Відкриваємо оплату…',
+    proActive: 'PRO активний',
+    schemes: {
+      complementary: {
+        name: 'Комплементарна',
+        short: 'Комплемент.',
+        desc: 'Протилежні кольори на колі (180°). Максимально виразний акцент.',
+      },
+      analogous: {
+        name: 'Аналогічна',
+        short: 'Аналогічна',
+        desc: 'Сусідні відтінки (±30°). Спокійний, цілісний силует.',
+      },
+      triadic: {
+        name: 'Тріада',
+        short: 'Тріада',
+        desc: 'Рівносторонній трикутник (120°). Збалансований контраст.',
+      },
+      'split-complementary': {
+        name: 'Спліт-комплементарна',
+        short: 'Спліт-компл.',
+        desc: 'Базовий колір + два сусіди протилежного (±150°).',
+      },
+      tetradic: {
+        name: 'Тетрада (квадрат)',
+        short: 'Тетрада',
+        desc: 'Чотири рівновіддалені відтінки (90°).',
+      },
+      rectangular: {
+        name: 'Прямокутна',
+        short: 'Прямокут.',
+        desc: 'Дві комплементарні пари (60°/180°/240°).',
+      },
+      monochromatic: {
+        name: 'Монохромна',
+        short: 'Монохром',
+        desc: 'Один відтінок у різних тонах світлоти й тіні.',
+      },
+    },
+    presets: {
+      classic: '60/30/10 База',
+      'toe-focus': 'Акцент носка',
+      'split-quarter': 'Спліт-берці',
+      'neutral-sole': 'Нейтральна',
+    },
+    zones: {
+      vamp: 'Верх (Союзка)',
+      quarters: 'Берці',
+      tongue: 'Язичок',
+      lining: 'Підкладка',
+      toeBox: 'Носок / Обвід',
+      heel: 'П’ята',
+      collar: 'Комір',
+      midsole: 'Основна підошва',
+      encap: 'Вставка / Циліндри',
+      outsole: 'Протектор',
+      laces: 'Шнурки',
+      eyestays: 'Планка шнурівки',
+      swoosh: 'Логотип / Акцент',
+    },
+    modelNotes: {
+      aerostrap: 'Модульний біговий силует із центральною стропою',
+      nexus: 'Футуристичний високий силует — акцент 10% на логотипах і циліндрах коміра',
+      monolith: 'Об’ємна скульптурна підошва з рельєфними бічними панелями',
+    },
+    guideSections: {
+      title: 'Як працює студія Cordwaine',
+      items: [
+        {
+          heading: '1. Чесна система Іттена 60/30/10',
+          body: 'Усі три кольори палітри обчислюються математично за обраною схемою гармонії на колі RYB або OKLCH без ручного спотворення верху.',
+        },
+        {
+          heading: '2. Незалежні Фон і Підошва',
+          body: 'Фон 3D-студії та колір підошви повністю відокремлені від теми інтерфейсу та схем гармонії. Біла підошва залишається білою в нічному режимі.',
+        },
+        {
+          heading: '3. Пресети розподілу та 3D-моделі',
+          body: 'Перемикайте AEROSTRAP, NEXUS X1 і MONOLITH V та 4 схеми розподілу. Верх і п’ята завжди тримають 60% силуету.',
+        },
+        {
+          heading: '4. Експорт техкарти',
+          body: 'Натисніть на будь-яку картку для копіювання HEX або скопіюйте повну 13-зонну техкарту для виробництва.',
+        },
+      ],
+      close: 'Зрозуміло',
+    },
   },
   de: {
     title: 'Farben',
-    complementary: 'Komplementär',
-    analogous: 'Analog',
-    triadic: 'Triadisch',
-    tetradic: 'Tetradisch (Quadrat)',
-    rectangular: 'Tetradisch (Rechteck)',
-    'split-complementary': 'Split-Komplementär',
-    monochromatic: 'Monochromatisch',
-    main60: '60%',
-    secondary30: '30%',
-    accent10: '10%',
-    main55: '55%',
-    secondary20: '20%',
-    secondary15: '15%',
-    roleClassicUpper: 'Obermaterial • Ferse',
-    roleClassicDetailsAll: 'Rand • Welle • Riemen',
-    roleClassicDetails: 'Rand • Welle • Riemen',
-    roleClassicLining: 'Paspel • Futter',
-    roleClassicAccent: 'Akzente • Air-Unit',
-    roleToeMain: 'Obermaterial • Ferse',
-    roleToeSecondary: 'Welle • Riemen • Air',
-    roleToeLining: 'Paspel • Futter',
-    roleToeAccent: 'Kappe • Akzente',
-    roleSplitMain: 'Obermaterial • Ferse • Akzente',
-    roleSplitSecondary: 'Rand • Zunge • Air',
-    roleSplitLining: 'Paspel • Futter',
-    roleSplitAccent: 'Riemen • Seitenwelle',
-    roleNeutralAccent: 'Akzente • Fersenlasche',
-    specTitle: '13-Zonen-Spezifikation (Tippen zum HEX-Kopieren)',
-    exportSpecBtn: 'Tech-Spec kopieren',
-    exportCopied: 'Tech-Spec kopiert',
-    zone_vamp: 'Obermaterial',
-    zone_toeBox: 'Rand',
-    zone_quarters: 'Welle',
-    zone_eyestays: 'Riemen',
-    zone_heel: 'Ferse',
-    zone_collar: 'Paspel',
-    zone_tongue: 'Zunge',
-    zone_lining: 'Futter',
-    zone_swoosh: 'Akzente',
-    zone_midsole: 'EVA-Basis',
-    zone_encap: 'Air-Unit',
-    zone_outsole: 'Laufsohle',
-    zone_laces: 'Schnalle',
-    quote: '«Farbe ist die Seele des Schuhs.»',
-    white: 'Weißanteil (Tint)',
-    black: 'Schwarzanteil (Shade)',
-    chroma: 'Sättigung',
-    pure: 'Pigment',
-    ittenLabel: 'Itten-Kreis (RYB)',
-    hslLabel: 'Digital (HSL)',
-    presetClassic: '60/30/10 Klassik',
-    presetToe: 'Kappen-Fokus',
-    presetSplit: 'Split-Quartier',
-    presetNeutral: 'Neutrale Sohle',
-    contrastOptimal: 'Optimaler Kontrast',
-    contrastSoft: 'Sanfte Nuance',
-    contrastHigh: 'Starker Kontrast',
+    settingsTitle: 'Studio-Einstellungen',
+    back: 'Zurück',
+    guide: 'Guide',
+    tabs: {
+      colors: 'Farben',
+      models: 'Modelle',
+      harmonies: 'Harmonien',
+      palette: 'Palette',
+    },
+    subTabs: {
+      tone: 'Ton',
+      sole: 'Sohle',
+      bg: 'Hintergrund',
+    },
+    themeModes: {
+      day: 'Tag',
+      night: 'Nacht',
+      auto: 'Auto',
+    },
+    honestBadge: 'Ehrliche Itten-Harmonie',
+    honestSubtext: 'Obermaterial, Quartiere und Akzente folgen strikt dem Itten-Farbkreis 60/30/10. Nur Hintergrund und Sohle sind frei wählbar.',
+    soleTitle: 'Sohlenfarbe',
+    soleSubtitle: 'Neutrale Basis — beeinflusst keine Harmonie-Schemata',
+    soleReset: 'Zurücksetzen',
+    soleCustom: 'Eigener HEX',
+    solePresets: {
+      white: 'Weiß EVA',
+      cream: 'Creme',
+      stone: 'Steingrau',
+      graphite: 'Graphit',
+      black: 'Schwarz',
+      gum: 'Kautschuk',
+    },
+    bgTitle: 'Studio-Hintergrund',
+    bgSubtitle: 'Ändert nur die 3D-Bühne, nicht das Schuhmaterial',
+    bgCustom: 'Eigener Ton',
+    bgAutoContrast: 'Auto-Kontrast',
+    bgAutoContrastDesc: 'Passt 3D-Beschriftungen an die Hintergrundhelligkeit an',
+    bgPresets: {
+      cream: 'Creme',
+      white: 'Weiß',
+      'light-gray': 'Hellgrau',
+      graphite: 'Graphit',
+      black: 'Schwarz',
+    },
+    toneTitle: 'Ton & Sättigung',
+    hueLabel: 'Farbton',
+    tintLabel: 'Aufhellung (Tint)',
+    shadeLabel: 'Schatten (Shade)',
+    chromaLabel: 'Sättigung',
+    wheelModelLabel: 'Farbkreis-Modell',
+    hapticsLabel: 'Haptik',
+    hapticsDesc: 'Taktiles Feedback für Tasten und Farbkreis',
+    langLabel: 'Sprache',
+    interfaceBlock: 'Darstellung & Oberfläche',
+    slots: {
+      primary: '60% Basis',
+      primaryDesc: 'Vorderblatt · Ferse',
+      secondary: '30% Sekundär',
+      secondaryDesc: 'Quartiere · Zunge',
+      accent: '10% Akzent',
+      accentDesc: 'Logo · Details',
+    },
+    contrastLabel: 'Kontrast',
+    contrastLevels: {
+      soft: 'Sanft',
+      optimal: 'Optimal',
+      high: 'Hoch',
+    },
+    copyHex: 'HEX kopieren',
     copied: 'Kopiert',
-    resetBtn: '360° • Reset',
-    loading3D: '3D lädt • CORDWAINE AEROSTRAP...',
-    webglFallback: 'WebGL nicht verfügbar • Palettenmodus',
-    guideBtn: 'Guide',
-    guideTitle: 'Farbe im Design',
-    guideClose: 'Schließen',
-    paywallTitle: 'PRO: Studio-Paletten',
-    paywallDesc:
-      'Lebenslanger Vollzugriff auf alle professionellen Itten-Farbschemata: Triaden, Tetraden, Monochrom und das komplette 13-Zonen-Datenblatt.',
-    paywallBtn: 'FREISCHALTEN FÜR ' + PRO_COLORS_PRICE_STARS + ' ⭐️',
-    loading: 'RECHNUNG WIRD ERSTELLT...',
-    verifying: 'ZAHLUNG PRÜFEN...',
-    paymentTelegramOnly: 'Öffnen Sie die App in Telegram, um mit Stars zu bezahlen.',
-    paymentVerifyFailed:
-      'Zahlung noch nicht vom Server bestätigt. Bitte warten Sie kurz und versuchen Sie es erneut.',
-    paymentPendingMsg:
-      'Zahlung wird von Telegram verarbeitet. Der Zugang wird nach Bestätigung freigeschaltet.',
-    paymentGenericFailed: 'Zahlung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.',
-    paymentInvoiceError: 'Rechnung konnte nicht erstellt werden',
-    guideIntro:
-      'Der Itten-Farbkreis (RYB) ist das klassische Werkzeug zur Farbharmonisierung. Im Gegensatz zum digitalen RGB/HSL-Modell bilden hier Rot–Grün, Blau–Orange und Gelb–Violett echte Komplementärpaare für Leder und Wildleder.',
-    guideBalanceTitle: 'Die Balance-Regel',
-    guideBalance:
-      '60 % — Hauptfarbe (Obermaterial & Ferse, immer am Basiswinkel).\n30 % — Unterstützende Farbe (Quartier, Riemen, Zunge).\n10 % — Akzent (Kappe, Akzente oder Air-Unit).\nNeutrale Zonen (EVA, Sohle, Schnürung) erhalten die Itten-Harmonie.',
-    guideSchemesTitle: 'Farbschemata & Anwendung',
-    guideComplementary:
-      'Komplementär — zwei gegenüberliegende Farben. Ergibt einen starken, energetischen Kontrast. Gut für Sport- und Fashion-Schuhe, bei denen ein leuchtender Akzent auf neutralem Grund benötigt wird.',
-    guideAnalogous:
-      'Analog — benachbarte Farben auf dem Kreis. Schafft einen weichen, ruhigen Übergang. Ideal für klassische und Freizeitschuhe, wenn man eine reiche Tonalität ohne Härte wünscht.',
-    guideTriadic:
-      'Triadisch — drei Farben im 120°-Abstand. Lebendig und ausgewogen. Geeignet für Capsule-Kollektionen und saisonale Farbgeschichten.',
-    guideTetradic:
-      'Tetradisch (Quadrat) — vier Farben im 90°-Abstand. Das lebhafteste Schema. Verwenden Sie einen dominierenden Ton, zwei unterstützende und einen reinen Akzent, sonst wird die Komposition zu bunt.',
-    guideRectangular:
-      'Tetradisch (Rechteck) — zwei komplementäre Paare mit Verschiebung. Weicher als das Quadrat, bietet mehr Raum für Nuancen. Funktioniert hervorragend bei Premium- und Designerschuhen.',
-    guideSplit:
-      'Split-Komplementär — Hauptfarbe + die zwei Nachbarn ihrer Komplementärfarbe. Kontrast ist vorhanden, aber weicher als rein komplementär. Eine universelle Wahl für die meisten Modelle.',
-    guideMono:
-      'Monochromatisch — eine Farbe in verschiedenen Tönen und Sättigungen. Das eleganteste und „teuerste“ Schema. Ideal für Minimalismus, Abendschuhe und wenn das Leder an sich schon ausdrucksstark ist.',
-    guideFootwearTitle: 'Besonderheiten bei Schuhen',
-    guideFootwear:
-      '• Obermaterial: Hauptfarbe (60–70 %).\n• Futter und Innensohle: unterstützender oder hellerer Ton.\n• Sohle und Absatz: oft neutral oder Akzent.\n• Beschläge und Nähte: der reinste und hellste Akzent (5–10 %).\n• Schwarz und Weiß sind keine „Farblosigkeit“, sondern mächtige Werkzeuge für Kontrast und Form.',
-    guideTip:
-      'Tipp: Tippen Sie unten auf ein beliebiges Farbfeld oder die 13-Zonen-Leiste, um den exakten HEX-Code direkt in die Zwischenablage zu kopieren.',
+    copySpec: 'Tech-Spec kopieren',
+    specTitle: '13-Zonen-Tech-Spec',
+    savePalette: 'Palette speichern',
+    savedToast: 'Palette gespeichert',
+    savedEmpty: 'Noch keine gespeicherten Paletten. Stelle eine Harmonie ein und tippe auf „Palette speichern“.',
+    applyPalette: 'Anwenden',
+    deletePalette: 'Löschen',
+    confirmDelete: 'Löschen?',
+    cancel: 'Abbrechen',
+    proBadge: 'PRO',
+    proTitle: 'Cordwaine Color Lab PRO',
+    proDesc: 'Schalte alle 7 klassischen Itten-Harmonien und unbegrenzte Tech-Specs frei.',
+    proBuyBtn: 'Freischalten für {stars} ★',
+    proProcessing: 'Zahlung wird geöffnet…',
+    proActive: 'PRO aktiv',
+    schemes: {
+      complementary: {
+        name: 'Komplementär',
+        short: 'Komplement.',
+        desc: 'Gegenüberliegende Farben (180°) für klaren Akzent.',
+      },
+      analogous: {
+        name: 'Analog',
+        short: 'Analog',
+        desc: 'Benachbarte Töne (±30°) für ruhige Silhouetten.',
+      },
+      triadic: {
+        name: 'Triade',
+        short: 'Triade',
+        desc: 'Gleichseitiges Dreieck (120°) für ausgewogenen Kontrast.',
+      },
+      'split-complementary': {
+        name: 'Split-Komplementär',
+        short: 'Split-Kompl.',
+        desc: 'Grundfarbe + Nachbarn der Gegenfarbe (±150°).',
+      },
+      tetradic: {
+        name: 'Tetrade',
+        short: 'Tetrade',
+        desc: 'Vier gleichmäßige Farbtöne (90°).',
+      },
+      rectangular: {
+        name: 'Rechteckig',
+        short: 'Rechteck.',
+        desc: 'Zwei Komplementärpaare (60°/180°/240°).',
+      },
+      monochromatic: {
+        name: 'Monochrom',
+        short: 'Monochrom',
+        desc: 'Ein Farbton in abgestuften Licht- und Schattenwerten.',
+      },
+    },
+    presets: {
+      classic: '60/30/10 Basis',
+      'toe-focus': 'Spitzen-Akzent',
+      'split-quarter': 'Split-Quartier',
+      'neutral-sole': 'Neutral',
+    },
+    zones: {
+      vamp: 'Vorderblatt',
+      quarters: 'Quartiere',
+      tongue: 'Zunge',
+      lining: 'Futter',
+      toeBox: 'Kappe / Rand',
+      heel: 'Ferse',
+      collar: 'Schaftrand',
+      midsole: 'Zwischensohle',
+      encap: 'Einsatz / Zylinder',
+      outsole: 'Laufsohle',
+      laces: 'Schnürsenkel',
+      eyestays: 'Ösenleiste',
+      swoosh: 'Logo / Akzent',
+    },
+    modelNotes: {
+      aerostrap: 'Modulare Runner-Silhouette mit zentralem Riemen',
+      nexus: 'Futuristischer High-Top — 10% Akzent auf Logos & Kragenzylindern',
+      monolith: 'Skulpturale Sohle mit strukturierten Seitenpaneelen',
+    },
+    guideSections: {
+      title: 'So funktioniert das Cordwaine Studio',
+      items: [
+        {
+          heading: '1. Ehrliche Itten-Harmonie 60/30/10',
+          body: 'Alle drei Palettenfarben werden mathematisch über den RYB- oder OKLCH-Farbkreis berechnet, ohne die Harmonie durch manuelles Überschreiben zu verfälschen.',
+        },
+        {
+          heading: '2. Unabhängiger Hintergrund & Sohle',
+          body: 'Studio-Hintergrund und Sohlenfarbe sind vollständig von UI-Theme und Harmonie getrennt. Weiße Sohlen bleiben auch im Nachtmodus weiß.',
+        },
+        {
+          heading: '3. Presets & 3D-Modelle',
+          body: 'Wechsle zwischen AEROSTRAP, NEXUS X1 und MONOLITH V sowie 4 Zonen-Presets. Obermaterial und Ferse halten stets 60%.',
+        },
+        {
+          heading: '4. Tech-Spec Export',
+          body: 'Tippe auf eine Farbkarte für den HEX-Code oder kopiere die komplette 13-Zonen-Tech-Spec für die Produktion.',
+        },
+      ],
+      close: 'Verstanden',
+    },
   },
-}
-
-export type TranslationDict = {
-  [K in keyof (typeof TRANSLATIONS)['ru']]: string
-}
-
-export function getPresetSwatchLabels(
-  preset: FootwearMappingPreset,
-  isTetrad: boolean,
-  t: TranslationDict
-): { ratioLabels: string[]; roleLabels: string[] } {
-  const ratioLabels = isTetrad
-    ? [t.main55, t.secondary20, t.secondary15, t.accent10]
-    : [t.main60, t.secondary30, t.accent10]
-
-  switch (preset) {
-    case 'toe-focus':
-      return {
-        ratioLabels,
-        roleLabels: isTetrad
-          ? [t.roleToeMain, t.roleToeSecondary, t.roleToeLining, t.roleToeAccent]
-          : [t.roleToeMain, t.roleToeSecondary, t.roleToeAccent],
-      }
-    case 'split-quarter':
-      return {
-        ratioLabels,
-        roleLabels: isTetrad
-          ? [t.roleSplitMain, t.roleSplitSecondary, t.roleSplitLining, t.roleSplitAccent]
-          : [t.roleSplitMain, t.roleSplitSecondary, t.roleSplitAccent],
-      }
-    case 'neutral-sole':
-      return {
-        ratioLabels,
-        roleLabels: isTetrad
-          ? [t.roleClassicUpper, t.roleClassicDetails, t.roleClassicLining, t.roleNeutralAccent]
-          : [t.roleClassicUpper, t.roleClassicDetailsAll, t.roleNeutralAccent],
-      }
-    case 'classic':
-    default:
-      return {
-        ratioLabels,
-        roleLabels: isTetrad
-          ? [t.roleClassicUpper, t.roleClassicDetails, t.roleClassicLining, t.roleClassicAccent]
-          : [t.roleClassicUpper, t.roleClassicDetailsAll, t.roleClassicAccent],
-      }
-  }
 }
