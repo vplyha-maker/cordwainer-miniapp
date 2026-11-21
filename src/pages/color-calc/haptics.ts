@@ -9,14 +9,6 @@ interface TgHapticAPI {
   selectionChanged?: () => void
 }
 
-interface TgWindow extends Window {
-  Telegram?: {
-    WebApp?: {
-      HapticFeedback?: TgHapticAPI
-    }
-  }
-}
-
 export function isHapticsEnabled(): boolean {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -37,7 +29,8 @@ export function setHapticsEnabled(enabled: boolean): void {
 
 function getTgHaptic(): TgHapticAPI | null {
   if (typeof window === 'undefined' || !isHapticsEnabled()) return null
-  return (window as TgWindow).Telegram?.WebApp?.HapticFeedback || null
+  const api = window.Telegram?.WebApp?.HapticFeedback as TgHapticAPI | undefined
+  return api || null
 }
 
 /** Лёгкий отклик при переключении вкладок, слоёв, режимов и освещения */
@@ -79,4 +72,3 @@ export function hapticError(): void {
     api.notificationOccurred('error')
   }
 }
-
