@@ -13,6 +13,17 @@ interface TgWebviewProxy {
   postEvent?: (eventType: string, eventData: string) => void
 }
 
+let audioCtx: AudioContext | null = null
+
+function detectIOS(): boolean {
+  if (typeof window === 'undefined') return false
+  const plat = window.Telegram?.WebApp?.platform as string | undefined
+  if (plat === 'ios') return true
+  return typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
+const IS_IOS = detectIOS()
+
 export function isHapticsEnabled(): boolean {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -31,6 +42,38 @@ export function setHapticsEnabled(enabled: boolean): void {
   }
 }
 
+function playSoftTick(pitch = 1): void {
+  if (typeof window === 'undefined' || !isHapticsEnabled()) return
+  try {
+    const soundOff = localStorage.getItem('cordwainer_sound') === '0'
+    if (soundOff) return
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctx) return
+    if (!audioCtx || audioCtx.state === 'closed') {
+      audioCtx = new Ctx()
+    }
+    if (audioCtx.state === 'suspended') {
+      void audioCtx.resume()
+    }
+    const t0 = audioCtx.currentTime
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(520 * pitch, t0)
+    osc.frequency.exponentialRampToValueAtTime(150 * pitch, t0 + 0.026)
+
+    gain.gain.setValueAtTime(0.16, t0)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.026)
+
+    osc.connect(gain)
+    gain.connect(audioCtx.destination)
+    osc.start(t0)
+    osc.stop(t0 + 0.03)
+  } catch {}
+}
+
 function getTgHaptic(): TgHapticAPI | null {
   if (typeof window === 'undefined' || !isHapticsEnabled()) return null
   return (window.Telegram?.WebApp?.HapticFeedback as TgHapticAPI | undefined) || null
@@ -38,16 +81,22 @@ function getTgHaptic(): TgHapticAPI | null {
 
 function getProxy(): TgWebviewProxy | null {
   if (typeof window === 'undefined' || !isHapticsEnabled()) return null
-  const raw = (window as unknown as { TelegramWebviewProxy?: TgWebviewProxy }).TelegramWebviewProxy
-  return raw || null
+  return (window as unknown as { TelegramWebviewProxy?: TgWebviewProxy }).TelegramWebviewProxy || null
 }
 
-function triggerImpact(style: 'light' | 'medium' | 'heavy'): void {
+function triggerImpact(style: 'light' | 'medium' | 'heavy', pitch = 1): void {
   if (!isHapticsEnabled()) return
-  const tgStyle: 'light' | 'medium' = style === 'heavy' ? 'medium' : 'light'
+  const tgStyle: 'light' | 'medium' =
+    IS_IOS ? (style === 'heavy' ? 'light' : 'light') : style === 'light' ? 'light' : 'medium'
+
+  playSoftTick(pitch)
 
   try {
-    getTgHaptic()?.impactOccurred?.(tgStyle)
+    if (IS_IOS && style === 'light') {
+      getTgHaptic()?.selectionChanged?.()
+    } else {
+      getTgHaptic()?.impactOccurred?.(tgStyle)
+    }
   } catch {}
 
   try {
@@ -58,48 +107,28 @@ function triggerImpact(style: 'light' | 'medium' | 'heavy'): void {
   } catch {}
 
   try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      const ms = style === 'heavy' ? 16 : style === 'medium' ? 11 : 7
+    if (!IS_IOS && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      const ms = style === 'heavy' ? 22 : style === 'medium' ? 16 : 12
       navigator.vibrate(ms)
     }
   } catch {}
 }
 
-/** Лёгкий отклик при переключении вкладок, слоёв, режимов и освещения */
 export function hapticSelect(): void {
-  if (!isHapticsEnabled()) return
-  try {
-    const hf = getTgHaptic()
-    if (hf?.selectionChanged) {
-      hf.selectionChanged()
-    } else {
-      getProxy()?.postEvent?.(
-        'web_app_trigger_haptic_feedback',
-        JSON.stringify({ type: 'selection_change' })
-      )
-    }
-  } catch {}
-
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(6)
-    }
-  } catch {}
+  triggerImpact('light', 1.08)
 }
 
-/** Мягкий клик на обычных кнопках */
 export function hapticTap(): void {
-  triggerImpact('light')
+  triggerImpact('light', 1.0)
 }
 
-/** Выраженный отклик для ключевых действий */
 export function hapticConfirm(): void {
-  triggerImpact('medium')
+  triggerImpact('medium', 1.2)
 }
 
-/** Сигнал успешного завершения (копирование HEX, синтез рецепта) */
 export function hapticSuccess(): void {
   if (!isHapticsEnabled()) return
+  playSoftTick(1.28)
   try {
     getTgHaptic()?.notificationOccurred?.('success')
     getProxy()?.postEvent?.(
@@ -108,15 +137,15 @@ export function hapticSuccess(): void {
     )
   } catch {}
   try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(14)
+    if (!IS_IOS && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(18)
     }
   } catch {}
 }
 
-/** Сигнал ошибки или предупреждения */
 export function hapticError(): void {
   if (!isHapticsEnabled()) return
+  playSoftTick(0.75)
   try {
     getTgHaptic()?.notificationOccurred?.('error')
     getProxy()?.postEvent?.(
@@ -125,8 +154,8 @@ export function hapticError(): void {
     )
   } catch {}
   try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate([14, 30, 14])
+    if (!IS_IOS && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate([18, 35, 18])
     }
   } catch {}
 }
