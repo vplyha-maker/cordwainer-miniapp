@@ -12,22 +12,135 @@ interface LeatherSubstratePickerProps {
 
 interface LeatherSwatch {
   hex: string
+  group: 'classic' | 'accent'
   name: { ru: string; uk: string; de: string }
+  note: { ru: string; uk: string; de: string }
 }
 
 const LEATHER_CATALOG: LeatherSwatch[] = [
-  { hex: '#D8C5A8', name: { ru: 'Краст', uk: 'Краст', de: 'Crust' } },
-  { hex: '#EAE3D5', name: { ru: 'Слон. кость', uk: 'Слон. кістка', de: 'Elfenbein' } },
-  { hex: '#C6AC88', name: { ru: 'Песок', uk: 'Пісок', de: 'Sand' } },
-  { hex: '#B48454', name: { ru: 'Кэмел', uk: 'Кемел', de: 'Camel' } },
-  { hex: '#B56E33', name: { ru: 'Тан', uk: 'Тан', de: 'Tan' } },
-  { hex: '#8B4513', name: { ru: 'Коньяк', uk: 'Коньяк', de: 'Cognac' } },
-  { hex: '#6A3822', name: { ru: 'Каштан', uk: 'Каштан', de: 'Kastanie' } },
-  { hex: '#462C1D', name: { ru: 'Шоколад', uk: 'Шоколад', de: 'Schoko' } },
-  { hex: '#5C1F22', name: { ru: 'Оксблад', uk: 'Оксблад', de: 'Oxblood' } },
-  { hex: '#253245', name: { ru: 'Нэви', uk: 'Неві', de: 'Navy' } },
-  { hex: '#2B3F33', name: { ru: 'Брит. зел.', uk: 'Брит. зел.', de: 'Brit. Grün' } },
-  { hex: '#2F2F31', name: { ru: 'Антрацит', uk: 'Антрацит', de: 'Anthrazit' } },
+  // Классическая тёмная и базовая палитра
+  {
+    hex: '#3E2417',
+    group: 'classic',
+    name: { ru: 'Шоколад', uk: 'Шоколад', de: 'Espresso' },
+    note: {
+      ru: 'Dark Brown / Espresso — мягче и дороже чёрного, раскрывает фактуру кожи.',
+      uk: 'Dark Brown / Espresso — мʼякший за чорний, розкриває фактуру шкіри.',
+      de: 'Dark Brown / Espresso — weicher als Schwarz, betont die Lederstruktur.',
+    },
+  },
+  {
+    hex: '#8B4513',
+    group: 'classic',
+    name: { ru: 'Коньяк', uk: 'Коньяк', de: 'Cognac' },
+    note: {
+      ru: 'Cognac — эталон для полуформальной обуви и ручного патинирования.',
+      uk: 'Cognac — еталон для напівформального взуття та ручного патинування.',
+      de: 'Cognac — Referenzton für Handpatina und klassische Rahmenschuhe.',
+    },
+  },
+  {
+    hex: '#B57236',
+    group: 'classic',
+    name: { ru: 'Тан', uk: 'Тан', de: 'Tan' },
+    note: {
+      ru: 'Tan — тёплый рыже-коричневый, идеально принимает тёмные воски и патину.',
+      uk: 'Tan — теплий рудо-коричневий, ідеально приймає темні воски та патину.',
+      de: 'Tan — warmes Hellbraun, ideal für dunkles Wachs und Patinierung.',
+    },
+  },
+  {
+    hex: '#5A1E22',
+    group: 'classic',
+    name: { ru: 'Оксблад', uk: 'Оксблад', de: 'Oxblood' },
+    note: {
+      ru: 'Burgundy / Oxblood — винно-бордовый с коричневым подтоном, аристократичная классика.',
+      uk: 'Burgundy / Oxblood — винно-бордовий із коричневим підтоном, шляхетна класика.',
+      de: 'Burgundy / Oxblood — dunkles Weinrot mit braunem Unterton.',
+    },
+  },
+  {
+    hex: '#1C1B1A',
+    group: 'classic',
+    name: { ru: 'Jet Black', uk: 'Jet Black', de: 'Jet Black' },
+    note: {
+      ru: 'Чёрный с лёгким глянцем — строгий дресс-код, глубина за счёт полировки.',
+      uk: 'Чорний із легким глянцем — строгий дрес-код, глибина за рахунок полірування.',
+      de: 'Tiefschwarz mit feinem Glanz — formelle Basis für perfekte Politur.',
+    },
+  },
+  {
+    hex: '#D8C5A8',
+    group: 'classic',
+    name: { ru: 'Краст', uk: 'Краст', de: 'Crust' },
+    note: {
+      ru: 'Неокрашенный краст — чистая база для полного окрашивания и патины с нуля.',
+      uk: 'Нефарбований краст — чиста база для повного фарбування та патини з нуля.',
+      de: 'Naturbelassenes Crust — neutrale Basis für Färbung und Handpatina.',
+    },
+  },
+
+  // Сложные и акцентные оттенки
+  {
+    hex: '#212D40',
+    group: 'accent',
+    name: { ru: 'Нэви', uk: 'Неві', de: 'Navy' },
+    note: {
+      ru: 'Navy — сдержанная альтернатива чёрному, особенно выразительна в замше и нубуке.',
+      uk: 'Navy — стримана альтернатива чорному, чудово виглядає в замші та нубуку.',
+      de: 'Navy — dezente Alternative zu Schwarz, stark auf Velours und Nubuk.',
+    },
+  },
+  {
+    hex: '#243A2C',
+    group: 'accent',
+    name: { ru: 'Хвойный', uk: 'Хвойний', de: 'Racing Green' },
+    note: {
+      ru: 'British Racing Green — глубокий бутылочный зелёный в рамках строгой классики.',
+      uk: 'British Racing Green — глибокий пляшковий зелений у межах класики.',
+      de: 'British Racing Green — tiefes Flaschengrün im klassischen Rahmen.',
+    },
+  },
+  {
+    hex: '#8C7D6E',
+    group: 'accent',
+    name: { ru: 'Тауп / Минк', uk: 'Тауп / Мінк', de: 'Taupe / Mink' },
+    note: {
+      ru: 'Taupe / Mink — сложный серо-коричневый, идеален для замши и весенне-летней обуви.',
+      uk: 'Taupe / Mink — складний сіро-коричневий, ідеальний для замші та літніх моделей.',
+      de: 'Taupe / Mink — edles Graubraun, ideal für Rauleder und Sommermodelle.',
+    },
+  },
+  {
+    hex: '#B68856',
+    group: 'accent',
+    name: { ru: 'Кэмел', uk: 'Кемел', de: 'Camel' },
+    note: {
+      ru: 'Camel — тёплый верблюжий тон, визуально удорожает повседневные и кэжуал-модели.',
+      uk: 'Camel — теплий верблюжий тон, робить кежуал-моделі візуально дорожчими.',
+      de: 'Camel — warmer Naturton, veredelt Casual- und Freizeitmodelle.',
+    },
+  },
+  {
+    hex: '#C9B292',
+    group: 'accent',
+    name: { ru: 'Песочный', uk: 'Пісочний', de: 'Sand' },
+    note: {
+      ru: 'Sand — благородный светлый песок для замши, лоферов и летней классики.',
+      uk: 'Sand — шляхетний світлий пісок для замші, лоферів і літньої класики.',
+      de: 'Sand — heller Sandton für Loafer, Velours und Sommerklassiker.',
+    },
+  },
+  {
+    hex: '#EAE3D5',
+    group: 'accent',
+    name: { ru: 'Слон. кость', uk: 'Слон. кістка', de: 'Ivory' },
+    note: {
+      ru: 'Ivory — тёплая белая кожа с кремовым подтоном, мягче стерильного белого.',
+      uk: 'Ivory — тепла біла шкіра з кремовим підтоном, мʼякша за стерильний білий.',
+      de: 'Ivory — warmes Naturweiß mit Cremeton, weicher als Reinweiß.',
+    },
+  },
 ]
 
 // Физические пределы реальной окрашенной кожи (исключают кислотный RGB-неон)
@@ -130,30 +243,41 @@ export function LeatherSubstratePicker({
     setHexDraft(valueHex.toUpperCase())
   }, [valueHex])
 
+  const matchedPreset = useMemo(
+    () => LEATHER_CATALOG.find((c) => c.hex.toUpperCase() === valueHex.toUpperCase()),
+    [valueHex]
+  )
+
   const ui = useMemo(() => {
     const map = {
       ru: {
-        title: 'Свой оттенок кожи',
+        title: 'Карта обувных кож',
         badge: 'Пигментный охват · без неона',
-        catalog: 'Карта обувных кож',
+        classicGroup: 'Классическая база',
+        accentGroup: 'Сложные и акцентные',
+        fineTune: 'Точная подстройка (в пределах реальных пигментов)',
         hue: 'Тон',
         sat: 'Насыщенность пигмента',
         light: 'Светлота кожи',
         done: 'Готово',
       },
       uk: {
-        title: 'Свій відтінок шкіри',
+        title: 'Карта взуттєвих шкір',
         badge: 'Пігментне охоплення · без неону',
-        catalog: 'Карта взуттєвих шкір',
+        classicGroup: 'Класична база',
+        accentGroup: 'Складні та акцентні',
+        fineTune: 'Точне підлаштування (у межах реальних пігментів)',
         hue: 'Тон',
         sat: 'Насиченість пігменту',
         light: 'Світлота шкіри',
         done: 'Готово',
       },
       de: {
-        title: 'Eigener Lederfarbton',
+        title: 'Leder-Farbkarte',
         badge: 'Pigment-Farbraum · kein Neon',
-        catalog: 'Leder-Farbkarte',
+        classicGroup: 'Klassische Basis',
+        accentGroup: 'Feine Akzenttöne',
+        fineTune: 'Feinabstimmung (realer Pigment-Farbraum)',
         hue: 'Farbton',
         sat: 'Pigmentsättigung',
         light: 'Helligkeit',
@@ -185,16 +309,54 @@ export function LeatherSubstratePicker({
     }
   }
 
-  // Реалистичный пигментный градиент тона (приглушённый, не кислотный)
   const hueGradient =
-    'linear-gradient(90deg, hsl(0,55%,45%), hsl(35,55%,45%), hsl(65,48%,46%), hsl(120,42%,40%), hsl(185,45%,42%), hsl(225,48%,42%), hsl(280,42%,42%), hsl(335,52%,45%), hsl(360,55%,45%))'
-
+    'linear-gradient(90deg, hsl(0,52%,44%), hsl(35,54%,45%), hsl(65,45%,46%), hsl(120,38%,38%), hsl(185,42%,40%), hsl(225,44%,40%), hsl(280,38%,40%), hsl(335,48%,44%), hsl(360,52%,44%))'
   const satGradient = `linear-gradient(90deg, hsl(${hue}, 0%, ${light}%), hsl(${hue}, ${MAX_LEATHER_SAT}%, ${light}%))`
   const lightGradient = `linear-gradient(90deg, hsl(${hue}, ${sat}%, ${MIN_LEATHER_LIGHT}%), hsl(${hue}, ${sat}%, 52%), hsl(${hue}, ${sat}%, ${MAX_LEATHER_LIGHT}%))`
 
+  const classicList = LEATHER_CATALOG.filter((c) => c.group === 'classic')
+  const accentList = LEATHER_CATALOG.filter((c) => c.group === 'accent')
+
+  const renderGroup = (title: string, items: LeatherSwatch[]) => (
+    <div>
+      <div
+        className="text-[10.5px] uppercase tracking-[0.12em] font-semibold mb-1.5"
+        style={{ color: tokens.inkMuted }}
+      >
+        {title}
+      </div>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+        {items.map((item) => {
+          const active = item.hex.toUpperCase() === valueHex.toUpperCase()
+          return (
+            <button
+              key={item.hex}
+              type="button"
+              onClick={() => {
+                hapticSelect()
+                onChange(item.hex)
+              }}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left cursor-pointer"
+              style={{
+                backgroundColor: tokens.surface,
+                borderColor: active ? tokens.accent : tokens.border,
+              }}
+            >
+              <span
+                className="w-4 h-4 rounded-full border border-black/15 shrink-0"
+                style={{ backgroundColor: item.hex }}
+              />
+              <span className="text-[11px] font-medium truncate">{item.name[lang]}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   return (
     <div
-      className="mt-3 rounded-2xl border p-3.5 sm:p-4 space-y-3.5"
+      className="mx-4 sm:mx-5 my-3 rounded-2xl border p-3.5 sm:p-4 space-y-3.5"
       style={{
         backgroundColor: tokens.surfaceSoft,
         borderColor: tokens.border,
@@ -219,13 +381,13 @@ export function LeatherSubstratePicker({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <input
             type="text"
             value={hexDraft}
             onChange={(e) => handleHexInput(e.target.value)}
             maxLength={7}
-            className="w-[82px] px-2 py-1.5 rounded-lg border font-mono text-[12px] text-center focus:outline-none"
+            className="w-[78px] px-2 py-1.5 rounded-lg border font-mono text-[12px] text-center focus:outline-none"
             style={{
               backgroundColor: tokens.surface,
               borderColor: tokens.border,
@@ -249,44 +411,35 @@ export function LeatherSubstratePicker({
         </div>
       </div>
 
-      {/* Карта 12 реальных обувных кож */}
-      <div>
-        <div
-          className="text-[10.5px] uppercase tracking-[0.12em] font-semibold mb-2"
-          style={{ color: tokens.inkMuted }}
-        >
-          {ui.catalog}
-        </div>
-        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
-          {LEATHER_CATALOG.map((item) => {
-            const active = item.hex.toUpperCase() === valueHex.toUpperCase()
-            return (
-              <button
-                key={item.hex}
-                type="button"
-                onClick={() => {
-                  hapticSelect()
-                  onChange(item.hex)
-                }}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl border text-left cursor-pointer"
-                style={{
-                  backgroundColor: tokens.surface,
-                  borderColor: active ? tokens.accent : tokens.border,
-                }}
-              >
-                <span
-                  className="w-4 h-4 rounded-full border border-black/15 shrink-0"
-                  style={{ backgroundColor: item.hex }}
-                />
-                <span className="text-[11px] truncate">{item.name[lang]}</span>
-              </button>
-            )
-          })}
-        </div>
+      {/* Две группы обувных кож */}
+      <div className="space-y-3">
+        {renderGroup(ui.classicGroup, classicList)}
+        {renderGroup(ui.accentGroup, accentList)}
       </div>
 
+      {/* Подсказка ателье по выбранной коже */}
+      {matchedPreset && (
+        <div
+          className="px-3 py-2 rounded-xl border text-[12px] leading-snug"
+          style={{
+            backgroundColor: tokens.surface,
+            borderColor: tokens.border,
+            color: tokens.inkSecondary,
+          }}
+        >
+          {matchedPreset.note[lang]}
+        </div>
+      )}
+
       {/* 3 пигментно-безопасных ползунка */}
-      <div className="space-y-3 pt-1">
+      <div className="space-y-2.5 pt-2 border-t" style={{ borderColor: tokens.border }}>
+        <div
+          className="text-[10.5px] uppercase tracking-[0.1em] font-semibold"
+          style={{ color: tokens.inkMuted }}
+        >
+          {ui.fineTune}
+        </div>
+
         <div>
           <div className="flex justify-between text-[11.5px] mb-1">
             <span style={{ color: tokens.inkSecondary }}>{ui.hue}</span>
@@ -300,10 +453,7 @@ export function LeatherSubstratePicker({
             max={360}
             value={hue}
             onChange={(e) => emitHsl(Number(e.target.value), sat, light)}
-            style={{
-              background: hueGradient,
-              touchAction: 'pan-y',
-            }}
+            style={{ background: hueGradient, touchAction: 'pan-y' }}
             className="w-full h-3 rounded-full appearance-none cursor-pointer"
           />
         </div>
@@ -321,10 +471,7 @@ export function LeatherSubstratePicker({
             max={MAX_LEATHER_SAT}
             value={sat}
             onChange={(e) => emitHsl(hue, Number(e.target.value), light)}
-            style={{
-              background: satGradient,
-              touchAction: 'pan-y',
-            }}
+            style={{ background: satGradient, touchAction: 'pan-y' }}
             className="w-full h-3 rounded-full appearance-none cursor-pointer"
           />
         </div>
@@ -342,10 +489,7 @@ export function LeatherSubstratePicker({
             max={MAX_LEATHER_LIGHT}
             value={light}
             onChange={(e) => emitHsl(hue, sat, Number(e.target.value))}
-            style={{
-              background: lightGradient,
-              touchAction: 'pan-y',
-            }}
+            style={{ background: lightGradient, touchAction: 'pan-y' }}
             className="w-full h-3 rounded-full appearance-none cursor-pointer"
           />
         </div>
@@ -353,4 +497,3 @@ export function LeatherSubstratePicker({
     </div>
   )
 }
-
