@@ -1,1467 +1,1652 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useLayoutEffect,
-  useMemo,
-} from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import type { Lang as AppLang } from '../App'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ChevronLeft,
+  Copy,
+  Check,
+  Bookmark,
+  Trash2,
+  Sun,
+  Moon,
+  Monitor,
+  MoreVertical,
+  HelpCircle,
+  Lock,
+  ShieldCheck,
+  Palette,
+  Layers,
+  Sparkles,
+} from 'lucide-react'
+import type { Lang } from '../App'
+import {
+  ColorModelMode,
+  DEFAULT_SOLE_CONFIG,
+  FootwearMappingPreset,
+  Scheme,
+  SneakerZoneKey,
+  SoleColorConfig,
+  applySoleColorToFootwear,
   evaluateHarmonyContrast,
+  formatOklch,
   generateHarmonyPalette,
   getCircularAngleDiff,
-  getPaletteSwatchAngleLabels,
   getSchemeWheelAngles,
   mapPaletteToFootwear,
   rybHueToRgbHue,
-  type ColorModelMode,
-  type FootwearMappingPreset,
-  type Scheme,
-  type SneakerZoneKey,
 } from './colors/colorEngine'
+import { COLORS_TRANSLATIONS } from './colors/colorsTranslations'
+import {
+  GuideModal,
+  SoleColorCard,
+  StudioBgCard,
+  StudioSettingsView,
+  ToneControlCard,
+} from './colors/ColorLabPanels'
 import { Sneaker3D } from './colors/Sneaker3D'
+import { DEFAULT_SNEAKER_MODEL, type SneakerModelId } from './colors/sneakerGeometry'
 import {
-  SNEAKER_MODELS,
-  getSneakerModelConfig,
-  type SneakerModelId,
-} from './colors/sneakerGeometry'
-import {
-  TRANSLATIONS,
-  getPresetSwatchLabels,
-  isAppNativeLang,
-  normalizeSupportedLang,
-  type SupportedLang,
-  type TranslationDict,
-} from './colors/colorsTranslations'
-import {
-  expandTelegramWebApp,
+  StudioBgConfig,
+  ThemeMode,
+  getThemeTokens,
+  isStudioBgDark,
+  loadHapticsEnabled,
+  loadStudioBg,
+  loadThemeMode,
+  resolveIsDark,
+  resolveStudioBgHex,
+  saveHapticsEnabled,
+  saveStudioBg,
+  saveThemeMode,
   triggerHaptic,
-  useTelegramProPayment,
-} from './colors/useTelegramProPayment'
+} from './colors/themeSystem'
 
-export {
-  PRO_COLORS_PRICE_STARS,
-  normalizeSupportedLang,
-  isAppNativeLang,
-  getPresetSwatchLabels,
-  type SupportedLang,
-  type TranslationDict,
-} from './colors/colorsTranslations'
-export {
-  getCircularAngleDiff,
-  rybHueToRgbHue,
-  synthesizePigmentHex,
-  getRelativeLuminance,
-  getContrastRatio,
-  getPerceptualPairContrast,
-  getSchemeWheelAngles,
-  getPaletteSwatchAngleLabels,
-  generateHarmonyPalette,
-  mapPaletteToFootwear,
-  evaluateHarmonyContrast,
-  type Scheme,
-  type ColorModelMode,
-  type FootwearMappingPreset,
-  type SneakerColors,
-  type SneakerZoneKey,
-} from './colors/colorEngine'
-export { type PaymentState } from './colors/useTelegramProPayment'
-export { Sneaker3D } from './colors/Sneaker3D'
-
-type ColorsPageProps = {
+type Props = {
   onBack: () => void
-  lang: AppLang
-  setLang: (lang: AppLang) => void
+  lang: Lang
+  setLang: (lang: Lang) => void
 }
 
-type StudioBgId = 'auto' | 'cream' | 'white' | 'gray' | 'graphite' | 'black'
-type SoleThemeId = 'auto' | 'cream' | 'black' | 'gum' | 'stone'
+type MainTab = 'colors' | 'models' | 'harmonies' | 'palette'
+type SubTool = 'tone' | 'sole' | 'bg'
+type PaymentState = 'idle' | 'creating_invoice' | 'invoice_open' | 'verifying_payment' | 'purchased' | 'failed'
 
-type StudioBgOption = {
-  id: StudioBgId
-  hex: string | null
-  swatchHex: string
-  isDarkStage: boolean | null
-  label: string
-}
-
-type SoleOption = {
-  id: Exclude<SoleThemeId, 'auto'>
-  midsole: string
-  outsole: string
-  encapNeutral: string
-  label: string
-}
-
-const STUDIO_BG_OPTIONS: readonly StudioBgOption[] = [
-  { id: 'cream', hex: '#F2EFE9', swatchHex: '#F2EFE9', isDarkStage: false, label: 'Cream' },
-  { id: 'white', hex: '#FFFFFF', swatchHex: '#FFFFFF', isDarkStage: false, label: 'White' },
-  { id: 'gray', hex: '#E3E3E6', swatchHex: '#D4D4D8', isDarkStage: false, label: 'Gray' },
-  { id: 'graphite', hex: '#1B1B1F', swatchHex: '#27272A', isDarkStage: true, label: 'Graphite' },
-  { id: 'black', hex: '#050505', swatchHex: '#050505', isDarkStage: true, label: 'Black' },
-]
-
-const SOLE_OPTIONS: readonly SoleOption[] = [
-  {
-    id: 'cream',
-    midsole: '#FAF8F4',
-    outsole: '#2C2825',
-    encapNeutral: '#E5E0D6',
-    label: 'Cream EVA',
-  },
-  {
-    id: 'black',
-    midsole: '#1F1E1D',
-    outsole: '#111010',
-    encapNeutral: '#2F2D2B',
-    label: 'Triple Black',
-  },
-  {
-    id: 'gum',
-    midsole: '#F4EFE4',
-    outsole: '#A87943',
-    encapNeutral: '#D8C9AE',
-    label: 'Gum Rubber',
-  },
-  {
-    id: 'stone',
-    midsole: '#D6D3CD',
-    outsole: '#454340',
-    encapNeutral: '#B9B4AC',
-    label: 'Stone',
-  },
-]
-
-const VALID_BG_IDS: readonly StudioBgId[] = ['auto', 'cream', 'white', 'gray', 'graphite', 'black']
-const VALID_SOLE_IDS: readonly SoleThemeId[] = ['auto', 'cream', 'black', 'gum', 'stone']
-
-type PersistedColorsState = {
-  baseHue: number
-  whiteAmount: number
-  blackAmount: number
-  chromaAmount: number
+type SavedPalette = {
+  id: string
+  createdAt: number
   scheme: Scheme
-  modelMode: ColorModelMode
-  mappingPreset: FootwearMappingPreset
+  preset: FootwearMappingPreset
   modelId: SneakerModelId
-  studioBg: StudioBgId
-  soleTheme: SoleThemeId
+  baseHue: number
+  tintWhite: number
+  shadeBlack: number
+  chromaScale: number
+  modelMode: ColorModelMode
+  sole: SoleColorConfig
+  colors: string[]
 }
 
-const STORAGE_KEY = 'cordwainer_colors_state_v1'
-
-const FREE_SCHEMES: readonly Scheme[] = ['complementary', 'analogous']
-
+const PRO_PRICE_STARS = 250
+const FREE_SCHEMES: readonly Scheme[] = ['complementary', 'analogous', 'monochromatic']
 const ALL_SCHEMES: readonly Scheme[] = [
   'complementary',
   'analogous',
   'triadic',
+  'split-complementary',
   'tetradic',
   'rectangular',
-  'split-complementary',
   'monochromatic',
 ]
-
 const ALL_PRESETS: readonly FootwearMappingPreset[] = [
   'classic',
   'toe-focus',
   'split-quarter',
   'neutral-sole',
 ]
+const MODEL_OPTIONS: readonly { id: SneakerModelId; name: string; shortName: string }[] = [
+  { id: 'aerostrap', name: 'CORDWAINE AEROSTRAP', shortName: 'AEROSTRAP' },
+  { id: 'nexus', name: 'CORDWAINE NEXUS X1', shortName: 'NEXUS X1' },
+  { id: 'monolith', name: 'CORDWAINE MONOLITH V', shortName: 'MONOLITH V' },
+]
+const SPEC_ZONES: readonly SneakerZoneKey[] = [
+  'vamp',
+  'heel',
+  'quarters',
+  'toeBox',
+  'eyestays',
+  'tongue',
+  'collar',
+  'lining',
+  'swoosh',
+  'encap',
+  'midsole',
+  'outsole',
+  'laces',
+]
 
-const VALID_MODEL_IDS: readonly SneakerModelId[] = ['aerostrap', 'nexus', 'monolith']
+const STATE_STORAGE_KEY = 'cordwainer_colorlab_state_v4'
+const SAVED_PALETTES_KEY = 'cordwainer_saved_palettes_v2'
 
-const DEFAULT_STATE: PersistedColorsState = {
-  baseHue: 194,
-  whiteAmount: 0.05,
-  blackAmount: 0.05,
-  chromaAmount: 0.85,
-  scheme: 'complementary',
-  modelMode: 'ryb',
-  mappingPreset: 'classic',
-  modelId: 'aerostrap',
-  studioBg: 'auto',
-  soleTheme: 'auto',
-}
-
-function loadSavedColorsState(): PersistedColorsState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_STATE
-    const parsed = JSON.parse(raw) as Partial<PersistedColorsState>
-    const clamp = (val: unknown, min: number, max: number, fallback: number) => {
-      if (typeof val !== 'number' || Number.isNaN(val)) return fallback
-      return Math.max(min, Math.min(max, val))
-    }
-
-    const scheme: Scheme =
-      typeof parsed.scheme === 'string' && FREE_SCHEMES.includes(parsed.scheme as Scheme)
-        ? (parsed.scheme as Scheme)
-        : DEFAULT_STATE.scheme
-
-    const modelMode: ColorModelMode =
-      parsed.modelMode === 'ryb' || parsed.modelMode === 'hsl'
-        ? parsed.modelMode
-        : DEFAULT_STATE.modelMode
-
-    const mappingPreset: FootwearMappingPreset =
-      typeof parsed.mappingPreset === 'string' &&
-      ALL_PRESETS.includes(parsed.mappingPreset as FootwearMappingPreset)
-        ? (parsed.mappingPreset as FootwearMappingPreset)
-        : DEFAULT_STATE.mappingPreset
-
-    const modelId: SneakerModelId =
-      typeof parsed.modelId === 'string' &&
-      VALID_MODEL_IDS.includes(parsed.modelId as SneakerModelId)
-        ? (parsed.modelId as SneakerModelId)
-        : DEFAULT_STATE.modelId
-
-    const studioBg: StudioBgId =
-      typeof parsed.studioBg === 'string' &&
-      VALID_BG_IDS.includes(parsed.studioBg as StudioBgId)
-        ? (parsed.studioBg as StudioBgId)
-        : DEFAULT_STATE.studioBg
-
-    const soleTheme: SoleThemeId =
-      typeof parsed.soleTheme === 'string' &&
-      VALID_SOLE_IDS.includes(parsed.soleTheme as SoleThemeId)
-        ? (parsed.soleTheme as SoleThemeId)
-        : DEFAULT_STATE.soleTheme
-
-    return {
-      baseHue: Math.round(clamp(parsed.baseHue, 0, 359, DEFAULT_STATE.baseHue)),
-      whiteAmount: clamp(parsed.whiteAmount, 0, 1, DEFAULT_STATE.whiteAmount),
-      blackAmount: clamp(parsed.blackAmount, 0, 1, DEFAULT_STATE.blackAmount),
-      chromaAmount: clamp(parsed.chromaAmount, 0.15, 1, DEFAULT_STATE.chromaAmount),
-      scheme,
-      modelMode,
-      mappingPreset,
-      modelId,
-      studioBg,
-      soleTheme,
-    }
-  } catch {
-    return DEFAULT_STATE
+type TgWebAppLike = {
+  initData?: string
+  initDataUnsafe?: { user?: { id?: number } }
+  openInvoice?: (url: string, cb: (status: string) => void) => void
+  setHeaderColor?: (c: string) => void
+  setBackgroundColor?: (c: string) => void
+  BackButton?: {
+    show?: () => void
+    hide?: () => void
+    onClick?: (cb: () => void) => void
+    offClick?: (cb: () => void) => void
   }
 }
 
-const LockIcon = ({ size = 10 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="mb-[1px]"
-    aria-hidden="true"
-  >
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-    <path d="M7 11V7a5 5 0 0110 0v4"></path>
-  </svg>
-)
+function getTg(): TgWebAppLike | undefined {
+  if (typeof window === 'undefined') return undefined
+  return (window as unknown as { Telegram?: { WebApp?: TgWebAppLike } }).Telegram?.WebApp
+}
 
-export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
-  const initialSaved = useMemo(() => loadSavedColorsState(), [])
+export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
+  const t = COLORS_TRANSLATIONS[lang] ?? COLORS_TRANSLATIONS.ru
 
-  const [localLang, setLocalLang] = useState<SupportedLang>(() => normalizeSupportedLang(lang))
+  const [themeMode, setThemeMode] = useState<ThemeMode>(loadThemeMode)
+  const [systemDark, setSystemDark] = useState<boolean>(() => resolveIsDark('auto'))
+  const [showThemeMenu, setShowThemeMenu] = useState(false)
+
   useEffect(() => {
-    setLocalLang(normalizeSupportedLang(lang))
-  }, [lang])
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => setSystemDark(mq.matches)
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
+  }, [])
 
-  const [scheme, setScheme] = useState<Scheme>(initialSaved.scheme)
-  const [modelMode, setModelMode] = useState<ColorModelMode>(initialSaved.modelMode)
-  const [mappingPreset, setMappingPreset] = useState<FootwearMappingPreset>(
-    initialSaved.mappingPreset
+  const isDark = themeMode === 'auto' ? systemDark : themeMode === 'night'
+  const tokens = useMemo(() => getThemeTokens(isDark), [isDark])
+
+  const [studioBg, setStudioBg] = useState<StudioBgConfig>(loadStudioBg)
+  const studioBgHex = useMemo(() => resolveStudioBgHex(studioBg), [studioBg])
+  const darkCanvas = useMemo(
+    () => (studioBg.autoContrast ? isStudioBgDark(studioBgHex) : isDark),
+    [studioBg.autoContrast, studioBgHex, isDark]
   )
-  const [modelId, setModelId] = useState<SneakerModelId>(initialSaved.modelId)
-  const [studioBg, setStudioBg] = useState<StudioBgId>(initialSaved.studioBg)
-  const [soleTheme, setSoleTheme] = useState<SoleThemeId>(initialSaved.soleTheme)
 
-  const [baseHue, setBaseHue] = useState(initialSaved.baseHue)
-  const [whiteAmount, setWhiteAmount] = useState(initialSaved.whiteAmount)
-  const [blackAmount, setBlackAmount] = useState(initialSaved.blackAmount)
-  const [chromaAmount, setChromaAmount] = useState(initialSaved.chromaAmount)
-
-  const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const [liveStatusText, setLiveStatusText] = useState('')
+  const [hapticsEnabled, setHapticsEnabled] = useState<boolean>(loadHapticsEnabled)
+  const [activeTab, setActiveTab] = useState<MainTab>('colors')
+  const [subTool, setSubTool] = useState<SubTool>('tone')
+  const [showSettings, setShowSettings] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
+  const [showProModal, setShowProModal] = useState(false)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [toastText, setToastText] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.classList.contains('dark')
+  const isTelegram = useMemo(() => {
+    const tg = getTg()
+    return Boolean(tg?.initData && tg.initData.trim().length > 0)
+  }, [])
+
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const isPro = paymentState === 'purchased'
+  const isPaymentBusy = paymentState === 'creating_invoice' || paymentState === 'verifying_payment'
+
+  const verifyPurchaseOnServer = useCallback(async (): Promise<boolean> => {
+    const tg = getTg()
+    const userId = tg?.initDataUnsafe?.user?.id
+    const rawInitData = tg?.initData || ''
+    if (!userId) return false
+    try {
+      const res = await fetch(
+        `/api/check-purchase?userId=${encodeURIComponent(String(userId))}&productId=pro_colors`,
+        {
+          method: 'GET',
+          headers: rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : undefined,
+        }
+      )
+      if (!res.ok) return false
+      const data = (await res.json()) as { purchased?: boolean }
+      if (data.purchased === true) {
+        setPaymentState('purchased')
+        return true
+      }
+      return false
+    } catch {
+      return false
     }
-    return true
-  })
-
-  const wheelRef = useRef<HTMLDivElement>(null)
-  const proModalCloseRef = useRef<HTMLButtonElement>(null)
-  const guideCloseRef = useRef<HTMLButtonElement>(null)
-  const isDragging = useRef(false)
-  const lastHapticHue = useRef(initialSaved.baseHue)
-
-  const t: TranslationDict = TRANSLATIONS[normalizeSupportedLang(localLang)] ?? TRANSLATIONS.ru
-  const activeModel = getSneakerModelConfig(modelId)
-
-  const activeBgOption = useMemo(
-    () => STUDIO_BG_OPTIONS.find((opt) => opt.id === studioBg) ?? null,
-    [studioBg]
-  )
-  const stageIsDark = activeBgOption?.isDarkStage ?? isDark
-  const stageBgColor = activeBgOption?.hex ?? (isDark ? '#0A0A0A' : '#F2EFE9')
-
-  const {
-    paymentState,
-    paymentErrorMsg,
-    showProModal,
-    isProPurchased,
-    isPaymentBusy,
-    openProModal,
-    closeProModal,
-    handleProClick,
-  } = useTelegramProPayment(t)
-
-  useLayoutEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
-    expandTelegramWebApp()
-    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
-    checkTheme()
-    const observer = new MutationObserver(checkTheme)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
-    try {
-      const payload: PersistedColorsState = {
-        baseHue,
-        whiteAmount,
-        blackAmount,
-        chromaAmount,
-        scheme: isProPurchased || FREE_SCHEMES.includes(scheme) ? scheme : 'complementary',
-        modelMode,
-        mappingPreset,
-        modelId,
-        studioBg,
-        soleTheme,
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-    } catch {}
-  }, [
-    baseHue,
-    whiteAmount,
-    blackAmount,
-    chromaAmount,
-    scheme,
-    modelMode,
-    mappingPreset,
-    modelId,
-    studioBg,
-    soleTheme,
-    isProPurchased,
-  ])
+    void verifyPurchaseOnServer()
+  }, [verifyPurchaseOnServer])
 
-  useEffect(() => {
-    if (!showProModal && !showGuide) return
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-
-    const focusTimer = window.setTimeout(() => {
-      if (showProModal) proModalCloseRef.current?.focus()
-      else if (showGuide) guideCloseRef.current?.focus()
-    }, 50)
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showProModal && !isPaymentBusy) closeProModal()
-        if (showGuide) setShowGuide(false)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.body.style.overflow = prevOverflow
-      window.clearTimeout(focusTimer)
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [showProModal, showGuide, isPaymentBusy, closeProModal])
-
-  const handleLangChange = (newLang: SupportedLang) => {
-    const safe = normalizeSupportedLang(newLang)
-    try {
-      localStorage.setItem('cordwainer_lang', safe)
-      localStorage.setItem('app_lang', safe)
-    } catch {}
-    setLocalLang(safe)
-    if (isAppNativeLang(safe)) {
-      setLang(safe)
-    }
-  }
-
-  const handleSchemeClick = (s: Scheme) => {
-    const isFree = FREE_SCHEMES.includes(s)
-    if (!isFree && !isProPurchased) {
-      openProModal()
+  const handleBuyPro = async () => {
+    if (isPaymentBusy || paymentState === 'invoice_open' || isPro) return
+    const tg = getTg()
+    const userId = tg?.initDataUnsafe?.user?.id
+    const rawInitData = tg?.initData || ''
+    if (!userId || !tg?.openInvoice) {
+      setPaymentError(t.paymentTelegramOnly)
       return
     }
-    triggerHaptic('light')
-    setScheme(s)
+    setPaymentError(null)
+    setPaymentState('creating_invoice')
+    triggerHaptic('tap', hapticsEnabled)
+
+    try {
+      const response = await fetch('/api/create-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : {}),
+        },
+        body: JSON.stringify({
+          userId,
+          productId: 'pro_colors',
+          initData: rawInitData,
+        }),
+      })
+      const data = (await response.json()) as {
+        invoiceLink?: string
+        error?: string
+        alreadyPurchased?: boolean
+      }
+      if (response.status === 409 && data.alreadyPurchased) {
+        triggerHaptic('save', hapticsEnabled)
+        setPaymentState('purchased')
+        setShowProModal(false)
+        return
+      }
+      if (!response.ok || !data.invoiceLink) {
+        throw new Error(data.error || t.paymentInvoiceError)
+      }
+      setPaymentState('invoice_open')
+      tg.openInvoice(data.invoiceLink, async (status: string) => {
+        if (status === 'paid' || status === 'pending') {
+          setPaymentState('verifying_payment')
+          let verified = await verifyPurchaseOnServer()
+          if (!verified) {
+            await new Promise((r) => setTimeout(r, 900))
+            verified = await verifyPurchaseOnServer()
+          }
+          if (verified) {
+            triggerHaptic('save', hapticsEnabled)
+            setPaymentState('purchased')
+            setShowProModal(false)
+          } else {
+            setPaymentState('idle')
+            setPaymentError(t.paymentPendingMsg)
+          }
+        } else {
+          setPaymentState('idle')
+        }
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setPaymentState('failed')
+      setPaymentError(msg)
+    }
   }
 
-  const handleModelSwitch = (nextId: SneakerModelId) => {
-    if (nextId === modelId) return
-    triggerHaptic('light')
-    setModelId(nextId)
+  const [baseHue, setBaseHue] = useState<number>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      return typeof saved.baseHue === 'number' ? saved.baseHue : 30
+    } catch {
+      return 30
+    }
+  })
+  const [tintWhite, setTintWhite] = useState<number>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      return typeof saved.tintWhite === 'number' ? saved.tintWhite : 0.08
+    } catch {
+      return 0.08
+    }
+  })
+  const [shadeBlack, setShadeBlack] = useState<number>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      return typeof saved.shadeBlack === 'number' ? saved.shadeBlack : 0.16
+    } catch {
+      return 0.16
+    }
+  })
+  const [chromaScale, setChromaScale] = useState<number>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      return typeof saved.chromaScale === 'number' ? saved.chromaScale : 0.85
+    } catch {
+      return 0.85
+    }
+  })
+  const [scheme, setScheme] = useState<Scheme>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      return ALL_SCHEMES.includes(saved.scheme) ? saved.scheme : 'complementary'
+    } catch {
+      return 'complementary'
+    }
+  })
+  const [preset, setPreset] = useState<FootwearMappingPreset>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      return ALL_PRESETS.includes(saved.preset) ? saved.preset : 'classic'
+    } catch {
+      return 'classic'
+    }
+  })
+  const [modelMode, setModelMode] = useState<ColorModelMode>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      if (saved.modelMode === 'hsl') return 'oklch'
+      if (saved.modelMode === 'ryb' || saved.modelMode === 'oklch') return saved.modelMode
+      return 'ryb'
+    } catch {
+      return 'ryb'
+    }
+  })
+  const [modelId, setModelId] = useState<SneakerModelId>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      if (saved.modelId === 'aerostrap' || saved.modelId === 'nexus' || saved.modelId === 'monolith') {
+        return saved.modelId
+      }
+      return DEFAULT_SNEAKER_MODEL
+    } catch {
+      return DEFAULT_SNEAKER_MODEL
+    }
+  })
+  const [soleConfig, setSoleConfig] = useState<SoleColorConfig>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATE_STORAGE_KEY) || '{}')
+      if (saved.sole && typeof saved.sole.presetId === 'string') {
+        return {
+          presetId: saved.sole.presetId,
+          customHex: typeof saved.sole.customHex === 'string' ? saved.sole.customHex : '#FAF8F4',
+        }
+      }
+      return DEFAULT_SOLE_CONFIG
+    } catch {
+      return DEFAULT_SOLE_CONFIG
+    }
+  })
+
+  const [savedPalettes, setSavedPalettes] = useState<SavedPalette[]>(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_PALETTES_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  })
+
+  const latestStateRef = useRef({
+    baseHue,
+    tintWhite,
+    shadeBlack,
+    chromaScale,
+    scheme,
+    preset,
+    modelMode,
+    modelId,
+    sole: soleConfig,
+  })
+  latestStateRef.current = {
+    baseHue,
+    tintWhite,
+    shadeBlack,
+    chromaScale,
+    scheme,
+    preset,
+    modelMode,
+    modelId,
+    sole: soleConfig,
   }
 
-  const handleResetAll = useCallback(() => {
-    setBaseHue(DEFAULT_STATE.baseHue)
-    setWhiteAmount(DEFAULT_STATE.whiteAmount)
-    setBlackAmount(DEFAULT_STATE.blackAmount)
-    setChromaAmount(DEFAULT_STATE.chromaAmount)
-    setMappingPreset(DEFAULT_STATE.mappingPreset)
-    setStudioBg('auto')
-    setSoleTheme('auto')
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(latestStateRef.current))
+      } catch {
+        // ignore
+      }
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [baseHue, tintWhite, shadeBlack, chromaScale, scheme, preset, modelMode, modelId, soleConfig])
+
+  useEffect(() => {
+    const flush = () => {
+      try {
+        localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(latestStateRef.current))
+      } catch {
+        // ignore
+      }
+    }
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
   }, [])
 
-  const copyToClipboard = useCallback(
-    (key: string, textToCopy: string, announcement: string) => {
-      triggerHaptic('light')
-      setCopiedKey(key)
-      setLiveStatusText(announcement)
-      try {
-        void navigator.clipboard?.writeText(textToCopy)
-      } catch {}
-      window.setTimeout(() => {
-        setCopiedKey((prev) => (prev === key ? null : prev))
-      }, 1500)
-    },
-    []
+  useEffect(() => {
+    try {
+      const tg = getTg()
+      tg?.setHeaderColor?.(tokens.pageBg)
+      tg?.setBackgroundColor?.(tokens.pageBg)
+    } catch {
+      // ignore
+    }
+  }, [tokens.pageBg])
+
+  const backLockRef = useRef(false)
+  const handleStepBack = useCallback(() => {
+    if (backLockRef.current) return
+    backLockRef.current = true
+    window.setTimeout(() => {
+      backLockRef.current = false
+    }, 240)
+
+    triggerHaptic('tap', hapticsEnabled)
+    if (showThemeMenu) {
+      setShowThemeMenu(false)
+      return
+    }
+    if (showProModal && !isPaymentBusy) {
+      setShowProModal(false)
+      return
+    }
+    if (showGuide) {
+      setShowGuide(false)
+      return
+    }
+    if (showSettings) {
+      setShowSettings(false)
+      return
+    }
+    if (activeTab !== 'colors') {
+      setActiveTab('colors')
+      return
+    }
+    try {
+      document.body.style.overflow = ''
+    } catch {
+      // ignore
+    }
+    onBack()
+  }, [hapticsEnabled, showThemeMenu, showProModal, isPaymentBusy, showGuide, showSettings, activeTab, onBack])
+
+  useEffect(() => {
+    const bb = getTg()?.BackButton
+    if (!bb) return
+    bb.show?.()
+    bb.onClick?.(handleStepBack)
+    return () => {
+      bb.offClick?.(handleStepBack)
+    }
+  }, [handleStepBack])
+
+  const harmonyPalette = useMemo(
+    () => generateHarmonyPalette(baseHue, tintWhite, shadeBlack, chromaScale, scheme, modelMode),
+    [baseHue, tintWhite, shadeBlack, chromaScale, scheme, modelMode]
   )
 
-  const schemeHues = useMemo(() => getSchemeWheelAngles(baseHue, scheme), [baseHue, scheme])
-  const swatchAngles = useMemo(
-    () => getPaletteSwatchAngleLabels(baseHue, scheme),
-    [baseHue, scheme]
-  )
+  const wheelAngles = useMemo(() => getSchemeWheelAngles(baseHue, scheme), [baseHue, scheme])
 
-  const colors = useMemo(
-    () =>
-      generateHarmonyPalette(
-        baseHue,
-        whiteAmount,
-        blackAmount,
-        chromaAmount,
-        scheme,
-        modelMode
-      ),
-    [baseHue, whiteAmount, blackAmount, chromaAmount, scheme, modelMode]
-  )
-
-  // Базовый расчёт гармоники Иттена + независимый выбор нейтральной подошвы (не влияет на схемы)
   const sneakerColors = useMemo(() => {
-    const base = mapPaletteToFootwear(
-      colors,
+    const honestBase = mapPaletteToFootwear(
+      harmonyPalette,
       baseHue,
-      whiteAmount,
-      blackAmount,
-      chromaAmount,
+      tintWhite,
+      shadeBlack,
+      chromaScale,
       modelMode,
-      mappingPreset,
-      isDark
+      preset,
+      false
     )
-    const chosenSole = SOLE_OPTIONS.find((s) => s.id === soleTheme)
-    if (!chosenSole) return base
-    return {
-      ...base,
-      midsole: chosenSole.midsole,
-      outsole: chosenSole.outsole,
-      encap: mappingPreset === 'neutral-sole' ? chosenSole.encapNeutral : base.encap,
-    }
-  }, [
-    colors,
-    baseHue,
-    whiteAmount,
-    blackAmount,
-    chromaAmount,
-    modelMode,
-    mappingPreset,
-    isDark,
-    soleTheme,
-  ])
+    return applySoleColorToFootwear(honestBase, soleConfig)
+  }, [harmonyPalette, baseHue, tintWhite, shadeBlack, chromaScale, modelMode, preset, soleConfig])
 
-  const harmonyEvaluation = useMemo(() => {
-    const res = evaluateHarmonyContrast(colors, sneakerColors)
-    const statusLabel =
-      res.level === 'soft'
-        ? t.contrastSoft
-        : res.level === 'high'
-          ? t.contrastHigh
-          : t.contrastOptimal
-
-    return {
-      ratioText: res.ratioText,
-      statusLabel,
-    }
-  }, [colors, sneakerColors, t.contrastSoft, t.contrastHigh, t.contrastOptimal])
-
-  const isTetrad = scheme === 'tetradic' || scheme === 'rectangular'
-
-  const { ratioLabels, roleLabels } = useMemo(
-    () => getPresetSwatchLabels(mappingPreset, isTetrad, t),
-    [mappingPreset, isTetrad, t]
+  const contrast = useMemo(
+    () => evaluateHarmonyContrast(harmonyPalette, sneakerColors),
+    [harmonyPalette, sneakerColors]
   )
 
-  const allZonesSpec = useMemo(
-    (): { key: SneakerZoneKey; label: string; hex: string }[] => [
-      { key: 'vamp', label: t.zone_vamp, hex: sneakerColors.vamp },
-      { key: 'toeBox', label: t.zone_toeBox, hex: sneakerColors.toeBox },
-      { key: 'quarters', label: t.zone_quarters, hex: sneakerColors.quarters },
-      { key: 'eyestays', label: t.zone_eyestays, hex: sneakerColors.eyestays },
-      { key: 'heel', label: t.zone_heel, hex: sneakerColors.heel },
-      { key: 'collar', label: t.zone_collar, hex: sneakerColors.collar },
-      { key: 'tongue', label: t.zone_tongue, hex: sneakerColors.tongue },
-      { key: 'lining', label: t.zone_lining, hex: sneakerColors.lining },
-      { key: 'swoosh', label: t.zone_swoosh, hex: sneakerColors.swoosh },
-      { key: 'midsole', label: t.zone_midsole, hex: sneakerColors.midsole },
-      { key: 'encap', label: t.zone_encap, hex: sneakerColors.encap },
-      { key: 'outsole', label: t.zone_outsole, hex: sneakerColors.outsole },
-      { key: 'laces', label: t.zone_laces, hex: sneakerColors.laces },
-    ],
-    [sneakerColors, t]
+  const slotPrimary = harmonyPalette[0]
+  const slotSecondary = harmonyPalette[1] ?? harmonyPalette[0]
+  const slotAccent = harmonyPalette[harmonyPalette.length - 1] ?? harmonyPalette[0]
+
+  const showToast = useCallback((msg: string) => {
+    setToastText(msg)
+    window.setTimeout(() => setToastText(null), 1900)
+  }, [])
+
+  const copyText = useCallback(
+    (key: string, text: string) => {
+      triggerHaptic('select', hapticsEnabled)
+      try {
+        void navigator.clipboard?.writeText(text)
+      } catch {
+        // ignore
+      }
+      setCopiedKey(key)
+      window.setTimeout(() => setCopiedKey((curr) => (curr === key ? null : curr)), 1400)
+    },
+    [hapticsEnabled]
   )
 
-  const handleExportFullSpec = useCallback(() => {
-    const header =
-      activeModel.name +
-      ' — ' +
-      t[scheme] +
-      ' (' +
-      modelMode.toUpperCase() +
-      ' ' +
-      baseHue +
-      '°, ΔE ' +
-      harmonyEvaluation.ratioText +
-      ')'
-    const lines = allZonesSpec.map((z) => z.label + ': ' + z.hex)
-    const fullText = header + '\n' + lines.join('\n')
-    copyToClipboard('__full_spec__', fullText, t.exportCopied)
+  const handleCopySpec = useCallback(() => {
+    const modelMeta = MODEL_OPTIONS.find((m) => m.id === modelId)
+    const lines = [
+      'CORDWAINE COLOR LAB — TECH SPEC',
+      'Model: ' + (modelMeta?.name ?? modelId.toUpperCase()),
+      'Harmony: ' + t.schemes[scheme].name + ' (' + modelMode.toUpperCase() + ' ' + Math.round(baseHue) + '°)',
+      'Preset: ' + t.presets[preset],
+      'Contrast: ' + contrast.ratioText,
+      '--- 60 / 30 / 10 ---',
+      '60% Primary: ' + slotPrimary + ' (' + formatOklch(slotPrimary) + ')',
+      '30% Secondary: ' + slotSecondary + ' (' + formatOklch(slotSecondary) + ')',
+      '10% Accent: ' + slotAccent + ' (' + formatOklch(slotAccent) + ')',
+      '--- 13 ZONES ---',
+      ...SPEC_ZONES.map((z) => t.zones[z] + ': ' + sneakerColors[z]),
+    ]
+    copyText('spec', lines.join('\n'))
+    showToast(t.copied)
   }, [
-    activeModel.name,
-    allZonesSpec,
-    baseHue,
-    copyToClipboard,
-    harmonyEvaluation.ratioText,
-    modelMode,
-    scheme,
+    modelId,
     t,
+    scheme,
+    modelMode,
+    baseHue,
+    preset,
+    contrast.ratioText,
+    slotPrimary,
+    slotSecondary,
+    slotAccent,
+    sneakerColors,
+    copyText,
+    showToast,
   ])
 
-  const wheelBackground = useMemo(() => {
-    const stops: string[] = []
-    for (let deg = 0; deg <= 360; deg += 30) {
-      const displayHue = modelMode === 'ryb' ? rybHueToRgbHue(deg) : deg
-      stops.push('hsl(' + displayHue.toFixed(1) + ', 90%, 50%)')
+  const handleSavePalette = useCallback(() => {
+    triggerHaptic('save', hapticsEnabled)
+    const item: SavedPalette = {
+      id: 'pal_' + Date.now(),
+      createdAt: Date.now(),
+      scheme,
+      preset,
+      modelId,
+      baseHue: Math.round(baseHue),
+      tintWhite,
+      shadeBlack,
+      chromaScale,
+      modelMode,
+      sole: soleConfig,
+      colors: [slotPrimary, slotSecondary, slotAccent],
     }
-    return 'conic-gradient(from 0deg, ' + stops.join(', ') + ')'
-  }, [modelMode])
+    setSavedPalettes((prev) => {
+      const next = [item, ...prev].slice(0, 30)
+      try {
+        localStorage.setItem(SAVED_PALETTES_KEY, JSON.stringify(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
+    showToast(t.savedToast)
+  }, [
+    hapticsEnabled,
+    scheme,
+    preset,
+    modelId,
+    baseHue,
+    tintWhite,
+    shadeBlack,
+    chromaScale,
+    modelMode,
+    soleConfig,
+    slotPrimary,
+    slotSecondary,
+    slotAccent,
+    showToast,
+    t.savedToast,
+  ])
 
-  const updateFromClientXY = useCallback((clientX: number, clientY: number) => {
+  const handleDeletePalette = (id: string) => {
+    triggerHaptic('reset', hapticsEnabled)
+    setSavedPalettes((prev) => {
+      const next = prev.filter((p) => p.id !== id)
+      try {
+        localStorage.setItem(SAVED_PALETTES_KEY, JSON.stringify(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
+    setConfirmDeleteId(null)
+  }
+
+  const handleSelectScheme = (nextScheme: Scheme) => {
+    const locked = !isPro && !FREE_SCHEMES.includes(nextScheme)
+    if (locked) {
+      triggerHaptic('tap', hapticsEnabled)
+      setPaymentError(null)
+      setShowProModal(true)
+      return
+    }
+    triggerHaptic('harmony', hapticsEnabled)
+    setScheme(nextScheme)
+  }
+
+  const wheelRef = useRef<HTMLDivElement | null>(null)
+  const lastWheelHapticHue = useRef<number>(baseHue)
+
+  const updateHueFromPointer = (clientX: number, clientY: number) => {
     const el = wheelRef.current
     if (!el) return
-
     const rect = el.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    const dx = clientX - cx
-    const dy = clientY - cy
-
-    let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-    angle = Math.round((angle + 90 + 360) % 360) % 360
-
-    if (getCircularAngleDiff(angle, lastHapticHue.current) >= 15) {
-      triggerHaptic('light')
-      lastHapticHue.current = angle
+    const dx = clientX - (rect.left + rect.width / 2)
+    const dy = clientY - (rect.top + rect.height / 2)
+    let angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90
+    if (angle < 0) angle += 360
+    const nextHue = Math.round(angle) % 360
+    if (getCircularAngleDiff(nextHue, lastWheelHapticHue.current) >= 15) {
+      lastWheelHapticHue.current = nextHue
+      triggerHaptic('select', hapticsEnabled)
     }
-
-    setBaseHue(angle)
-  }, [])
-
-  const handleWheelPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    isDragging.current = true
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {}
-    updateFromClientXY(e.clientX, e.clientY)
+    setBaseHue(nextHue)
   }
 
-  const handleWheelPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging.current) return
-    updateFromClientXY(e.clientX, e.clientY)
-  }
-
-  const handleWheelPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    isDragging.current = false
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    } catch {}
-  }
-
-  const handleWheelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const step = e.shiftKey ? 15 : 5
-    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-      e.preventDefault()
-      triggerHaptic('light')
-      setBaseHue((h) => (h + step) % 360)
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-      e.preventDefault()
-      triggerHaptic('light')
-      setBaseHue((h) => (h - step + 360) % 360)
-    } else if (e.key === 'Home') {
-      e.preventDefault()
-      setBaseHue(0)
-    } else if (e.key === 'End') {
-      e.preventDefault()
-      setBaseHue(180)
+  const wheelGradient = useMemo(() => {
+    const stops: string[] = []
+    for (let deg = 0; deg <= 360; deg += 15) {
+      const rgbHue = modelMode === 'ryb' ? rybHueToRgbHue(deg) : deg
+      stops.push(`hsl(${Math.round(rgbHue)} 85% 52%) ${deg}deg`)
     }
-  }
+    return `conic-gradient(from 0deg, ${stops.join(', ')})`
+  }, [modelMode])
 
-  const PRESETS: { id: FootwearMappingPreset; label: string }[] = [
-    { id: 'classic', label: t.presetClassic },
-    { id: 'toe-focus', label: t.presetToe },
-    { id: 'split-quarter', label: t.presetSplit },
-    { id: 'neutral-sole', label: t.presetNeutral },
-  ]
-
-  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
-  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/60' : 'text-[#1C1816]/60'
-  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
-  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
-  const fadeMaskStyle = {
-    maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-    WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-  }
-
-  const soleLabel = localLang === 'de' ? 'Sohle' : localLang === 'uk' ? 'Підошва' : 'Подошва'
+  const tabIndex = activeTab === 'colors' ? 0 : activeTab === 'models' ? 1 : activeTab === 'harmonies' ? 2 : 3
+  const ThemeIcon = themeMode === 'day' ? Sun : themeMode === 'night' ? Moon : Monitor
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      className={
-        'relative min-h-[100dvh] w-full flex flex-col justify-between transition-colors duration-700 ' +
-        cBg +
-        ' ' +
-        cText
-      }
+    <div
+      className="fixed inset-0 z-30 overflow-y-auto transition-colors duration-200"
       style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        backgroundColor: tokens.pageBg,
+        color: tokens.ink,
+        WebkitTextSizeAdjust: '100%',
       }}
     >
-      <style>{`
-        * {
-          -webkit-tap-highlight-color: transparent !important;
-          -webkit-touch-callout: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      <header
+        className="sticky top-0 z-40 border-b backdrop-blur-md"
+        style={{
+          backgroundColor: tokens.headerBg,
+          borderColor: tokens.border,
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-3.5 h-13 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={handleStepBack}
+              className="inline-flex items-center gap-1 pl-1.5 pr-3 h-9 rounded-full border text-[13px] font-medium transition-colors"
+              style={{
+                backgroundColor: tokens.cardBg,
+                borderColor: tokens.border,
+                color: tokens.ink,
+              }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="truncate">{showSettings ? t.settingsTitle : t.title}</span>
+            </button>
 
-        input[type=range] {
-          -webkit-appearance: none;
-          background: transparent;
-          touch-action: pan-x;
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-          width: 100%;
-          height: 2px;
-          background: ${isDark ? 'rgba(244,240,232,0.22)' : 'rgba(28,24,22,0.22)'};
-        }
-        input[type=range]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          height: 16px;
-          width: 16px;
-          border-radius: 50%;
-          background: ${isDark ? '#F4F0E8' : '#1C1816'};
-          margin-top: -7px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          cursor: pointer;
-        }
-      `}</style>
-
-      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {liveStatusText}
-      </div>
-
-      {/* КОМПАКТНЫЙ ВЕРХНИЙ ХЕДЕР */}
-      <header className="px-4 pt-3 pb-1.5 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className={
-              'group flex items-center gap-1.5 py-1 text-[10px] font-sans uppercase tracking-[0.18em] outline-none border-none bg-transparent cursor-pointer transition-colors ' +
-              cTextMuted +
-              ' ' +
-              cHover
-            }
-          >
-            <span className="transform transition-transform group-hover:-translate-x-0.5">←</span>
-            <span>Back</span>
-          </button>
-          <span className={'h-3 w-px ' + (isDark ? 'bg-white/15' : 'bg-black/15')} />
-          <h1 className="font-serif text-xl sm:text-2xl tracking-[-0.02em] leading-none">
-            {t.title}
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic('light')
-              setModelMode((m) => (m === 'ryb' ? 'hsl' : 'ryb'))
-            }}
-            className={
-              'px-2 py-1 border text-[9px] font-sans uppercase tracking-[0.16em] outline-none bg-transparent cursor-pointer transition-colors ' +
-              cLine +
-              ' ' +
-              cTextMuted +
-              ' ' +
-              cHover
-            }
-            title="RYB / HSL"
-          >
-            {modelMode === 'ryb' ? 'RYB' : 'HSL'}
-          </button>
-
-          <div className="flex items-center gap-2">
-            {(['ru', 'uk', 'de'] as SupportedLang[]).map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => handleLangChange(l)}
-                className={
-                  'py-1 text-[9.5px] font-sans uppercase tracking-[0.18em] outline-none border-0 bg-transparent cursor-pointer transition-colors ' +
-                  (localLang === l ? cText + ' font-semibold' : cTextMuted) +
-                  ' ' +
-                  cHover
-                }
+            {!isTelegram && (
+              <span
+                className="hidden sm:inline-block ml-2 text-[15px] font-semibold tracking-tight"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif", color: tokens.ink }}
               >
-                {l === 'uk' ? 'UKR' : l}
-              </button>
-            ))}
+                Cordwaine
+              </span>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowGuide(true)}
-            className={
-              'px-2.5 py-1 border text-[9.5px] font-sans uppercase tracking-[0.16em] outline-none bg-transparent cursor-pointer transition-colors ' +
-              cLine +
-              ' ' +
-              cText
-            }
-          >
-            {t.guideBtn}
-          </button>
+          <div className="flex items-center gap-1.5 relative">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('tap', hapticsEnabled)
+                setShowThemeMenu((v) => !v)
+              }}
+              aria-label="Theme"
+              className="w-9 h-9 rounded-full border flex items-center justify-center transition-colors"
+              style={{
+                backgroundColor: showThemeMenu ? tokens.activeTintBg : tokens.cardBg,
+                borderColor: showThemeMenu ? tokens.activeTintBorder : tokens.border,
+                color: tokens.ink,
+              }}
+            >
+              <ThemeIcon className="w-4 h-4" />
+            </button>
+
+            {showThemeMenu && (
+              <div
+                className="absolute right-0 top-11 z-50 p-1.5 rounded-2xl border flex items-center gap-1"
+                style={{
+                  backgroundColor: tokens.cardBg,
+                  borderColor: tokens.strongBorder,
+                  boxShadow: tokens.shadowCard,
+                }}
+              >
+                {(['day', 'night', 'auto'] as ThemeMode[]).map((m) => {
+                  const active = themeMode === m
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('select', hapticsEnabled)
+                        setThemeMode(m)
+                        saveThemeMode(m)
+                        setShowThemeMenu(false)
+                      }}
+                      className="px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition-colors"
+                      style={{
+                        backgroundColor: active ? tokens.activeTintBg : 'transparent',
+                        color: active ? tokens.activeTintInk : tokens.muted,
+                      }}
+                    >
+                      {t.themeModes[m]}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('tap', hapticsEnabled)
+                setShowThemeMenu(false)
+                setShowGuide(true)
+              }}
+              aria-label={t.guide}
+              className="w-9 h-9 rounded-full border flex items-center justify-center transition-colors"
+              style={{
+                backgroundColor: tokens.cardBg,
+                borderColor: tokens.border,
+                color: tokens.ink,
+              }}
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('tap', hapticsEnabled)
+                setShowThemeMenu(false)
+                setShowSettings((v) => !v)
+              }}
+              aria-label={t.settingsTitle}
+              className="w-9 h-9 rounded-full border flex items-center justify-center transition-colors"
+              style={{
+                backgroundColor: showSettings ? tokens.activeTintBg : tokens.cardBg,
+                borderColor: showSettings ? tokens.activeTintBorder : tokens.border,
+                color: tokens.ink,
+              }}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ОСНОВНОЙ КОНТЕНТ */}
-      <div className="flex-1 flex flex-col justify-between px-4 pb-3 max-w-2xl mx-auto w-full">
-        {/* 1. ПОЛОСА СХЕМ ГАРМОНИИ */}
-        <div
-          className={'flex overflow-x-auto gap-5 py-2 pr-6 border-y scrollbar-hide ' + cLine}
-          style={fadeMaskStyle}
-        >
-          {ALL_SCHEMES.map((s) => {
-            const isFree = FREE_SCHEMES.includes(s)
-            const isLocked = !isFree && !isProPurchased
+      <main
+        className="max-w-6xl mx-auto px-3.5 pt-3 pb-10 min-[820px]:grid min-[820px]:grid-cols-12 min-[820px]:gap-5 min-[820px]:items-start"
+        style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <section className="min-[820px]:col-span-6 min-[820px]:sticky min-[820px]:top-16 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div
+              className="inline-flex p-1 rounded-full border overflow-x-auto max-w-full"
+              style={{
+                backgroundColor: tokens.cardBg,
+                borderColor: tokens.border,
+              }}
+            >
+              {MODEL_OPTIONS.map((m) => {
+                const active = modelId === m.id
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('harmony', hapticsEnabled)
+                      setModelId(m.id)
+                    }}
+                    className="px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide whitespace-nowrap transition-colors"
+                    style={{
+                      backgroundColor: active ? tokens.activeTintBg : 'transparent',
+                      color: active ? tokens.activeTintInk : tokens.muted,
+                    }}
+                  >
+                    {m.shortName}
+                  </button>
+                )
+              })}
+            </div>
 
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => handleSchemeClick(s)}
-                className={
-                  'flex items-center gap-1 text-[9.5px] font-sans uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-200 outline-none border-none bg-transparent cursor-pointer ' +
-                  (scheme === s
-                    ? 'italic font-semibold ' + cText + ' opacity-100'
-                    : cTextMuted + ' opacity-70 hover:opacity-100')
-                }
-              >
-                {isLocked && (
-                  <span className="text-[#FFB020]">
-                    <LockIcon size={9} />
-                  </span>
-                )}
-                {t[s]}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* 1.5. ПРЕСЕТЫ РАСПРЕДЕЛЕНИЯ + ПЕРЕКЛЮЧАТЕЛЬ 3D-МОДЕЛЕЙ И КОНТРАСТ */}
-        <div className="pt-1.5 flex flex-col gap-1.5">
-          <div className="flex overflow-x-auto gap-1.5 pr-6 scrollbar-hide" style={fadeMaskStyle}>
-            {PRESETS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  triggerHaptic('light')
-                  setMappingPreset(p.id)
-                }}
-                className={
-                  'px-2 py-1 text-[8.5px] font-sans uppercase tracking-[0.14em] whitespace-nowrap border transition-colors cursor-pointer bg-transparent shrink-0 ' +
-                  (mappingPreset === p.id
-                    ? cLine + ' ' + cText + ' font-semibold'
-                    : 'border-transparent ' + cTextMuted + ' ' + cHover)
-                }
-              >
-                {p.label}
-              </button>
-            ))}
+            <span
+              className="px-2.5 py-1 rounded-full border text-[11px] font-mono font-medium shrink-0"
+              style={{
+                backgroundColor: tokens.cardBg,
+                borderColor: tokens.border,
+                color: tokens.muted,
+              }}
+            >
+              Δ {contrast.ratioText}
+            </span>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-              {SNEAKER_MODELS.map((m) => (
+          <div
+            className="rounded-3xl overflow-hidden border"
+            style={{
+              backgroundColor: studioBgHex,
+              borderColor: tokens.border,
+              boxShadow: tokens.shadowCard,
+            }}
+          >
+            <Sneaker3D
+              sneakerColors={sneakerColors}
+              modelId={modelId}
+              isDark={darkCanvas}
+              studioBg={studioBgHex}
+              resetLabel="360°"
+            />
+          </div>
+
+          <div
+            className="hidden min-[820px]:block rounded-3xl border p-4"
+            style={{
+              backgroundColor: tokens.cardBg,
+              borderColor: tokens.border,
+              boxShadow: tokens.shadowCard,
+            }}
+          >
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span className="text-[13px] font-semibold" style={{ color: tokens.ink }}>
+                {t.specTitle}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopySpec}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors"
+                style={{
+                  backgroundColor: tokens.elevatedBg,
+                  borderColor: tokens.border,
+                  color: tokens.ink,
+                }}
+              >
+                {copiedKey === 'spec' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedKey === 'spec' ? t.copied : t.copySpec}
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {SPEC_ZONES.map((z) => (
                 <button
-                  key={m.id}
+                  key={z}
                   type="button"
-                  onClick={() => handleModelSwitch(m.id)}
-                  className={
-                    'px-2 py-0.5 text-[7.5px] font-sans uppercase tracking-[0.16em] rounded-full border transition-colors cursor-pointer shrink-0 ' +
-                    (modelId === m.id
-                      ? isDark
-                        ? 'border-[#F4F0E8]/40 bg-[#F4F0E8]/10 text-[#F4F0E8] font-semibold'
-                        : 'border-[#1C1816]/40 bg-[#1C1816]/10 text-[#1C1816] font-semibold'
-                      : 'border-transparent bg-transparent ' + cTextMuted + ' ' + cHover)
-                  }
+                  onClick={() => copyText(z, sneakerColors[z])}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-colors min-w-0"
+                  style={{
+                    backgroundColor: tokens.elevatedBg,
+                    borderColor: tokens.border,
+                  }}
                 >
-                  {m.shortLabel}
+                  <span
+                    className="w-4 h-4 rounded-md shrink-0 border"
+                    style={{ backgroundColor: sneakerColors[z], borderColor: tokens.strongBorder }}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[10px] truncate" style={{ color: tokens.muted }}>
+                      {t.zones[z]}
+                    </div>
+                    <div className="text-[11px] font-mono font-semibold truncate" style={{ color: tokens.ink }}>
+                      {copiedKey === z ? t.copied : sneakerColors[z]}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
-
-            <span
-              className={
-                'text-[7.5px] font-sans uppercase tracking-[0.12em] whitespace-nowrap ' + cTextMuted
-              }
-            >
-              ΔE {harmonyEvaluation.ratioText}
-            </span>
           </div>
-        </div>
+        </section>
 
-        {/* 2. 3D-МОДЕЛЬ + ВЫБОР ПОДОШВЫ (ВЕРХ СЛЕВА) И СТУДИЙНОГО ФОНА (НИЗ СЛЕВА) */}
-        <div
-          className={
-            'relative my-1 rounded-[4px] overflow-hidden transition-colors duration-300 ' +
-            (studioBg !== 'auto' ? 'border ' + cLine : '')
-          }
-          style={{ backgroundColor: stageBgColor }}
-        >
-          <Sneaker3D
-            sneakerColors={sneakerColors}
-            isDark={stageIsDark}
-            modelId={modelId}
-            onResetAll={handleResetAll}
-            resetLabel={t.resetBtn}
-            loading3DLabel={'3D • ' + activeModel.name + '...'}
-            webglFallbackLabel={t.webglFallback}
-          />
-
-          {/* Выбор цвета нейтральной подошвы (не влияет на схемы Иттена) */}
-          <div
-            className="absolute top-1.5 left-2 z-[5] flex items-center gap-1.5 px-2 py-1 rounded-full"
-            style={{
-              backgroundColor: stageIsDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.72)',
-            }}
-            aria-label={soleLabel}
-          >
-            <span
-              className={
-                'text-[7px] font-sans uppercase tracking-[0.14em] pr-0.5 ' +
-                (stageIsDark ? 'text-[#F4F0E8]/70' : 'text-[#1C1816]/70')
-              }
-            >
-              {soleLabel}
-            </span>
-            {SOLE_OPTIONS.map((opt) => {
-              const isSelected =
-                soleTheme === opt.id ||
-                (soleTheme === 'auto' && ((isDark && opt.id === 'black') || (!isDark && opt.id === 'cream')))
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic('light')
-                    setSoleTheme(opt.id)
-                  }}
-                  aria-label={opt.label}
-                  title={opt.label}
-                  className={
-                    'w-3.5 h-3.5 rounded-full cursor-pointer transition-transform ' +
-                    (isSelected
-                      ? 'scale-110 ring-1 ring-offset-1 ' +
-                        (stageIsDark
-                          ? 'ring-white ring-offset-black'
-                          : 'ring-black ring-offset-white')
-                      : 'opacity-80 hover:opacity-100')
-                  }
-                  style={{
-                    background:
-                      'linear-gradient(180deg, ' +
-                      opt.midsole +
-                      ' 50%, ' +
-                      opt.outsole +
-                      ' 50%)',
-                    border:
-                      '1px solid ' +
-                      (stageIsDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'),
-                  }}
-                />
-              )
-            })}
-          </div>
-
-          {/* 5 студийных фонов в левом нижнем углу 3D-сцены */}
-          <div
-            className="absolute bottom-1.5 left-2 z-[5] flex items-center gap-1.5 px-1.5 py-1 rounded-full"
-            style={{
-              backgroundColor: stageIsDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.65)',
-            }}
-            aria-label="Studio background"
-          >
-            {STUDIO_BG_OPTIONS.map((opt) => {
-              const isSelected =
-                studioBg === opt.id ||
-                (studioBg === 'auto' && ((isDark && opt.id === 'black') || (!isDark && opt.id === 'cream')))
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic('light')
-                    setStudioBg(opt.id)
-                  }}
-                  aria-label={opt.label}
-                  title={opt.label}
-                  className={
-                    'w-3.5 h-3.5 rounded-full cursor-pointer transition-transform ' +
-                    (isSelected
-                      ? 'scale-110 ring-1 ring-offset-1 ' +
-                        (stageIsDark
-                          ? 'ring-white ring-offset-black'
-                          : 'ring-black ring-offset-white')
-                      : 'opacity-75 hover:opacity-100')
-                  }
-                  style={{
-                    backgroundColor: opt.swatchHex,
-                    border:
-                      '1px solid ' +
-                      (opt.isDarkStage ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'),
-                  }}
-                />
-              )
-            })}
-          </div>
-        </div>
-
-        {/* 3. КОМПАКТНЫЙ ПУЛЬТ: КРУГ ИТТЕНА СЛЕВА + 3 ПОЛЗУНКА СПРАВА */}
-        <div
-          className={
-            'grid grid-cols-[114px_1fr] sm:grid-cols-[136px_1fr] gap-4 items-center py-2 border-t ' +
-            cLine
-          }
-        >
-          <div className="flex flex-col items-center">
-            <div
-              ref={wheelRef}
-              role="slider"
-              tabIndex={0}
-              aria-label={modelMode === 'ryb' ? t.ittenLabel : t.hslLabel}
-              aria-valuemin={0}
-              aria-valuemax={359}
-              aria-valuenow={baseHue}
-              className="relative w-[98px] h-[98px] sm:w-[118px] sm:h-[118px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none focus:outline-none focus:ring-1 focus:ring-current/40"
-              style={{
-                background: wheelBackground,
-                touchAction: 'none',
-                boxShadow:
-                  '0 0 0 1px ' +
-                  (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)') +
-                  ', 0 6px 18px rgba(0,0,0,0.16)',
+        <section className="min-[820px]:col-span-6 mt-3 min-[820px]:mt-0 space-y-3.5">
+          {showSettings ? (
+            <StudioSettingsView
+              t={t}
+              tokens={tokens}
+              lang={lang}
+              modelMode={modelMode}
+              hapticsEnabled={hapticsEnabled}
+              studioBg={studioBg}
+              soleConfig={soleConfig}
+              onChangeStudioBg={(next) => {
+                setStudioBg(next)
+                saveStudioBg(next)
               }}
-              onPointerDown={handleWheelPointerDown}
-              onPointerMove={handleWheelPointerMove}
-              onPointerUp={handleWheelPointerUp}
-              onPointerCancel={handleWheelPointerUp}
-              onKeyDown={handleWheelKeyDown}
-            >
+              onChangeSole={setSoleConfig}
+              onResetSole={() => setSoleConfig(DEFAULT_SOLE_CONFIG)}
+              onChangeModelMode={setModelMode}
+              onToggleHaptics={() => {
+                const next = !hapticsEnabled
+                setHapticsEnabled(next)
+                saveHapticsEnabled(next)
+                if (next) triggerHaptic('select', true)
+              }}
+              onChangeLang={setLang}
+              onOpenGuide={() => setShowGuide(true)}
+            />
+          ) : (
+            <>
               <div
-                className="absolute inset-[24%] rounded-full pointer-events-none"
+                className="relative grid grid-cols-4 p-1 rounded-2xl border"
                 style={{
-                  background:
-                    'radial-gradient(circle at 35% 32%, white 0%, ' + colors[0] + ' 42%, #111 95%)',
-                  boxShadow:
-                    'inset -3px -3px 8px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)',
+                  backgroundColor: tokens.cardBg,
+                  borderColor: tokens.border,
+                  boxShadow: tokens.shadowSoft,
                 }}
-              />
-
-              {schemeHues.slice(1).map((hAngle, idx) => {
-                const dotHue = modelMode === 'ryb' ? rybHueToRgbHue(hAngle) : hAngle
-                return (
-                  <div
-                    key={idx}
-                    className="absolute inset-0 pointer-events-none"
-                    style={{ transform: 'rotate(' + hAngle + 'deg)' }}
-                  >
-                    <div
-                      className="absolute top-[4px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full border border-white/90 shadow-sm"
-                      style={{ backgroundColor: 'hsl(' + dotHue + ', 85%, 50%)' }}
-                    />
-                  </div>
-                )
-              })}
-
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{ transform: 'rotate(' + baseHue + 'deg)' }}
               >
                 <div
-                  className="absolute top-[2px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-[1.5px] border-white shadow-md"
+                  className="absolute top-1 bottom-1 left-1 rounded-xl border transition-transform duration-200 pointer-events-none"
                   style={{
-                    backgroundColor:
-                      'hsl(' +
-                      (modelMode === 'ryb' ? rybHueToRgbHue(baseHue) : baseHue) +
-                      ', 85%, 50%)',
+                    width: 'calc(25% - 2px)',
+                    transform: `translate3d(${tabIndex * 100}%, 0, 0)`,
+                    backgroundColor: tokens.activeTintBg,
+                    borderColor: tokens.activeTintBorder,
                   }}
                 />
-              </div>
-            </div>
-            <span
-              className={
-                'mt-1.5 text-[8.5px] font-sans tracking-[0.18em] uppercase whitespace-nowrap ' +
-                cTextMuted
-              }
-            >
-              {modelMode === 'ryb' ? 'RYB' : 'HSL'} • {baseHue}°
-            </span>
-          </div>
-
-          <div className="flex flex-col justify-center gap-2.5 pr-1">
-            <div>
-              <label
-                htmlFor="slider-tint-white"
-                className={
-                  'flex justify-between text-[8.5px] font-sans uppercase tracking-[0.16em] mb-1 ' +
-                  cTextMuted
-                }
-              >
-                <span>{t.pure}</span>
-                <span>
-                  {t.white} ({Math.round(whiteAmount * 100)}%)
-                </span>
-              </label>
-              <input
-                id="slider-tint-white"
-                aria-label={t.white}
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={whiteAmount}
-                onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="slider-shade-black"
-                className={
-                  'flex justify-between text-[8.5px] font-sans uppercase tracking-[0.16em] mb-1 ' +
-                  cTextMuted
-                }
-              >
-                <span>{t.pure}</span>
-                <span>
-                  {t.black} ({Math.round(blackAmount * 100)}%)
-                </span>
-              </label>
-              <input
-                id="slider-shade-black"
-                aria-label={t.black}
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={blackAmount}
-                onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="slider-chroma-sat"
-                className={
-                  'flex justify-between text-[8.5px] font-sans uppercase tracking-[0.16em] mb-1 ' +
-                  cTextMuted
-                }
-              >
-                <span>Muted</span>
-                <span>
-                  {t.chroma} ({Math.round(chromaAmount * 100)}%)
-                </span>
-              </label>
-              <input
-                id="slider-chroma-sat"
-                aria-label={t.chroma}
-                type="range"
-                min="0.15"
-                max="1"
-                step="0.01"
-                value={chromaAmount}
-                onChange={(e) => setChromaAmount(parseFloat(e.target.value))}
-                className="w-full"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ С ЧЕСТНЫМ УГЛОМ КРУГА */}
-        <div className={'grid gap-2.5 pt-1.5 ' + (isTetrad ? 'grid-cols-4' : 'grid-cols-3')}>
-          {colors.map((c, i) => {
-            const isCopied = copiedKey === 'swatch:' + i + ':' + c
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => copyToClipboard('swatch:' + i + ':' + c, c, c + ' ' + t.copied)}
-                className="flex flex-col text-left bg-transparent border-0 p-0 cursor-pointer group outline-none"
-                title={c}
-              >
-                <div
-                  className={
-                    'relative w-full h-9 sm:h-10 mb-1 rounded-[2px] shadow-sm border transition-transform duration-150 group-active:scale-[0.98] flex items-end justify-between px-1.5 pb-1 ' +
-                    (isDark ? 'border-white/15' : 'border-black/10')
-                  }
-                  style={{ backgroundColor: c }}
-                >
-                  <span className="px-1 py-[1px] text-[8px] font-mono tracking-wider rounded-[1px] bg-black/50 text-white/95 backdrop-blur-[2px]">
-                    {isCopied ? t.copied : c}
-                  </span>
-                </div>
-                <div className="flex flex-col w-full leading-tight">
-                  <div className="flex items-baseline justify-between gap-1">
-                    <span
-                      className={'text-[9px] font-sans font-semibold uppercase tracking-[0.14em] ' + cText}
+                {(['colors', 'models', 'harmonies', 'palette'] as MainTab[]).map((tab) => {
+                  const active = activeTab === tab
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('select', hapticsEnabled)
+                        setActiveTab(tab)
+                      }}
+                      className="relative z-10 py-2 text-[12px] font-semibold transition-colors"
+                      style={{ color: active ? tokens.activeTintInk : tokens.muted }}
                     >
-                      {ratioLabels[i]}
-                    </span>
-                    <span className={'text-[7.5px] font-mono uppercase ' + cTextMuted}>
-                      {swatchAngles[i]}
-                    </span>
-                  </div>
-                  <span
-                    className={'text-[7.5px] font-sans uppercase tracking-[0.04em] line-clamp-1 ' + cTextMuted}
-                  >
-                    {roleLabels[i]}
-                  </span>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* 4.5. ПРОИЗВОДСТВЕННАЯ ТЕХКАРТА 13 ЗОН */}
-        <div className={'mt-2 pt-1.5 border-t ' + cLine}>
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className={'text-[8px] font-sans uppercase tracking-[0.16em] ' + cTextMuted}>
-              {activeModel.name} • 13
-            </span>
-            <button
-              type="button"
-              onClick={handleExportFullSpec}
-              className={
-                'px-2 py-0.5 border rounded-[2px] text-[8px] font-sans uppercase tracking-[0.14em] bg-transparent cursor-pointer transition-colors ' +
-                cLine +
-                ' ' +
-                cTextMuted +
-                ' ' +
-                cHover
-              }
-            >
-              {copiedKey === '__full_spec__' ? t.exportCopied : t.exportSpecBtn}
-            </button>
-          </div>
-
-          <div
-            className="flex overflow-x-auto gap-1.5 pb-1 pr-6 scrollbar-hide"
-            style={fadeMaskStyle}
-          >
-            {allZonesSpec.map((item) => {
-              const zoneKey = 'zone:' + item.key + ':' + item.hex
-              const isZoneCopied = copiedKey === zoneKey
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() =>
-                    copyToClipboard(zoneKey, item.hex, item.label + ' ' + item.hex + ' ' + t.copied)
-                  }
-                  className={
-                    'flex items-center gap-1.5 px-2 py-1 border rounded-[2px] bg-transparent cursor-pointer shrink-0 transition-opacity hover:opacity-100 opacity-90 ' +
-                    cLine
-                  }
-                  title={item.label + ': ' + item.hex}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-[1px] border border-current/20 shrink-0"
-                    style={{ backgroundColor: item.hex }}
-                  />
-                  <span className={'text-[8px] font-sans uppercase tracking-[0.08em] ' + cText}>
-                    {item.label}
-                  </span>
-                  <span className={'text-[8px] font-mono ' + cTextMuted}>
-                    {isZoneCopied ? t.copied : item.hex}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* 5. РЕДАКЦИОННАЯ ПОДПИСЬ */}
-        <div className={'mt-2 pt-1.5 border-t flex items-center justify-between ' + cLine}>
-          <p className={'font-serif text-[12px] italic ' + cTextMuted}>{t.quote}</p>
-          <span className={'text-[8.5px] font-sans font-bold uppercase tracking-[0.3em] ' + cText}>
-            Cordwainer
-          </span>
-        </div>
-      </div>
-
-      {/* МОДАЛКА PRO ДОСТУПА */}
-      <AnimatePresence>
-        {showProModal && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pro-modal-title"
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#000000]/70 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className={
-                'relative w-full max-w-[340px] p-8 border shadow-2xl flex flex-col overflow-hidden ' +
-                cLine +
-                ' ' +
-                (isDark ? 'bg-[#111111]' : 'bg-[#EAE6DF]')
-              }
-            >
-              <div className={'absolute top-0 left-0 w-2 h-2 border-t border-l ' + cLine} />
-              <div className={'absolute top-0 right-0 w-2 h-2 border-t border-r ' + cLine} />
-              <div className={'absolute bottom-0 left-0 w-2 h-2 border-b border-l ' + cLine} />
-              <div className={'absolute bottom-0 right-0 w-2 h-2 border-b border-r ' + cLine} />
-
-              <button
-                ref={proModalCloseRef}
-                type="button"
-                disabled={isPaymentBusy}
-                onClick={closeProModal}
-                aria-label={t.guideClose}
-                className={
-                  'absolute top-4 right-4 p-1 hover:text-current bg-transparent border-0 cursor-pointer disabled:opacity-40 ' +
-                  cTextMuted
-                }
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-
-              <div className={'flex justify-center mb-5 opacity-50 ' + cTextMuted}>
-                <LockIcon size={32} />
+                      {t.tabs[tab]}
+                    </button>
+                  )
+                })}
               </div>
 
-              <h3
-                id="pro-modal-title"
-                className={'font-serif text-2xl tracking-tight mb-4 text-center ' + cText}
-              >
-                {t.paywallTitle}
-              </h3>
+              {activeTab === 'colors' && (
+                <div className="space-y-3.5">
+                  <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                    {ALL_SCHEMES.map((sc) => {
+                      const active = scheme === sc
+                      const locked = !isPro && !FREE_SCHEMES.includes(sc)
+                      return (
+                        <button
+                          key={sc}
+                          type="button"
+                          onClick={() => handleSelectScheme(sc)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[12px] font-semibold whitespace-nowrap shrink-0 transition-colors"
+                          style={{
+                            backgroundColor: active ? tokens.primaryBtnBg : tokens.cardBg,
+                            borderColor: active ? tokens.primaryBtnBg : tokens.border,
+                            color: active ? tokens.primaryBtnInk : tokens.ink,
+                          }}
+                        >
+                          {locked && <Lock className="w-3 h-3 opacity-70" />}
+                          {t.schemes[sc].short}
+                        </button>
+                      )
+                    })}
+                  </div>
 
-              <p
-                className={
-                  'text-[12px] font-sans font-light leading-relaxed mb-6 text-center ' + cTextMuted
-                }
-              >
-                {t.paywallDesc}
-              </p>
+                  <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                    {ALL_PRESETS.map((pr) => {
+                      const active = preset === pr
+                      return (
+                        <button
+                          key={pr}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('select', hapticsEnabled)
+                            setPreset(pr)
+                          }}
+                          className="px-3 py-1.5 rounded-full border text-[11px] font-semibold whitespace-nowrap shrink-0 transition-colors"
+                          style={{
+                            backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
+                            borderColor: active ? tokens.activeTintBorder : tokens.border,
+                            color: active ? tokens.activeTintInk : tokens.muted,
+                          }}
+                        >
+                          {t.presets[pr]}
+                        </button>
+                      )
+                    })}
+                  </div>
 
-              {paymentErrorMsg && (
-                <p className="text-[10px] font-sans text-amber-400 text-center mb-4">
-                  {paymentErrorMsg}
-                </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      {
+                        key: 'primary',
+                        hex: slotPrimary,
+                        title: t.slots.primary,
+                        desc: t.slots.primaryDesc,
+                        angle: wheelAngles[0],
+                      },
+                      {
+                        key: 'secondary',
+                        hex: slotSecondary,
+                        title: t.slots.secondary,
+                        desc: t.slots.secondaryDesc,
+                        angle: wheelAngles[1] ?? wheelAngles[0],
+                      },
+                      {
+                        key: 'accent',
+                        hex: slotAccent,
+                        title: t.slots.accent,
+                        desc: t.slots.accentDesc,
+                        angle: wheelAngles[wheelAngles.length - 1] ?? wheelAngles[0],
+                      },
+                    ].map((card) => (
+                      <button
+                        key={card.key}
+                        type="button"
+                        onClick={() => copyText(card.key, card.hex)}
+                        className="rounded-2xl border p-2.5 text-left transition-colors min-w-0"
+                        style={{
+                          backgroundColor: tokens.cardBg,
+                          borderColor: tokens.border,
+                          boxShadow: tokens.shadowSoft,
+                        }}
+                      >
+                        <div
+                          className="h-11 rounded-xl mb-2 flex items-end justify-between p-1.5 border"
+                          style={{
+                            backgroundColor: card.hex,
+                            borderColor: 'rgba(0,0,0,0.08)',
+                          }}
+                        >
+                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-black/55 text-white">
+                            {copiedKey === card.key ? t.copied : card.hex}
+                          </span>
+                          <span className="px-1 py-0.5 rounded-md text-[9px] font-mono bg-black/45 text-white/90">
+                            {Math.round(card.angle)}°
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-semibold truncate" style={{ color: tokens.ink }}>
+                          {card.title}
+                        </div>
+                        <div className="text-[10px] truncate" style={{ color: tokens.muted }}>
+                          {card.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div
+                    className="rounded-2xl border px-3.5 py-2.5 flex items-start gap-2.5"
+                    style={{
+                      backgroundColor: tokens.elevatedBg,
+                      borderColor: tokens.border,
+                    }}
+                  >
+                    <ShieldCheck
+                      className="w-4 h-4 shrink-0 mt-0.5"
+                      style={{ color: tokens.activeTintBorder }}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold" style={{ color: tokens.ink }}>
+                        {t.honestBadge}
+                      </div>
+                      <div className="text-[11px] leading-snug" style={{ color: tokens.muted }}>
+                        {t.honestSubtext}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="grid grid-cols-3 p-1 rounded-2xl border gap-1"
+                    style={{
+                      backgroundColor: tokens.cardBg,
+                      borderColor: tokens.border,
+                    }}
+                  >
+                    {(
+                      [
+                        { id: 'tone', label: t.subTabs.tone, Icon: Palette },
+                        { id: 'sole', label: t.subTabs.sole, Icon: Layers },
+                        { id: 'bg', label: t.subTabs.bg, Icon: Sparkles },
+                      ] as const
+                    ).map(({ id, label, Icon }) => {
+                      const active = subTool === id
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('select', hapticsEnabled)
+                            setSubTool(id)
+                          }}
+                          className="py-2 px-2 rounded-xl border text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                          style={{
+                            backgroundColor: active ? tokens.activeTintBg : 'transparent',
+                            borderColor: active ? tokens.activeTintBorder : 'transparent',
+                            color: active ? tokens.activeTintInk : tokens.muted,
+                          }}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {subTool === 'tone' && (
+                    <div className="space-y-3">
+                      <div
+                        className="rounded-3xl border p-4 flex flex-col sm:flex-row items-center gap-4"
+                        style={{
+                          backgroundColor: tokens.cardBg,
+                          borderColor: tokens.border,
+                          boxShadow: tokens.shadowCard,
+                        }}
+                      >
+                        <div className="flex flex-col items-center shrink-0">
+                          <div
+                            ref={wheelRef}
+                            onPointerDown={(e) => {
+                              e.currentTarget.setPointerCapture(e.pointerId)
+                              updateHueFromPointer(e.clientX, e.clientY)
+                            }}
+                            onPointerMove={(e) => {
+                              if (e.buttons === 1 || e.pointerType === 'touch') {
+                                updateHueFromPointer(e.clientX, e.clientY)
+                              }
+                            }}
+                            className="relative w-36 h-36 rounded-full touch-none select-none cursor-crosshair border"
+                            style={{
+                              background: wheelGradient,
+                              borderColor: tokens.strongBorder,
+                            }}
+                          >
+                            <div
+                              className="absolute inset-8 rounded-full border shadow-inner"
+                              style={{
+                                backgroundColor: slotPrimary,
+                                borderColor: 'rgba(255,255,255,0.45)',
+                              }}
+                            />
+                            {wheelAngles.map((ang, idx) => {
+                              const rad = ((ang - 90) * Math.PI) / 180
+                              const r = 56
+                              const cx = 72 + Math.cos(rad) * r
+                              const cy = 72 + Math.sin(rad) * r
+                              const isPrimaryMarker = idx === 0
+                              return (
+                                <span
+                                  key={idx}
+                                  className="absolute rounded-full border-2 border-white shadow pointer-events-none"
+                                  style={{
+                                    width: isPrimaryMarker ? 18 : 12,
+                                    height: isPrimaryMarker ? 18 : 12,
+                                    left: cx - (isPrimaryMarker ? 9 : 6),
+                                    top: cy - (isPrimaryMarker ? 9 : 6),
+                                    backgroundColor:
+                                      idx === 0
+                                        ? slotPrimary
+                                        : idx === 1
+                                          ? slotSecondary
+                                          : slotAccent,
+                                  }}
+                                />
+                              )
+                            })}
+                          </div>
+                          <div className="mt-2 text-[11px] font-mono" style={{ color: tokens.muted }}>
+                            {modelMode.toUpperCase()} · {Math.round(baseHue)}° · {t.schemes[scheme].short}
+                          </div>
+                        </div>
+
+                        <div className="flex-1 w-full space-y-2">
+                          <div className="flex items-center justify-between text-[12px]">
+                            <span style={{ color: tokens.muted }}>{t.contrastLabel}</span>
+                            <span className="font-mono font-semibold" style={{ color: tokens.ink }}>
+                              {contrast.ratioText} · {t.contrastLevels[contrast.level]}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSavePalette}
+                            className="w-full py-2.5 px-4 rounded-2xl text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                            style={{
+                              backgroundColor: tokens.primaryBtnBg,
+                              color: tokens.primaryBtnInk,
+                            }}
+                          >
+                            <Bookmark className="w-3.5 h-3.5" />
+                            {t.savePalette}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCopySpec}
+                            className="w-full py-2.5 px-4 rounded-2xl border text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                            style={{
+                              backgroundColor: tokens.elevatedBg,
+                              borderColor: tokens.border,
+                              color: tokens.ink,
+                            }}
+                          >
+                            {copiedKey === 'spec' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedKey === 'spec' ? t.copied : t.copySpec}
+                          </button>
+                        </div>
+                      </div>
+
+                      <ToneControlCard
+                        t={t}
+                        tokens={tokens}
+                        primaryHex={slotPrimary}
+                        baseHue={baseHue}
+                        tintWhite={tintWhite}
+                        shadeBlack={shadeBlack}
+                        chromaScale={chromaScale}
+                        hapticsEnabled={hapticsEnabled}
+                        onChangeHue={setBaseHue}
+                        onChangeTint={setTintWhite}
+                        onChangeShade={setShadeBlack}
+                        onChangeChroma={setChromaScale}
+                      />
+                    </div>
+                  )}
+
+                  {subTool === 'sole' && (
+                    <SoleColorCard
+                      t={t}
+                      tokens={tokens}
+                      soleConfig={soleConfig}
+                      hapticsEnabled={hapticsEnabled}
+                      onChangeSole={setSoleConfig}
+                      onResetSole={() => setSoleConfig(DEFAULT_SOLE_CONFIG)}
+                    />
+                  )}
+
+                  {subTool === 'bg' && (
+                    <StudioBgCard
+                      t={t}
+                      tokens={tokens}
+                      studioBg={studioBg}
+                      hapticsEnabled={hapticsEnabled}
+                      onChangeStudioBg={(next) => {
+                        setStudioBg(next)
+                        saveStudioBg(next)
+                      }}
+                    />
+                  )}
+
+                  <div
+                    className="min-[820px]:hidden rounded-3xl border p-3.5"
+                    style={{
+                      backgroundColor: tokens.cardBg,
+                      borderColor: tokens.border,
+                      boxShadow: tokens.shadowSoft,
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <span className="text-[12px] font-semibold" style={{ color: tokens.ink }}>
+                        {t.specTitle}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopySpec}
+                        className="text-[11px] font-semibold"
+                        style={{ color: tokens.activeTintBorder }}
+                      >
+                        {copiedKey === 'spec' ? t.copied : t.copySpec}
+                      </button>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                      {SPEC_ZONES.map((z) => (
+                        <button
+                          key={z}
+                          type="button"
+                          onClick={() => copyText(z, sneakerColors[z])}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border shrink-0"
+                          style={{
+                            backgroundColor: tokens.elevatedBg,
+                            borderColor: tokens.border,
+                          }}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-sm border"
+                            style={{ backgroundColor: sneakerColors[z], borderColor: tokens.strongBorder }}
+                          />
+                          <span className="text-[11px] font-medium" style={{ color: tokens.ink }}>
+                            {t.zones[z]}
+                          </span>
+                          <span className="text-[10px] font-mono" style={{ color: tokens.muted }}>
+                            {copiedKey === z ? t.copied : sneakerColors[z]}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
 
-              <button
-                type="button"
-                onClick={() => void handleProClick()}
-                disabled={isPaymentBusy || paymentState === 'invoice_open'}
-                className={
-                  'group flex items-center justify-center gap-3 w-full py-4 border hover:bg-current/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer disabled:opacity-50 ' +
-                  cLine +
-                  ' ' +
-                  cText
-                }
-              >
-                {isPaymentBusy || paymentState === 'invoice_open' ? (
-                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
-                    {paymentState === 'verifying_payment' ? t.verifying : t.loading}
-                  </span>
-                ) : (
-                  <>
-                    <LockIcon size={14} />
-                    <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
-                      {t.paywallBtn}
-                    </span>
-                  </>
-                )}
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* OVERLAY: ГИД */}
-      <AnimatePresence>
-        {showGuide && (
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="color-guide-title"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className={'fixed inset-0 z-[90] flex flex-col overflow-hidden ' + cBg + ' ' + cText}
-            style={{
-              paddingTop: 'env(safe-area-inset-top, 0px)',
-              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-            }}
-          >
-            <div className="px-6 pt-10 pb-6 flex items-start justify-between shrink-0">
-              <h2
-                id="color-guide-title"
-                className="font-serif text-[12vw] min-[400px]:text-5xl leading-none tracking-tight"
-              >
-                {t.guideTitle}
-              </h2>
-              <button
-                ref={guideCloseRef}
-                type="button"
-                onClick={() => setShowGuide(false)}
-                className={
-                  'text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer transition-colors mt-2 ' +
-                  cTextMuted +
-                  ' ' +
-                  cHover
-                }
-              >
-                {t.guideClose}
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-6 pb-24 scrollbar-hide space-y-12">
-              <p className="text-[14px] min-[400px]:text-[16px] leading-[1.8] font-light max-w-lg">
-                {t.guideIntro}
-              </p>
-
-              <div>
-                <h3 className={'text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ' + cTextMuted}>
-                  {t.guideBalanceTitle}
-                </h3>
-                <p className="text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg">
-                  {t.guideBalance}
-                </p>
-              </div>
-
-              <div>
-                <h3 className={'text-[9px] font-sans uppercase tracking-[0.3em] mb-8 ' + cTextMuted}>
-                  {t.guideSchemesTitle}
-                </h3>
-                <div className="space-y-8 max-w-lg">
-                  {[
-                    { title: t.complementary, text: t.guideComplementary },
-                    { title: t.analogous, text: t.guideAnalogous },
-                    { title: t.triadic, text: t.guideTriadic },
-                    { title: t.tetradic, text: t.guideTetradic },
-                    { title: t.rectangular, text: t.guideRectangular },
-                    { title: t['split-complementary'], text: t.guideSplit },
-                    { title: t.monochromatic, text: t.guideMono },
-                  ].map((item) => (
-                    <div key={item.title}>
-                      <div className="font-serif text-[22px] min-[400px]:text-[26px] leading-[1.2] mb-3">
-                        {item.title}
-                      </div>
-                      <p
-                        className={
-                          'text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light ' +
-                          cTextMuted
-                        }
+              {activeTab === 'models' && (
+                <div className="space-y-2.5">
+                  {MODEL_OPTIONS.map((m) => {
+                    const active = modelId === m.id
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic('harmony', hapticsEnabled)
+                          setModelId(m.id)
+                        }}
+                        className="w-full rounded-3xl border p-4 text-left flex items-center justify-between gap-3 transition-colors"
+                        style={{
+                          backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
+                          borderColor: active ? tokens.activeTintBorder : tokens.border,
+                          boxShadow: tokens.shadowCard,
+                        }}
                       >
-                        {item.text}
-                      </p>
-                    </div>
-                  ))}
+                        <div className="min-w-0">
+                          <div className="text-[14px] font-semibold tracking-tight" style={{ color: tokens.ink }}>
+                            {m.name}
+                          </div>
+                          <div className="text-[12px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
+                            {t.modelNotes[m.id]}
+                          </div>
+                        </div>
+                        {active && (
+                          <span
+                            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                            style={{
+                              backgroundColor: tokens.activeTintBorder,
+                              color: '#FFFFFF',
+                            }}
+                          >
+                            <Check className="w-4 h-4" />
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
-              </div>
+              )}
 
-              <div>
-                <h3 className={'text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ' + cTextMuted}>
-                  {t.guideFootwearTitle}
-                </h3>
-                <p className="text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg">
-                  {t.guideFootwear}
-                </p>
-              </div>
+              {activeTab === 'harmonies' && (
+                <div className="space-y-2.5">
+                  {ALL_SCHEMES.map((sc) => {
+                    const active = scheme === sc
+                    const locked = !isPro && !FREE_SCHEMES.includes(sc)
+                    const preview = generateHarmonyPalette(
+                      baseHue,
+                      tintWhite,
+                      shadeBlack,
+                      chromaScale,
+                      sc,
+                      modelMode
+                    )
+                    return (
+                      <button
+                        key={sc}
+                        type="button"
+                        onClick={() => handleSelectScheme(sc)}
+                        className="w-full rounded-3xl border p-4 text-left flex items-center justify-between gap-3 transition-colors"
+                        style={{
+                          backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
+                          borderColor: active ? tokens.activeTintBorder : tokens.border,
+                          boxShadow: tokens.shadowCard,
+                        }}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[14px] font-semibold" style={{ color: tokens.ink }}>
+                              {t.schemes[sc].name}
+                            </span>
+                            {locked && (
+                              <span
+                                className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                                style={{
+                                  backgroundColor: tokens.elevatedBg,
+                                  color: tokens.activeTintBorder,
+                                }}
+                              >
+                                {t.proBadge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[12px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
+                            {t.schemes[sc].desc}
+                          </div>
+                        </div>
+                        <div className="flex items-center -space-x-1.5 shrink-0">
+                          {preview.slice(0, 3).map((hex, i) => (
+                            <span
+                              key={i}
+                              className="w-6 h-6 rounded-full border-2"
+                              style={{
+                                backgroundColor: hex,
+                                borderColor: tokens.cardBg,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
-              <div className={'pt-8 border-t max-w-lg ' + cLine}>
-                <p
-                  className={
-                    'text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light italic ' +
-                    cTextMuted
-                  }
-                >
-                  {t.guideTip}
-                </p>
-              </div>
+              {activeTab === 'palette' && (
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={handleSavePalette}
+                    className="w-full py-3 rounded-2xl text-[13px] font-semibold flex items-center justify-center gap-2"
+                    style={{
+                      backgroundColor: tokens.primaryBtnBg,
+                      color: tokens.primaryBtnInk,
+                    }}
+                  >
+                    <Bookmark className="w-4 h-4" />
+                    {t.savePalette}
+                  </button>
+
+                  {savedPalettes.length === 0 ? (
+                    <div
+                      className="rounded-3xl border p-5 text-center text-[12px] leading-relaxed"
+                      style={{
+                        backgroundColor: tokens.cardBg,
+                        borderColor: tokens.border,
+                        color: tokens.muted,
+                      }}
+                    >
+                      {t.savedEmpty}
+                    </div>
+                  ) : (
+                    savedPalettes.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-3xl border p-3.5 flex items-center justify-between gap-3"
+                        style={{
+                          backgroundColor: tokens.cardBg,
+                          borderColor: tokens.border,
+                          boxShadow: tokens.shadowSoft,
+                        }}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex -space-x-1.5 shrink-0">
+                            {item.colors.map((c, idx) => (
+                              <span
+                                key={idx}
+                                className="w-7 h-7 rounded-full border-2"
+                                style={{ backgroundColor: c, borderColor: tokens.cardBg }}
+                              />
+                            ))}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-semibold truncate" style={{ color: tokens.ink }}>
+                              {t.schemes[item.scheme]?.name ?? item.scheme}
+                            </div>
+                            <div className="text-[11px] font-mono truncate" style={{ color: tokens.muted }}>
+                              {item.modelId.toUpperCase()} · {item.baseHue}° · {t.presets[item.preset]}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic('harmony', hapticsEnabled)
+                              setScheme(item.scheme)
+                              setPreset(item.preset)
+                              setModelId(item.modelId)
+                              setBaseHue(item.baseHue)
+                              setTintWhite(item.tintWhite)
+                              setShadeBlack(item.shadeBlack)
+                              setChromaScale(item.chromaScale)
+                              setModelMode(item.modelMode === 'hsl' ? 'oklch' : item.modelMode)
+                              if (item.sole) setSoleConfig(item.sole)
+                              setActiveTab('colors')
+                            }}
+                            className="px-3 py-1.5 rounded-full border text-[11px] font-semibold"
+                            style={{
+                              backgroundColor: tokens.activeTintBg,
+                              borderColor: tokens.activeTintBorder,
+                              color: tokens.activeTintInk,
+                            }}
+                          >
+                            {t.applyPalette}
+                          </button>
+
+                          {confirmDeleteId === item.id ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePalette(item.id)}
+                              className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold bg-red-600 text-white"
+                            >
+                              {t.confirmDelete}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(item.id)}
+                              aria-label={t.deletePalette}
+                              className="w-8 h-8 rounded-full border flex items-center justify-center"
+                              style={{
+                                backgroundColor: tokens.elevatedBg,
+                                borderColor: tokens.border,
+                                color: tokens.muted,
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </main>
+
+      {toastText && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-[12px] font-semibold shadow-lg"
+          style={{
+            backgroundColor: tokens.primaryBtnBg,
+            color: tokens.primaryBtnInk,
+          }}
+        >
+          {toastText}
+        </div>
+      )}
+
+      {showGuide && <GuideModal t={t} tokens={tokens} onClose={() => setShowGuide(false)} />}
+
+      {showProModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6"
+          style={{ backgroundColor: 'rgba(10, 10, 12, 0.56)' }}
+          onClick={() => {
+            if (!isPaymentBusy) setShowProModal(false)
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border p-5"
+            style={{
+              backgroundColor: tokens.cardBg,
+              borderColor: tokens.strongBorder,
+              boxShadow: tokens.shadowCard,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[16px] font-semibold mb-1.5" style={{ color: tokens.ink }}>
+              {t.proTitle}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            <p className="text-[12px] leading-relaxed mb-3" style={{ color: tokens.muted }}>
+              {t.proDesc}
+            </p>
+            {paymentError && (
+              <div className="mb-3 px-3 py-2 rounded-xl text-[11px] bg-red-500/10 text-red-500 border border-red-500/20">
+                {paymentError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={isPaymentBusy}
+                onClick={() => setShowProModal(false)}
+                className="flex-1 py-2.5 rounded-2xl border text-[12px] font-semibold"
+                style={{
+                  backgroundColor: tokens.elevatedBg,
+                  borderColor: tokens.border,
+                  color: tokens.ink,
+                }}
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={isPaymentBusy}
+                onClick={() => {
+                  void handleBuyPro()
+                }}
+                className="flex-1 py-2.5 rounded-2xl text-[12px] font-semibold"
+                style={{
+                  backgroundColor: tokens.primaryBtnBg,
+                  color: tokens.primaryBtnInk,
+                }}
+              >
+                {isPaymentBusy
+                  ? t.proProcessing
+                  : t.proBuyBtn.replace('{stars}', String(PRO_PRICE_STARS))}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
