@@ -21,9 +21,7 @@ export interface MixComponent {
   spectrum: SpectrumPoint[]
   volume: number
   isBinder?: boolean
-  /** Опциональная измеренная красящая сила пигмента (если доступна) */
   tintingStrength?: number
-  /** Опциональная измеренная спектральная кривая рассеяния S(λ) длиной 81 */
   scattering?: ArrayLike<number>
 }
 
@@ -143,10 +141,6 @@ const RAW_D65 = new Float64Array([
   75.0865, 69.3616, 63.6363, 64.8082, 65.9801, 65.023, 64.0659, 61.3633, 58.6608,
 ])
 
-/**
- * Нормирует спектральное распределение мощности S(λ) так,
- * чтобы трапецеидальный интеграл ∫ S(λ)·ȳ(λ)·dλ = 100.0.
- */
 function normalizeIlluminantSPD(raw: ArrayLike<number>): Float64Array {
   let ySum = 0
   for (let i = 0; i < SPECTRUM_LEN; i++) {
@@ -160,13 +154,9 @@ function normalizeIlluminantSPD(raw: ArrayLike<number>): Float64Array {
   return out
 }
 
-/**
- * Генерирует планковский спектр излучения для температуры tempK (в Кельвинах),
- * строго нормированный на Y = 100 по 2° наблюдателю CIE 1931.
- */
 export function buildPlanckIlluminant(tempK: number): Float64Array {
   const safeT = Number.isFinite(tempK) && tempK > 500 ? tempK : 6504
-  const c2 = 1.4388e7 // Вторая радиационная постоянная CIE 15:2004 (нм·К)
+  const c2 = 1.4388e7
   const raw = new Float64Array(SPECTRUM_LEN)
   for (let i = 0; i < SPECTRUM_LEN; i++) {
     const wl = WL[i]
@@ -306,13 +296,13 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * Точная обратимая поправка Саундерсона (1942) для полимерной/акриловой плёнки (n ≈ 1.50).
- * Все внутренние расчёты выполняются в относительных единицах отражения [0..1].
+ * Точная обратимая поправка Саундерсона (1942) для 45°/0° FORS-спектроскопии
+ * (зеркальный блик исключён геометрически, поэтому k1 мал и не выбеливает глубокие тени).
  */
-const K1_DRY = 0.015
-const K1_WET = 0.004
+const K1_DRY = 0.0025
+const K1_WET = 0.0005
 const K2_INTERNAL = 0.4
-const R_INT_MIN = 0.0005
+const R_INT_MIN = 0.0003
 const R_INT_MAX = 0.999
 
 export function measuredToInternalR(rMeasUnit: number, k1 = K1_DRY): number {
@@ -331,11 +321,6 @@ export function internalToMeasuredR(rIntUnit: number, isWet = false): number {
   return Math.max(0, Math.min(1, out))
 }
 
-/**
- * Оценивает спектральную кривую относительного рассеяния S(λ) для двухконстантной
- * модели Кубелки–Мунка при наличии только спектра полного укрытия R_∞(λ).
- * Гладкая зависимость от светимости CIE Y, глубины поглощения и дисперсии Ми.
- */
 function estimateSpectralScattering(
   rUnit: Float64Array,
   explicitStrength?: number,
@@ -397,7 +382,6 @@ export function mixSpectra(components: MixComponent[], isWet = false): SpectrumP
     }
   }
 
-  // Вырожденный случай: в формуле присутствует только биндер/эмульсия
   if (colorParts.length === 0 || colorVol <= 0) {
     if (binderVol > 0) {
       const refl = isWet ? 78 : 85
@@ -425,8 +409,10 @@ export function mixSpectra(components: MixComponent[], isWet = false): SpectrumP
     fractions[c] = colorParts[c].volume / colorVol
   }
 
+  // Молочное рассеяние эмульсии присутствует только пока акрил мокрый;
+  // после высыхания полимерная плёнка биндера оптически прозрачна.
   const binderRatio = binderVol / (colorVol + binderVol)
-  const emulsionS = (isWet ? 0.025 : 0) + binderRatio * 0.03
+  const emulsionS = isWet ? 0.02 + binderRatio * 0.02 : 0
 
   const result: SpectrumPoint[] = new Array(SPECTRUM_LEN)
 
@@ -444,7 +430,7 @@ export function mixSpectra(components: MixComponent[], isWet = false): SpectrumP
 
     if (emulsionS > 0) {
       totalS += emulsionS
-      totalK += emulsionS * 0.012
+      totalK += emulsionS * 0.01
     }
 
     const mixedKS = totalS > 1e-10 ? totalK / totalS : 0.0001
@@ -473,10 +459,6 @@ const M_BFD_INV = [
   -0.0085287, 0.0400428, 0.9684867,
 ] as const
 
-/**
- * Преобразование хроматической адаптации Брэдфорда (Bradford CAT)
- * из белой точки исходного осветителя srcWhite в целевую dstWhite (по умолчанию D65).
- */
 export function adaptXYZBradford(
   xyz: XYZ,
   srcWhite: XYZ,
