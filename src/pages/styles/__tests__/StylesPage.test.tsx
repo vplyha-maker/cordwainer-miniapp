@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import {
   StylesPage,
   STYLES_DATA,
@@ -51,6 +51,8 @@ function mockTelegramWebApp(overrides: Record<string, unknown> = {}) {
   return tg
 }
 
+const PAYWALL_BTN_REGEX = new RegExp(`ОТКРЫТЬ ВЕСЬ ЛУКБУК.*${PRO_VIDEOS_PRICE_STARS}`)
+
 describe('StylesPage — интеграционные тесты', () => {
   const originalTelegram = (window as unknown as { Telegram?: unknown }).Telegram
 
@@ -81,13 +83,9 @@ describe('StylesPage — интеграционные тесты', () => {
   it('показывает только бесплатные фасоны и Paywall без покупки', () => {
     render(<StylesPage onBack={vi.fn()} lang="ru" />)
 
-    // Первый бесплатный фасон виден
     expect(screen.getAllByText(STYLES_DATA[0].title.ru).length).toBeGreaterThan(0)
-    // Кнопка покупки с актуальной ценой видна
-    expect(
-      screen.getByRole('button', { name: new RegExp(String(PRO_VIDEOS_PRICE_STARS)) })
-    ).toBeTruthy()
-    // Закрытый фасон за пределами бесплатного лимита не отрендерен как слайд
+    expect(screen.getByRole('button', { name: PAYWALL_BTN_REGEX })).toBeTruthy()
+
     const lockedSlideTitle = STYLES_DATA[STYLES_DATA.length - 1].title.ru
     expect(screen.queryByRole('heading', { name: lockedSlideTitle })).toBeNull()
   })
@@ -111,9 +109,7 @@ describe('StylesPage — интеграционные тесты', () => {
       expect(screen.getAllByText(lastSlideTitle).length).toBeGreaterThan(0)
     })
 
-    expect(
-      screen.queryByRole('button', { name: new RegExp(String(PRO_VIDEOS_PRICE_STARS)) })
-    ).toBeNull()
+    expect(screen.queryByRole('button', { name: PAYWALL_BTN_REGEX })).toBeNull()
   })
 
   it('проходит полный цикл оплаты Telegram Stars (create-invoice -> openInvoice -> check-purchase)', async () => {
@@ -148,9 +144,7 @@ describe('StylesPage — интеграционные тесты', () => {
 
     render(<StylesPage onBack={vi.fn()} lang="ru" />)
 
-    const payBtn = screen.getByRole('button', {
-      name: new RegExp(String(PRO_VIDEOS_PRICE_STARS)),
-    })
+    const payBtn = screen.getByRole('button', { name: PAYWALL_BTN_REGEX })
     fireEvent.click(payBtn)
 
     await waitFor(() => {
@@ -170,9 +164,7 @@ describe('StylesPage — интеграционные тесты', () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     render(<StylesPage onBack={vi.fn()} lang="ru" />)
 
-    const payBtn = screen.getByRole('button', {
-      name: new RegExp(String(PRO_VIDEOS_PRICE_STARS)),
-    })
+    const payBtn = screen.getByRole('button', { name: PAYWALL_BTN_REGEX })
     fireEvent.click(payBtn)
 
     expect(alertSpy).toHaveBeenCalledWith(
@@ -180,12 +172,14 @@ describe('StylesPage — интеграционные тесты', () => {
     )
   })
 
-  it('автоматически прокручивает к фасону при передаче initialStyleId', async () => {
+  it('автоматически прокручивает к фасону при передаче initialStyleId', () => {
     vi.useFakeTimers()
     const targetStyle = STYLES_DATA[1] // chelsea
 
     render(<StylesPage onBack={vi.fn()} lang="ru" initialStyleId={targetStyle.id} />)
-    vi.advanceTimersByTime(100)
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
 
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto' })
     vi.useRealTimers()
@@ -202,4 +196,3 @@ describe('StylesPage — интеграционные тесты', () => {
     expect(onBack).toHaveBeenCalledTimes(2)
   })
 })
-
