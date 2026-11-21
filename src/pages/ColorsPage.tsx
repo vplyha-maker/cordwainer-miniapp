@@ -141,6 +141,15 @@ function getTg(): TgWebAppLike | undefined {
   return (window as unknown as { Telegram?: { WebApp?: TgWebAppLike } }).Telegram?.WebApp
 }
 
+function getProportionalDotSize(index: number, total: number): number {
+  if (total >= 4) {
+    const sizes = [28, 22, 18, 14]
+    return sizes[index] ?? 14
+  }
+  const sizes = [28, 22, 16]
+  return sizes[index] ?? 16
+}
+
 export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
   const t = COLORS_TRANSLATIONS[lang] ?? COLORS_TRANSLATIONS.ru
 
@@ -543,16 +552,27 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
 
   const handleCopySpec = useCallback(() => {
     const modelMeta = MODEL_OPTIONS.find((m) => m.id === modelId)
+    const paletteLines =
+      harmonyPalette.length === 4
+        ? [
+            '60% Primary: ' + harmonyPalette[0] + ' (' + formatOklch(harmonyPalette[0]) + ')',
+            '20% Secondary: ' + harmonyPalette[1] + ' (' + formatOklch(harmonyPalette[1]) + ')',
+            '10% Tertiary: ' + harmonyPalette[2] + ' (' + formatOklch(harmonyPalette[2]) + ')',
+            '10% Accent: ' + harmonyPalette[3] + ' (' + formatOklch(harmonyPalette[3]) + ')',
+          ]
+        : [
+            '60% Primary: ' + slotPrimary + ' (' + formatOklch(slotPrimary) + ')',
+            '30% Secondary: ' + slotSecondary + ' (' + formatOklch(slotSecondary) + ')',
+            '10% Accent: ' + slotAccent + ' (' + formatOklch(slotAccent) + ')',
+          ]
     const lines = [
       'CORDWAINE COLOR LAB — TECH SPEC',
       'Model: ' + (modelMeta?.name ?? modelId.toUpperCase()),
       'Harmony: ' + t.schemes[scheme].name + ' (' + modelMode.toUpperCase() + ' ' + Math.round(baseHue) + '°)',
       'Preset: ' + t.presets[preset],
       'Contrast: ' + contrast.ratioText,
-      '--- 60 / 30 / 10 ---',
-      '60% Primary: ' + slotPrimary + ' (' + formatOklch(slotPrimary) + ')',
-      '30% Secondary: ' + slotSecondary + ' (' + formatOklch(slotSecondary) + ')',
-      '10% Accent: ' + slotAccent + ' (' + formatOklch(slotAccent) + ')',
+      '--- PALETTE ---',
+      ...paletteLines,
       '--- 13 ZONES ---',
       ...SPEC_ZONES.map((z) => t.zones[z] + ': ' + sneakerColors[z]),
     ]
@@ -560,6 +580,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
     showToast(t.copied)
   }, [
     modelId,
+    harmonyPalette,
     t,
     scheme,
     modelMode,
@@ -588,7 +609,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
       chromaScale,
       modelMode,
       sole: soleConfig,
-      colors: [slotPrimary, slotSecondary, slotAccent],
+      colors: [...harmonyPalette],
     }
     setSavedPalettes((prev) => {
       const next = [item, ...prev].slice(0, 30)
@@ -611,9 +632,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
     chromaScale,
     modelMode,
     soleConfig,
-    slotPrimary,
-    slotSecondary,
-    slotAccent,
+    harmonyPalette,
     showToast,
     t.savedToast,
   ])
@@ -674,6 +693,22 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
 
   const ThemeIcon = themeMode === 'day' ? Sun : themeMode === 'night' ? Moon : Monitor
 
+  const swatchItems = useMemo(() => {
+    if (harmonyPalette.length >= 4) {
+      return [
+        { key: 'c0', hex: harmonyPalette[0], share: '60%', flex: 'flex-[3.4]' },
+        { key: 'c1', hex: harmonyPalette[1], share: '20%', flex: 'flex-[2.4]' },
+        { key: 'c2', hex: harmonyPalette[2], share: '10%', flex: 'flex-[2.1]' },
+        { key: 'c3', hex: harmonyPalette[3], share: '10%', flex: 'flex-[2.1]' },
+      ]
+    }
+    return [
+      { key: 'c0', hex: slotPrimary, share: '60%', flex: 'flex-[5]' },
+      { key: 'c1', hex: slotSecondary, share: '30%', flex: 'flex-[3.2]' },
+      { key: 'c2', hex: slotAccent, share: '10%', flex: 'flex-[2.8]' },
+    ]
+  }, [harmonyPalette, slotPrimary, slotSecondary, slotAccent])
+
   const swatchStrip = (
     <div
       className="shrink-0 px-4 py-2.5 border-t"
@@ -683,11 +718,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
       }}
     >
       <div className="flex items-stretch gap-1.5">
-        {[
-          { key: 'primary', hex: slotPrimary, share: '60%', angle: wheelAngles[0], flex: 'flex-[5.5]' },
-          { key: 'secondary', hex: slotSecondary, share: '30%', angle: wheelAngles[1] ?? wheelAngles[0], flex: 'flex-[3.3]' },
-          { key: 'accent', hex: slotAccent, share: '10%', angle: wheelAngles[wheelAngles.length - 1] ?? wheelAngles[0], flex: 'flex-[2.4]' },
-        ].map((slot) => (
+        {swatchItems.map((slot) => (
           <button
             key={slot.key}
             type="button"
@@ -696,19 +727,23 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
             title={t.copyHex}
           >
             <div
-              className="h-5 w-full rounded-md border"
+              className="h-5 w-full rounded-md border flex items-center justify-end px-1.5"
               style={{
                 backgroundColor: slot.hex,
                 borderColor: tokens.strongBorder,
               }}
-            />
-            <div className="mt-1 flex items-center justify-between gap-1 text-[11px] font-mono tabular-nums">
-              <span className="truncate font-medium" style={{ color: tokens.ink }}>
-                {copiedKey === slot.key ? t.copied : slot.hex}
-              </span>
-              <span className="shrink-0" style={{ color: tokens.subtle }}>
+            >
+              <span
+                className="text-[9px] font-mono font-semibold leading-none"
+                style={{
+                  color: isStudioBgDark(slot.hex) ? 'rgba(255,255,255,0.88)' : 'rgba(24,22,19,0.72)',
+                }}
+              >
                 {slot.share}
               </span>
+            </div>
+            <div className="mt-1 text-[10.5px] font-mono tabular-nums font-medium leading-none" style={{ color: tokens.ink }}>
+              {copiedKey === slot.key ? t.copied : slot.hex}
             </div>
           </button>
         ))}
@@ -861,22 +896,21 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                       const r = 50
                       const cx = 64 + Math.cos(rad) * r
                       const cy = 64 + Math.sin(rad) * r
-                      const isPrimaryMarker = idx === 0
+                      const markerSize = idx === 0 ? 17 : idx === 1 ? 13 : idx === 2 ? 11 : 9
+                      const markerColor =
+                        wheelAngles.length === 2 && idx === 1
+                          ? slotAccent
+                          : harmonyPalette[idx] ?? slotAccent
                       return (
                         <span
                           key={idx}
                           className="absolute rounded-full border-2 border-white shadow pointer-events-none"
                           style={{
-                            width: isPrimaryMarker ? 16 : 11,
-                            height: isPrimaryMarker ? 16 : 11,
-                            left: cx - (isPrimaryMarker ? 8 : 5.5),
-                            top: cy - (isPrimaryMarker ? 8 : 5.5),
-                            backgroundColor:
-                              idx === 0
-                                ? slotPrimary
-                                : idx === 1
-                                  ? slotSecondary
-                                  : slotAccent,
+                            width: markerSize,
+                            height: markerSize,
+                            left: cx - markerSize / 2,
+                            top: cy - markerSize / 2,
+                            backgroundColor: markerColor,
                           }}
                         />
                       )
@@ -1101,17 +1135,23 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                     {t.schemes[sc].desc}
                   </div>
                 </div>
-                <div className="flex items-center -space-x-1.5 shrink-0">
-                  {preview.slice(0, 3).map((hex, i) => (
-                    <span
-                      key={i}
-                      className="w-6 h-6 rounded-full border-2"
-                      style={{
-                        backgroundColor: hex,
-                        borderColor: tokens.pageBg,
-                      }}
-                    />
-                  ))}
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {preview.map((hex, i) => {
+                    const size = getProportionalDotSize(i, preview.length)
+                    return (
+                      <span
+                        key={i}
+                        className="rounded-full border shrink-0"
+                        style={{
+                          width: size,
+                          height: size,
+                          backgroundColor: hex,
+                          borderColor: tokens.strongBorder,
+                        }}
+                      />
+                    )
+                  })}
                 </div>
               </button>
             )
@@ -1147,14 +1187,22 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                   style={{ borderColor: tokens.border }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex -space-x-1.5 shrink-0">
-                      {item.colors.map((c, idx) => (
-                        <span
-                          key={idx}
-                          className="w-7 h-7 rounded-full border-2"
-                          style={{ backgroundColor: c, borderColor: tokens.pageBg }}
-                        />
-                      ))}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {item.colors.map((c, idx) => {
+                        const size = getProportionalDotSize(idx, item.colors.length)
+                        return (
+                          <span
+                            key={idx}
+                            className="rounded-full border shrink-0"
+                            style={{
+                              width: size,
+                              height: size,
+                              backgroundColor: c,
+                              borderColor: tokens.strongBorder,
+                            }}
+                          />
+                        )
+                      })}
                     </div>
                     <div className="min-w-0">
                       <div className="text-[14px] font-medium truncate" style={{ color: tokens.ink }}>
@@ -1447,7 +1495,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 borderColor: tokens.border,
               }}
             >
-              <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-5">
                 {MODEL_OPTIONS.map((m) => {
                   const active = modelId === m.id
                   return (
@@ -1470,9 +1518,6 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                   )
                 })}
               </div>
-              <span className="text-[11px] font-mono shrink-0" style={{ color: tokens.muted }}>
-                60 / 30 / 10
-              </span>
             </div>
           )}
 
