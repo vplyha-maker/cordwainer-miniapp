@@ -50,21 +50,6 @@ export interface ColorCalcPageProps {
 type MobileTabId = 'formula' | 'spectrum' | 'match' | 'archive'
 type DesktopRightTabId = 'match' | 'archive'
 
-const DEFAULT_INVENTORY_IDS = [
-  'pw_6_anatase',
-  'pbk_1_aniline_black',
-  'py_154_benzimidazolone_yellow_h3g',
-  'py_83_diarylide_yellow_hr',
-  'po_73_pyrrole_orange',
-  'pr_254_pyrrole_red',
-  'pr_122_quinacridone_magenta',
-  'pv_23_dioxazine_purple',
-  'phthalo_blue',
-  'pg_36_phthalo_green_ys',
-  'pbr_25_benzimidazolone_brown',
-  'acrylic_binder',
-] as const
-
 function calculateDeltaE2000Hex(hex1: string, hex2: string): number {
   const rgb1 = hexToRgbObj(hex1)
   const rgb2 = hexToRgbObj(hex2)
@@ -72,6 +57,16 @@ function calculateDeltaE2000Hex(hex1: string, hex2: string): number {
     rgbToLab(rgb1.r, rgb1.g, rgb1.b),
     rgbToLab(rgb2.r, rgb2.g, rgb2.b)
   )
+}
+
+function buildAllInventoryIds(loaded: Pigment[], sys: CoverageSystem): string[] {
+  const ids = loaded
+    .filter((p) => p.id !== 'acrylic_binder' && p.id !== 'cardboard' && Boolean(p.spectrum))
+    .map((p) => p.id)
+  if (sys === 'acrylic' && loaded.some((p) => p.id === 'acrylic_binder')) {
+    ids.push('acrylic_binder')
+  }
+  return ids
 }
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
@@ -135,8 +130,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadAllPigments()
       .then((loaded) => {
         setPigments(loaded)
-        const available = new Set(loaded.map((p) => p.id))
-        setInventoryIds(DEFAULT_INVENTORY_IDS.filter((id) => available.has(id)))
+        setInventoryIds(buildAllInventoryIds(loaded, 'acrylic'))
         setLoading(false)
       })
       .catch((err) => {
@@ -464,21 +458,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     )
   }
 
-  const resetInventoryDefaults = () => {
-    hapticTap()
-    const available = new Set(pigments.map((p) => p.id))
-    setInventoryIds(DEFAULT_INVENTORY_IDS.filter((id) => available.has(id)))
-  }
-
   const selectAllInventory = () => {
     hapticTap()
-    const ids = pigments
-      .filter((p) => p.id !== 'acrylic_binder' && p.id !== 'cardboard' && p.spectrum)
-      .map((p) => p.id)
-    if (system === 'acrylic' && pigments.some((p) => p.id === 'acrylic_binder')) {
-      ids.push('acrylic_binder')
-    }
-    setInventoryIds(ids)
+    setInventoryIds(buildAllInventoryIds(pigments, system))
   }
 
   const clearInventory = () => {
@@ -605,7 +587,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       onSystemChange={handleSystemChange}
       inventoryIds={inventoryIds}
       onToggleInventory={toggleInventory}
-      onResetInventoryDefaults={resetInventoryDefaults}
       onSelectAllInventory={selectAllInventory}
       onClearInventory={clearInventory}
       recipeLoading={recipeLoading}
@@ -640,6 +621,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     { id: 'match', label: dict.navMatch },
     { id: 'archive', label: dict.navArchive },
   ]
+
+  const isMobileMatch = mobileTab === 'match'
+  const footerColor = isMobileMatch
+    ? recipeResult?.resultHex || targetHex
+    : displayHex || tokens.surfaceSoft
+  const footerLabel = isMobileMatch
+    ? recipeResult
+      ? `ΔE ${recipeResult.deltaE.toFixed(1)}`
+      : targetHex
+    : liveDeltaE !== null
+    ? `ΔE ${liveDeltaE.toFixed(1)}`
+    : displayHex || '—'
 
   const themeToggleButton = (
     <button
@@ -683,7 +676,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
     >
-      {/* ШАПКА ТОЛЬКО ДЛЯ ПЛАНШЕТА И ПК (на смартфоне скрыта) */}
+      {/* ШАПКА ТОЛЬКО ДЛЯ ПЛАНШЕТА И ПК */}
       <header
         className="hidden md:flex items-center justify-between px-6 lg:px-8 py-3.5 border-b max-w-[1440px] mx-auto w-full"
         style={{ borderColor: tokens.border }}
@@ -851,7 +844,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </div>
       </main>
 
-      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ */}
+      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ (контекстно синхронизирована с активной вкладкой) */}
       <footer
         className="sticky bottom-0 z-30 border-t px-4 py-2.5"
         style={{
@@ -872,10 +865,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           >
             <span
               className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
-              style={{ backgroundColor: displayHex || tokens.surfaceSoft }}
+              style={{ backgroundColor: footerColor }}
             />
             <span className="text-[12px] font-mono font-semibold tabular-nums">
-              {liveDeltaE !== null ? `ΔE ${liveDeltaE.toFixed(1)}` : displayHex || '—'}
+              {footerLabel}
             </span>
           </button>
 
@@ -886,18 +879,33 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             CORDWAINE · SPECTRAL ATELIER
           </span>
 
-          <button
-            type="button"
-            onClick={copyHex}
-            disabled={!displayHex}
-            className="h-9 px-4 rounded-full text-[12px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
-            style={{
-              backgroundColor: tokens.activeBg,
-              color: tokens.activeText,
-            }}
-          >
-            {copied ? dict.copied : dict.copy}
-          </button>
+          {isMobileMatch ? (
+            <button
+              type="button"
+              onClick={recipeResult ? sendRecipeToMix : runRecipeSearch}
+              disabled={recipeLoading || loading || inventoryIds.length === 0}
+              className="h-9 px-4 rounded-full text-[12px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
+              style={{
+                backgroundColor: recipeResult ? tokens.accent : tokens.activeBg,
+                color: tokens.activeText,
+              }}
+            >
+              {recipeLoading ? '...' : recipeResult ? dict.navFormula : dict.navMatch}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={copyHex}
+              disabled={!displayHex}
+              className="h-9 px-4 rounded-full text-[12px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
+              style={{
+                backgroundColor: tokens.activeBg,
+                color: tokens.activeText,
+              }}
+            >
+              {copied ? dict.copied : dict.copy}
+            </button>
+          )}
         </div>
       </footer>
 
