@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion'
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react'
 
 import type { Lang } from '../../App'
 import type { Pigment } from '../../data/pigments'
@@ -30,6 +30,16 @@ import {
   PigmentDossierModal,
   MasterGuideModal,
 } from './PigmentArchive'
+import { useAtelierTheme } from './themeTokens'
+import {
+  hapticConfirm,
+  hapticError,
+  hapticSelect,
+  hapticSuccess,
+  hapticTap,
+  isHapticsEnabled,
+  setHapticsEnabled,
+} from './haptics'
 
 export interface ColorCalcPageProps {
   lang: Lang
@@ -65,7 +75,10 @@ function calculateDeltaE2000Hex(hex1: string, hex2: string): number {
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const dict = useMemo(() => getColorCalcDict(lang), [lang])
+  const prefersReduced = useReducedMotion()
+  const { isDark, toggleTheme, tokens } = useAtelierTheme()
 
+  const [hapticsOn, setHapticsOn] = useState<boolean>(() => isHapticsEnabled())
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -153,7 +166,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     return workerRef.current
   }, [])
 
-  // Симуляция 4 слоёв по Кубелке–Мунку с учётом выбранного освещения (метамеризм)
   const layerSwatches = useMemo<LayerSwatchItem[] | null>(() => {
     if (!mixedColor?.spectrum || pigments.length === 0) return null
     const basePigment =
@@ -204,7 +216,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const liveDeltaE =
     activeTarget && displayHex ? calculateDeltaE2000Hex(activeTarget, displayHex) : null
 
-  // Кривые компонентов для наложения на спектральный график
   const componentSeries = useMemo<SpectralSeries[]>(() => {
     const out: SpectralSeries[] = []
     for (let i = 0; i < paints.length; i++) {
@@ -222,12 +233,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       out.push({
         id: `${paint.id}-${pig.id}`,
         label,
-        color: pig.hex || '#D8A35C',
+        color: pig.hex || tokens.accent,
         spectrum: pig.spectrum,
       })
     }
     return out
-  }, [paints, pigments, lang])
+  }, [paints, pigments, lang, tokens.accent])
 
   const inspectedPigment = useMemo(
     () => (inspectedPigmentId ? pigments.find((p) => p.id === inspectedPigmentId) : undefined),
@@ -238,6 +249,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const handleAddFromArchive = useCallback(
     (pigmentId: string) => {
+      hapticConfirm()
       setPaints((prev) => {
         if (prev.some((row) => row.pigmentId === pigmentId)) return prev
         const emptyIdx = prev.findIndex((row) => !row.amount || parseFloat(row.amount) <= 0)
@@ -263,17 +275,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (!displayHex) return
     try {
       await navigator.clipboard?.writeText(displayHex)
+      hapticSuccess()
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch {
-      // ignore clipboard errors in restricted WebView
+      hapticError()
     }
   }
 
   const runRecipeSearch = () => {
     if (!/^#[0-9A-Fa-f]{6}$/.test(targetHex) || pigments.length === 0 || inventoryIds.length === 0) {
+      hapticError()
       return
     }
+    hapticConfirm()
     setRecipeLoading(true)
     setRecipeError(null)
     setRecipeResult(null)
@@ -286,13 +301,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       worker.removeEventListener('message', onMsg)
       setRecipeLoading(false)
       if (e.data.error) {
+        hapticError()
         setRecipeError(String(e.data.error))
         setRecipeResult(null)
         return
       }
       const result = e.data.result as RecipeResult | null
       setRecipeResult(result)
-      if (!result) setRecipeError(dict.recipeError)
+      if (!result) {
+        hapticError()
+        setRecipeError(dict.recipeError)
+      } else {
+        hapticSuccess()
+      }
     }
 
     worker.addEventListener('message', onMsg)
@@ -310,6 +331,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const autoAdjustCurrentMix = () => {
     if (!activeTarget || paints.length === 0 || pigments.length === 0) return
+    hapticConfirm()
     setIsAutoAdjusting(true)
 
     setTimeout(() => {
@@ -399,8 +421,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           const ratio = initialTotal > 0 ? oldBinder / initialTotal : 0.2
           updatePaint(binderPaint.id, 'amount', String(Number((targetTotalVol * ratio).toFixed(2))))
         }
+        hapticSuccess()
       } catch (err) {
         console.error(err)
+        hapticError()
       } finally {
         setIsAutoAdjusting(false)
       }
@@ -409,6 +433,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const sendRecipeToMix = () => {
     if (!recipeResult?.recipe?.length) return
+    hapticConfirm()
     applyRecipe(
       recipeResult.recipe.map((item) => ({
         pigmentId: item.pigment.id,
@@ -421,6 +446,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const handleSystemChange = (newSystem: CoverageSystem) => {
+    hapticSelect()
     setSystem(newSystem)
     if (newSystem === 'aniline') {
       setInventoryIds((prev) => prev.filter((id) => id !== 'acrylic_binder'))
@@ -433,17 +459,21 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }
 
-  const toggleInventory = (pid: string) =>
+  const toggleInventory = (pid: string) => {
+    hapticSelect()
     setInventoryIds((prev) =>
       prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]
     )
+  }
 
   const resetInventoryDefaults = () => {
+    hapticTap()
     const available = new Set(pigments.map((p) => p.id))
     setInventoryIds(DEFAULT_INVENTORY_IDS.filter((id) => available.has(id)))
   }
 
   const selectAllInventory = () => {
+    hapticTap()
     const ids = pigments
       .filter((p) => p.id !== 'acrylic_binder' && p.id !== 'cardboard' && p.spectrum)
       .map((p) => p.id)
@@ -453,7 +483,25 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setInventoryIds(ids)
   }
 
-  const clearInventory = () => setInventoryIds([])
+  const clearInventory = () => {
+    hapticTap()
+    setInventoryIds([])
+  }
+
+  const handleToggleHaptics = () => {
+    const next = !hapticsOn
+    setHapticsOn(next)
+    setHapticsEnabled(next)
+    if (next) hapticTap()
+  }
+
+  const themeVars = {
+    '--color-bg': tokens.pageBg,
+    '--color-surface': tokens.surface,
+    '--color-ink': tokens.ink,
+    '--color-accent': tokens.accent,
+    '--color-danger': tokens.danger,
+  } as CSSProperties
 
   const formulaNode = (
     <FormulaPanel
@@ -466,35 +514,62 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       paints={paints}
       amountRefs={amountRefs}
       totalAmount={totalAmount}
-      onAddPaint={addPaint}
-      onRemovePaint={removePaint}
+      onAddPaint={() => {
+        hapticTap()
+        addPaint()
+      }}
+      onRemovePaint={(id) => {
+        hapticTap()
+        removePaint(id)
+      }}
       onUpdatePaint={updatePaint}
-      onClearAmounts={clearAllAmounts}
+      onClearAmounts={() => {
+        hapticTap()
+        clearAllAmounts()
+      }}
       isWet={isWet}
-      onToggleWet={() => setIsWet((w) => !w)}
+      onToggleWet={() => {
+        hapticSelect()
+        setIsWet((w) => !w)
+      }}
       illuminant={illuminant}
-      onIlluminantChange={setIlluminant}
+      onIlluminantChange={(ill) => {
+        hapticSelect()
+        setIlluminant(ill)
+      }}
       layerSwatches={layerSwatches}
       selectedCoatIdx={selectedCoatIdx}
-      onSelectCoat={setSelectedCoatIdx}
+      onSelectCoat={(idx) => {
+        hapticSelect()
+        setSelectedCoatIdx(idx)
+      }}
       displayHex={displayHex}
       activeLab={activeLab}
       activeTarget={activeTarget}
-      onClearTarget={() => setActiveTarget(null)}
+      onClearTarget={() => {
+        hapticTap()
+        setActiveTarget(null)
+      }}
       liveDeltaE={liveDeltaE}
       copied={copied}
       onCopyHex={copyHex}
       isAutoAdjusting={isAutoAdjusting}
       onAutoAdjust={autoAdjustCurrentMix}
-      onInspectPigment={setInspectedPigmentId}
-      onOpenGuide={() => setShowGuideModal(true)}
+      onInspectPigment={(id) => {
+        hapticTap()
+        setInspectedPigmentId(id)
+      }}
+      onOpenGuide={() => {
+        hapticTap()
+        setShowGuideModal(true)
+      }}
     />
   )
 
   const spectralNode = (
     <SpectralChart
       primarySpectrum={mixedColor?.spectrum || null}
-      primaryColor={displayHex || '#D8A35C'}
+      primaryColor={displayHex || tokens.accent}
       primaryLabel={displayHex ? `${dict.mix} · ${displayHex}` : dict.mix}
       componentSeries={componentSeries}
       dict={dict}
@@ -514,7 +589,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         setRecipeError(null)
       }}
       maxComponents={maxComponents}
-      onMaxComponentsChange={setMaxComponents}
+      onMaxComponentsChange={(n) => {
+        hapticSelect()
+        setMaxComponents(n)
+      }}
       system={system}
       onSystemChange={handleSystemChange}
       inventoryIds={inventoryIds}
@@ -527,7 +605,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       recipeResult={recipeResult}
       onRunRecipeSearch={runRecipeSearch}
       onSendRecipeToMix={sendRecipeToMix}
-      onInspectPigment={setInspectedPigmentId}
+      onInspectPigment={(id) => {
+        hapticTap()
+        setInspectedPigmentId(id)
+      }}
     />
   )
 
@@ -538,7 +619,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       pigments={pigments}
       activePigmentIds={activePigmentIds}
       onAddToFormula={handleAddFromArchive}
-      onInspectPigment={setInspectedPigmentId}
+      onInspectPigment={(id) => {
+        hapticTap()
+        setInspectedPigmentId(id)
+      }}
     />
   )
 
@@ -549,58 +633,90 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     { id: 'archive', label: dict.navArchive },
   ]
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      className="min-h-screen flex flex-col pt-safe pb-10 w-full overflow-x-hidden"
+  const themeToggleButton = (
+    <button
+      type="button"
+      onClick={() => {
+        hapticTap()
+        toggleTheme()
+      }}
+      aria-label={isDark ? 'Light mode' : 'Dark mode'}
+      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 cursor-pointer transition-colors border"
       style={{
-        background: 'var(--color-bg, #141210)',
-        color: 'var(--color-ink, #F5F1EA)',
+        backgroundColor: tokens.surface,
+        borderColor: tokens.border,
+        color: tokens.inkSecondary,
       }}
     >
-      {/* ШАПКА ТОЛЬКО ДЛЯ ПЛАНШЕТА И ПК (на телефоне скрыта) */}
+      {isDark ? (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      )}
+    </button>
+  )
+
+  return (
+    <motion.div
+      initial={prefersReduced ? { opacity: 1 } : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={prefersReduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+      transition={{ duration: prefersReduced ? 0.05 : 0.2 }}
+      className="min-h-[100dvh] flex flex-col w-full overflow-x-hidden transition-colors duration-200 select-none"
+      style={{
+        ...themeVars,
+        backgroundColor: tokens.pageBg,
+        color: tokens.ink,
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}
+    >
+      {/* ШАПКА ТОЛЬКО ДЛЯ ПЛАНШЕТА И ПК (на смартфоне скрыта) */}
       <header
-        className="hidden md:flex items-center justify-between px-6 lg:px-8 py-4 border-b max-w-[1440px] mx-auto w-full"
-        style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
+        className="hidden md:flex items-center justify-between px-6 lg:px-8 py-3.5 border-b max-w-[1440px] mx-auto w-full"
+        style={{ borderColor: tokens.border }}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3.5">
           <button
             type="button"
-            onClick={onBack}
-            className="w-9 h-9 flex items-center justify-center border opacity-75 hover:opacity-100 cursor-pointer"
+            onClick={() => {
+              hapticTap()
+              onBack()
+            }}
+            className="w-9 h-9 rounded-full flex items-center justify-center border cursor-pointer transition-colors"
             style={{
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
-              color: 'var(--color-ink, #F5F1EA)',
+              backgroundColor: tokens.surface,
+              borderColor: tokens.border,
+              color: tokens.ink,
             }}
             aria-label={dict.back}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 18L9 12L15 6"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18L9 12L15 6" />
             </svg>
           </button>
 
           <div>
-            <div className="text-[10px] tracking-[0.28em] uppercase font-semibold" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+            <div
+              className="text-[10px] tracking-[0.26em] uppercase font-semibold"
+              style={{ color: tokens.accent }}
+            >
               {dict.brand} · {dict.edition}
             </div>
-            <h1 className="text-[20px] font-serif tracking-wide leading-tight mt-0.5">
+            <h1 className="text-[20px] font-serif tracking-tight leading-tight mt-0.5">
               {dict.title}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <div
-            className="flex border p-0.5"
-            style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)' }}
+            className="flex p-1 rounded-full border"
+            style={{ backgroundColor: tokens.surface, borderColor: tokens.border }}
           >
             {(['match', 'archive'] as const).map((id) => {
               const active = desktopRightTab === id
@@ -608,15 +724,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setDesktopRightTab(id)}
-                  className="px-3.5 py-1.5 text-[11px] uppercase tracking-[0.16em] font-semibold transition-colors cursor-pointer"
+                  onClick={() => {
+                    hapticSelect()
+                    setDesktopRightTab(id)
+                  }}
+                  className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-[0.14em] font-semibold transition-colors cursor-pointer"
                   style={{
-                    background: active
-                      ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)'
-                      : 'transparent',
-                    color: active
-                      ? 'var(--color-accent, #D8A35C)'
-                      : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 65%, transparent)',
+                    backgroundColor: active ? tokens.activeBg : 'transparent',
+                    color: active ? tokens.activeText : tokens.inkSecondary,
                   }}
                 >
                   {id === 'match' ? dict.navMatch : dict.navArchive}
@@ -627,11 +742,31 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
           <button
             type="button"
-            onClick={() => setShowGuideModal(true)}
-            className="px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] border font-semibold cursor-pointer"
+            onClick={handleToggleHaptics}
+            className="h-9 px-3 rounded-full text-[11px] font-sans font-medium border cursor-pointer transition-colors"
             style={{
-              borderColor: 'color-mix(in srgb, var(--color-accent, #D8A35C) 48%, transparent)',
-              color: 'var(--color-accent, #D8A35C)',
+              backgroundColor: hapticsOn ? tokens.activeTintBg : tokens.surface,
+              borderColor: hapticsOn ? tokens.activeTintBorder : tokens.border,
+              color: hapticsOn ? tokens.accent : tokens.inkMuted,
+            }}
+            title="Haptic Feedback"
+          >
+            {hapticsOn ? 'Haptic ON' : 'Haptic OFF'}
+          </button>
+
+          {themeToggleButton}
+
+          <button
+            type="button"
+            onClick={() => {
+              hapticTap()
+              setShowGuideModal(true)
+            }}
+            className="h-9 px-3.5 rounded-full text-[11px] uppercase tracking-[0.12em] font-semibold border cursor-pointer"
+            style={{
+              backgroundColor: tokens.surface,
+              borderColor: tokens.border,
+              color: tokens.accent,
             }}
           >
             ? {dict.guideBtn}
@@ -639,96 +774,124 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </div>
       </header>
 
-      {/* МОБИЛЬНАЯ КОМПАКТНАЯ ПАНЕЛЬ (без шапки) */}
-      <div className="md:hidden px-3 pt-2.5 pb-2 flex flex-col gap-2">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onBack}
-            className="w-9 h-9 shrink-0 flex items-center justify-center border opacity-80 cursor-pointer"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
-              color: 'var(--color-ink, #F5F1EA)',
-            }}
-            aria-label={dict.back}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 18L9 12L15 6"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+      {/* МОБИЛЬНАЯ КОМПАКТНАЯ СТРОКА УПРАВЛЕНИЯ (как в SizeCalcPage: без шапки, скруглённые пиллы) */}
+      <div className="md:hidden px-3.5 pt-2.5 pb-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            hapticTap()
+            onBack()
+          }}
+          className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center border cursor-pointer"
+          style={{
+            backgroundColor: tokens.surface,
+            borderColor: tokens.border,
+            color: tokens.ink,
+          }}
+          aria-label={dict.back}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18L9 12L15 6" />
+          </svg>
+        </button>
 
-          <div
-            className="flex-1 grid grid-cols-4 border p-0.5"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
-              background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
-            }}
-          >
-            {mobileTabs.map((tItem) => {
-              const active = mobileTab === tItem.id
-              return (
-                <button
-                  key={tItem.id}
-                  type="button"
-                  onClick={() => setMobileTab(tItem.id)}
-                  className="py-2 text-[10px] uppercase tracking-[0.1em] font-semibold transition-colors cursor-pointer"
-                  style={{
-                    background: active
-                      ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)'
-                      : 'transparent',
-                    color: active
-                      ? 'var(--color-accent, #D8A35C)'
-                      : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 65%, transparent)',
-                  }}
-                >
-                  {tItem.label}
-                </button>
-              )
-            })}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowGuideModal(true)}
-            className="w-9 h-9 shrink-0 flex items-center justify-center border text-[12px] font-bold cursor-pointer"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)',
-              color: 'var(--color-accent, #D8A35C)',
-            }}
-            aria-label={dict.guideBtn}
-          >
-            {dict.guideShort}
-          </button>
+        <div
+          className="flex-1 min-w-0 grid grid-cols-4 p-1 rounded-full border"
+          style={{ backgroundColor: tokens.surface, borderColor: tokens.border }}
+        >
+          {mobileTabs.map((tItem) => {
+            const active = mobileTab === tItem.id
+            return (
+              <button
+                key={tItem.id}
+                type="button"
+                onClick={() => {
+                  hapticSelect()
+                  setMobileTab(tItem.id)
+                }}
+                className="py-1.5 px-1 rounded-full text-[10.5px] font-sans font-semibold uppercase tracking-[0.04em] transition-colors cursor-pointer truncate"
+                style={{
+                  backgroundColor: active ? tokens.activeBg : 'transparent',
+                  color: active ? tokens.activeText : tokens.inkSecondary,
+                }}
+              >
+                {tItem.label}
+              </button>
+            )
+          })}
         </div>
+
+        {themeToggleButton}
       </div>
 
-      {/* МОБИЛЬНЫЙ РЕЖИМ: одна рабочая панель за раз */}
-      <main className="md:hidden px-3 flex-1">
+      {/* МОБИЛЬНЫЙ РЕЖИМ */}
+      <main className="md:hidden px-3.5 pt-1 pb-20 flex-1">
         {mobileTab === 'formula' && formulaNode}
         {mobileTab === 'spectrum' && spectralNode}
         {mobileTab === 'match' && matchingNode}
         {mobileTab === 'archive' && archiveNode}
       </main>
 
-      {/* ПЛАНШЕТ И ПК: многопанельная спектральная лаборатория */}
-      <main className="hidden md:grid md:grid-cols-12 gap-5 px-6 lg:px-8 pt-5 max-w-[1440px] mx-auto w-full flex-1 items-start">
-        {/* Левая колонка: Формула + Спектр */}
-        <div className="md:col-span-7 xl:col-span-7 flex flex-col gap-5">
+      {/* ПЛАНШЕТ И ПК */}
+      <main className="hidden md:grid md:grid-cols-12 gap-6 px-6 lg:px-8 pt-5 pb-16 max-w-[1440px] mx-auto w-full flex-1 items-start">
+        <div className="md:col-span-7 flex flex-col gap-5">
           {formulaNode}
           {spectralNode}
         </div>
-
-        {/* Правая колонка: Подбор рецепта или Архив пигментов */}
-        <div className="md:col-span-5 xl:col-span-5 flex flex-col gap-5">
+        <div className="md:col-span-5 flex flex-col gap-5">
           {desktopRightTab === 'match' ? matchingNode : archiveNode}
         </div>
       </main>
+
+      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ (в стиле ColorsPage) */}
+      <footer
+        className="sticky bottom-0 z-30 border-t px-4 py-2.5"
+        style={{
+          backgroundColor: tokens.pageBg,
+          borderColor: tokens.border,
+          paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
+        <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              hapticTap()
+              setShowGuideModal(true)
+            }}
+            className="flex items-center gap-2 bg-transparent border-0 cursor-pointer py-1 px-1.5 rounded-full shrink-0"
+            style={{ color: tokens.ink }}
+          >
+            <span
+              className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
+              style={{ backgroundColor: displayHex || tokens.surfaceSoft }}
+            />
+            <span className="text-[12px] font-mono font-semibold tabular-nums">
+              {liveDeltaE !== null ? `ΔE ${liveDeltaE.toFixed(1)}` : displayHex || '—'}
+            </span>
+          </button>
+
+          <span
+            className="hidden min-[380px]:inline text-[9.5px] font-sans uppercase tracking-[0.18em] truncate"
+            style={{ color: tokens.inkMuted }}
+          >
+            CORDWAINE · SPECTRAL ATELIER
+          </span>
+
+          <button
+            type="button"
+            onClick={copyHex}
+            disabled={!displayHex}
+            className="h-9 px-4 rounded-full text-[12px] font-sans font-semibold cursor-pointer disabled:opacity-35 shrink-0 transition-colors"
+            style={{
+              backgroundColor: tokens.activeBg,
+              color: tokens.activeText,
+            }}
+          >
+            {copied ? dict.copied : dict.copy}
+          </button>
+        </div>
+      </footer>
 
       <PigmentDossierModal
         lang={lang}
@@ -745,4 +908,3 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     </motion.div>
   )
 }
-
