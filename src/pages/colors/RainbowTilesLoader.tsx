@@ -1,83 +1,778 @@
-import React from 'react'
+import React, {
+  Component,
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
+import type * as THREE_TYPES from 'three'
+import type { SneakerColors, SneakerZoneKey } from './colorEngine'
+import { hapticReset } from './haptics'
+import { RainbowTilesLoader } from './RainbowTilesLoader'
+import {
+  SNEAKER_LAST_PARAMS,
+  bindGlbMaterialsPreservingTextures,
+  buildSneakerMeshGroup,
+  createSneakerMaterials,
+  disposeObject3DResources,
+  drawShadowGradient,
+  ensureCleanGlbSegmentation,
+  getSneakerModelConfig,
+  resetZoneRegistry,
+  type SneakerMaterials,
+  type SneakerModelId,
+  type ZoneMaterialRegistry,
+} from './sneakerGeometry'
+import { getThemeTokens, resolveStudioStageStyle } from './themeSystem'
 
-export type RainbowTilesLoaderProps = {
-  isDark?: boolean
-  label?: string
+export type Sneaker3DHandle = {
+  applyColorsImmediate: (colors: SneakerColors) => void
 }
 
-const SPECTRUM_CSS = `
-@keyframes cwLiquidRainbow {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+export type Sneaker3DProps = {
+  sneakerColors: SneakerColors
+  isDark: boolean
+  modelId?: SneakerModelId
+  onResetAll?: () => void
+  resetLabel?: string
+  loading3DLabel?: string
+  webglFallbackLabel?: string
+  compact?: boolean
+  studioBgHex?: string
+  autoContrast?: boolean
 }
 
-@keyframes cwPrismWave {
-  0%   { transform: translate3d(-35%, -10%, 0) rotate(-12deg) scale(1.1); }
-  50%  { transform: translate3d(35%, 10%, 0) rotate(12deg) scale(1.25); }
-  100% { transform: translate3d(-35%, -10%, 0) rotate(-12deg) scale(1.1); }
+function isAndroidDevice(): boolean {
+  try {
+    return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+  } catch {
+    return false
+  }
 }
 
-@keyframes cwLineSlide {
-  0%   { transform: translate3d(-100%, 0, 0); }
-  100% { transform: translate3d(220%, 0, 0); }
-}
-`
-
-export const RainbowTilesLoader: React.FC<RainbowTilesLoaderProps> = ({
-  isDark = false,
+function SneakerFallbackCard({
+  sneakerColors,
+  isDarkStage,
   label,
-}) => {
-  void isDark
-  const cleanLabel = label ? label.replace(/^3D\s*·\s*/i, '').trim() : 'CORDWAINE'
+}: {
+  sneakerColors: SneakerColors
+  isDarkStage: boolean
+  label?: string
+}) {
+  const previewZones: string[] = [
+    sneakerColors.vamp,
+    sneakerColors.quarters,
+    sneakerColors.swoosh,
+    sneakerColors.outsole,
+    sneakerColors.encap,
+  ]
 
   return (
     <div
-      className="absolute inset-0 z-30 w-full h-full overflow-hidden flex items-center justify-center"
-      aria-busy="true"
+      className={
+        'w-full h-full flex flex-col items-center justify-center border border-dashed rounded-2xl px-4 text-center ' +
+        (isDarkStage ? 'border-white/15 text-[#F4F0E8]/75' : 'border-black/15 text-[#1C1816]/75')
+      }
     >
-      <style>{SPECTRUM_CSS}</style>
-
-      {/* Основной сочный переливающийся спектр */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(125deg, #FF3B6B 0%, #FF8A2B 16%, #FFD43B 32%, #2FD17A 48%, #1EC8E8 64%, #4C6EF5 80%, #B44CFF 92%, #FF3B6B 100%)',
-          backgroundSize: '320% 320%',
-          animation: 'cwLiquidRainbow 3.6s ease-in-out infinite',
-          willChange: 'background-position',
-        }}
-      />
-
-      {/* Встречная шёлковая световая волна для объёма и перелива */}
-      <div
-        className="pointer-events-none absolute -inset-1/2"
-        style={{
-          background:
-            'radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.12) 32%, transparent 66%)',
-          animation: 'cwPrismWave 3.2s ease-in-out infinite',
-          willChange: 'transform',
-        }}
-      />
-
-      {/* Чистая подпись модели по центру */}
-      <div className="relative z-10 flex flex-col items-center gap-2 px-5 py-2.5 rounded-2xl bg-black/28 backdrop-blur-sm border border-white/25">
-        <div className="text-[12px] font-mono font-semibold uppercase tracking-[0.2em] text-white whitespace-nowrap">
-          {cleanLabel}
-        </div>
-        <div className="relative w-24 h-[2px] rounded-full overflow-hidden bg-white/30">
-          <div
-            className="absolute inset-y-0 w-1/2 rounded-full bg-white"
-            style={{
-              animation: 'cwLineSlide 1.3s ease-in-out infinite',
-              willChange: 'transform',
-            }}
+      <div className="flex gap-2 mb-2.5">
+        {previewZones.map((hex, idx) => (
+          <span
+            key={idx}
+            className="w-5 h-5 rounded-full border border-current/20 shadow-sm"
+            style={{ backgroundColor: hex }}
           />
-        </div>
+        ))}
       </div>
+      <span className="text-[10px] font-sans uppercase tracking-[0.18em]">
+        {label || 'WebGL недоступен • Режим палитры'}
+      </span>
     </div>
   )
 }
 
-export default RainbowTilesLoader
+type ErrorBoundaryProps = {
+  sneakerColors: SneakerColors
+  isDarkStage: boolean
+  fallbackLabel?: string
+  children: React.ReactNode
+}
+
+type ErrorBoundaryState = {
+  hasError: boolean
+}
+
+class SneakerErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error) {
+    if (import.meta.env.DEV) {
+      console.error('[Sneaker3D] ErrorBoundary перехватил сбой 3D:', error)
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="relative w-full h-[196px] sm:h-[236px] select-none">
+          <SneakerFallbackCard
+            sneakerColors={this.props.sneakerColors}
+            isDarkStage={this.props.isDarkStage}
+            label={this.props.fallbackLabel}
+          />
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sneaker3DCanvas(
+  {
+    sneakerColors,
+    isDark,
+    modelId = 'aerostrap',
+    onResetAll,
+    resetLabel,
+    loading3DLabel,
+    webglFallbackLabel,
+    compact = false,
+    studioBgHex,
+    autoContrast = true,
+  },
+  ref
+) {
+  const uiTokens = getThemeTokens(isDark)
+  const effectiveStageHex = studioBgHex || uiTokens.pageBg
+  const stageStyle = resolveStudioStageStyle(effectiveStageHex, autoContrast, uiTokens)
+
+  const mountRef = useRef<HTMLDivElement>(null)
+  const matsRef = useRef<SneakerMaterials | null>(null)
+  const zoneRegistryRef = useRef<ZoneMaterialRegistry | null>(null)
+  const shoeRootRef = useRef<THREE_TYPES.Group | null>(null)
+
+  const latestColorsRef = useRef<SneakerColors>(sneakerColors)
+  latestColorsRef.current = sneakerColors
+  const latestIsDarkStageRef = useRef<boolean>(stageStyle.isDarkStage)
+  latestIsDarkStageRef.current = stageStyle.isDarkStage
+  const latestModelIdRef = useRef<SneakerModelId>(modelId)
+  latestModelIdRef.current = modelId
+
+  const shadowCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const shadowTexRef = useRef<THREE_TYPES.CanvasTexture | null>(null)
+
+  const requestSingleRenderRef = useRef<(() => void) | null>(null)
+  const wakeCameraAnimationRef = useRef<(() => void) | null>(null)
+  const loadModelRef = useRef<((id: SneakerModelId) => void) | null>(null)
+
+  const [isLoading3D, setIsLoading3D] = useState(true)
+  const [webglError, setWebglError] = useState(false)
+  const [contextLostCount, setContextLostCount] = useState(0)
+
+  const rotTarget = useRef({ yaw: -0.26, pitch: 0.16 })
+  const rotCurrent = useRef({ yaw: -0.26, pitch: 0.16 })
+  const isInteracting = useRef(false)
+  const lastActivityTime = useRef<number>(Date.now())
+  const lastPointer = useRef({ x: 0, y: 0 })
+
+  // Прямое обновление цвета материалов в GPU без перерендера React!
+  const applyColorsToRegistry = useCallback((colors: SneakerColors) => {
+    latestColorsRef.current = colors
+    const reg = zoneRegistryRef.current
+    if (!reg) return
+    ;(Object.keys(colors) as SneakerZoneKey[]).forEach((zone) => {
+      const hex = colors[zone]
+      reg[zone]?.forEach((mat) => {
+        mat.color.set(hex)
+      })
+    })
+    requestSingleRenderRef.current?.()
+  }, [])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      applyColorsImmediate: applyColorsToRegistry,
+    }),
+    [applyColorsToRegistry]
+  )
+
+  useEffect(() => {
+    let disposed = false
+    let frameId = 0
+    let isLoopRunning = false
+    let isVisibleInViewport = true
+    let isDocumentVisible = typeof document !== 'undefined' ? !document.hidden : true
+    let loadRequestCounter = 0
+    let cleanupFn: (() => void) | undefined
+
+    const isAndroid = isAndroidDevice()
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+    setIsLoading3D(true)
+    setWebglError(false)
+
+    Promise.all([
+      import('three'),
+      import('three/examples/jsm/loaders/GLTFLoader.js').catch(() => null),
+    ])
+      .then(([THREE, gltfMod]) => {
+        if (disposed) return
+
+        const container = mountRef.current
+        if (!container) return
+
+        const width = container.clientWidth || 340
+        const height = container.clientHeight || 205
+
+        // Полное высокое качество 3D без артефактов (highp + antialias: true)
+        let renderer: THREE_TYPES.WebGLRenderer
+        try {
+          renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,
+            powerPreference: isAndroid ? 'default' : 'high-performance',
+            precision: 'highp',
+          })
+        } catch (err) {
+          if (import.meta.env.DEV) {
+            console.error('[Sneaker3D] Не удалось инициализировать WebGLRenderer:', err)
+          }
+          if (!disposed) {
+            setWebglError(true)
+            setIsLoading3D(false)
+          }
+          return
+        }
+
+        const maxDpr = isAndroid ? 1.5 : 2
+        renderer.setSize(width, height)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr))
+        renderer.toneMapping = THREE.ACESFilmicToneMapping
+        renderer.toneMappingExposure = 1.12
+        container.innerHTML = ''
+        container.appendChild(renderer.domElement)
+
+        const scene = new THREE.Scene()
+        const camera = new THREE.PerspectiveCamera(29, width / height, 0.5, 20)
+        camera.position.set(0, 0.44, 5.15)
+        camera.lookAt(0, 0.04, 0)
+
+        const currentColors = latestColorsRef.current
+
+        // Полная 4-точечная студийная схема света (не зависит от Day/Night темы)
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd8d0c5, 1.3)
+        hemiLight.position.set(0, 6, 0)
+        scene.add(hemiLight)
+
+        const keyLight = new THREE.DirectionalLight(0xfffdf8, 2.0)
+        keyLight.position.set(3.6, 5.2, 4.4)
+        scene.add(keyLight)
+
+        const fillLight = new THREE.DirectionalLight(0xe2ecff, 1.0)
+        fillLight.position.set(-4.2, 2.2, 2.8)
+        scene.add(fillLight)
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 1.2)
+        rimLight.position.set(0, 3.8, -4.5)
+        scene.add(rimLight)
+
+        const { mats, registry } = createSneakerMaterials(THREE, currentColors)
+        matsRef.current = mats
+        zoneRegistryRef.current = registry
+        const baseMaterialsSet = new Set<THREE_TYPES.Material>(Object.values(mats))
+
+        const pivotGroup = new THREE.Group()
+        scene.add(pivotGroup)
+        shoeRootRef.current = pivotGroup
+
+        const shadowCanvas = document.createElement('canvas')
+        shadowCanvas.width = 256
+        shadowCanvas.height = 128
+        drawShadowGradient(shadowCanvas, latestIsDarkStageRef.current)
+        shadowCanvasRef.current = shadowCanvas
+
+        const shadowTex = new THREE.CanvasTexture(shadowCanvas)
+        shadowTexRef.current = shadowTex
+        const shadowGeom = new THREE.PlaneGeometry(3.3, 1.35)
+        const shadowMat = new THREE.MeshBasicMaterial({
+          map: shadowTex,
+          transparent: true,
+          depthWrite: false,
+        })
+        const shadowPlane = new THREE.Mesh(shadowGeom, shadowMat)
+        shadowPlane.rotation.x = -Math.PI / 2
+        shadowPlane.renderOrder = -1
+        let baseShadowY = -0.48
+        shadowPlane.position.y = baseShadowY
+        scene.add(shadowPlane)
+
+        const syncShadowHeight = (pitchRad: number) => {
+          const pitchDrop = Math.abs(Math.sin(pitchRad)) * 0.72
+          shadowPlane.position.y = baseShadowY - pitchDrop
+        }
+
+        const clock = new THREE.Clock()
+
+        const renderSingleFrame = () => {
+          if (disposed || !isVisibleInViewport || !isDocumentVisible) return
+          if (!isLoopRunning) {
+            if (shoeRootRef.current) {
+              shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+              shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+            }
+            syncShadowHeight(rotCurrent.current.pitch)
+            renderer.render(scene, camera)
+          }
+        }
+        requestSingleRenderRef.current = renderSingleFrame
+
+        const animate = () => {
+          if (disposed || !isVisibleInViewport || !isDocumentVisible) {
+            isLoopRunning = false
+            return
+          }
+
+          const idleMs = Date.now() - lastActivityTime.current
+          const dYaw = rotTarget.current.yaw - rotCurrent.current.yaw
+          const dPitch = rotTarget.current.pitch - rotCurrent.current.pitch
+          const isSettled = Math.abs(dYaw) < 0.0012 && Math.abs(dPitch) < 0.0012
+
+          const shouldStop =
+            !isInteracting.current &&
+            (prefersReducedMotion ||
+              (isAndroid && (isSettled || idleMs >= 1600)) ||
+              idleMs >= 5500)
+
+          if (shouldStop) {
+            rotCurrent.current.yaw = rotTarget.current.yaw
+            rotCurrent.current.pitch = rotTarget.current.pitch
+            if (shoeRootRef.current) {
+              shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+              shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+              shoeRootRef.current.position.y = 0
+            }
+            syncShadowHeight(rotCurrent.current.pitch)
+            isLoopRunning = false
+            renderer.render(scene, camera)
+            return
+          }
+
+          isLoopRunning = true
+          frameId = requestAnimationFrame(animate)
+          const elapsed = clock.getElapsedTime()
+
+          const swayDamping = isAndroid
+            ? 0
+            : Math.max(0, Math.min(1, (5000 - idleMs) / 1200))
+
+          if (!isInteracting.current && !prefersReducedMotion && swayDamping > 0) {
+            rotTarget.current.yaw += Math.sin(elapsed * 0.65) * 0.0007 * swayDamping
+          }
+
+          const lerpFactor = isAndroid ? 0.24 : 0.14
+          rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * lerpFactor
+          rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * lerpFactor
+
+          if (shoeRootRef.current) {
+            shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+            shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+            shoeRootRef.current.position.y =
+              prefersReducedMotion || isAndroid
+                ? 0
+                : Math.sin(elapsed * 1.5) * 0.015 * swayDamping
+          }
+          syncShadowHeight(rotCurrent.current.pitch)
+
+          renderer.render(scene, camera)
+        }
+
+        const wakeCameraLoop = () => {
+          lastActivityTime.current = Date.now()
+          if (prefersReducedMotion) {
+            renderSingleFrame()
+            return
+          }
+          if (!isLoopRunning && !disposed && isVisibleInViewport && isDocumentVisible) {
+            clock.getDelta()
+            animate()
+          }
+        }
+        wakeCameraAnimationRef.current = wakeCameraLoop
+
+        const mountProceduralFallback = () => {
+          if (disposed) return
+          disposeObject3DResources(pivotGroup, baseMaterialsSet)
+          pivotGroup.clear()
+          resetZoneRegistry(mats, registry)
+          const proceduralMesh = buildSneakerMeshGroup(THREE, mats)
+          pivotGroup.add(proceduralMesh)
+          baseShadowY = -0.48
+          syncShadowHeight(rotCurrent.current.pitch)
+          applyColorsToRegistry(latestColorsRef.current)
+          setIsLoading3D(false)
+          wakeCameraLoop()
+        }
+
+        const loader = gltfMod?.GLTFLoader ? new gltfMod.GLTFLoader() : null
+
+        const loadModelById = (targetId: SneakerModelId) => {
+          if (disposed) return
+          loadRequestCounter += 1
+          const myRequestId = loadRequestCounter
+          const modelCfg = getSneakerModelConfig(targetId)
+
+          setIsLoading3D(true)
+
+          if (!loader) {
+            mountProceduralFallback()
+            return
+          }
+
+          const tryLoadGlb = (urls: string[], index = 0) => {
+            if (disposed || myRequestId !== loadRequestCounter) return
+            if (index >= urls.length) {
+              mountProceduralFallback()
+              return
+            }
+
+            loader.load(
+              urls[index],
+              (gltf) => {
+                if (disposed || myRequestId !== loadRequestCounter) {
+                  if (gltf?.scene) disposeObject3DResources(gltf.scene)
+                  return
+                }
+                if (!gltf?.scene) {
+                  tryLoadGlb(urls, index + 1)
+                  return
+                }
+
+                const box = new THREE.Box3().setFromObject(gltf.scene)
+                const size = new THREE.Vector3()
+                box.getSize(size)
+                const maxDim = Math.max(size.x, size.y, size.z)
+
+                if (maxDim > 0 && Number.isFinite(maxDim)) {
+                  disposeObject3DResources(pivotGroup, baseMaterialsSet)
+                  pivotGroup.clear()
+                  resetZoneRegistry(mats, registry)
+
+                  ensureCleanGlbSegmentation(THREE, gltf.scene)
+                  bindGlbMaterialsPreservingTextures(
+                    THREE,
+                    gltf.scene,
+                    mats,
+                    registry,
+                    latestColorsRef.current
+                  )
+
+                  const scale = SNEAKER_LAST_PARAMS.glbTargetMaxDim / maxDim
+                  gltf.scene.scale.setScalar(scale)
+                  gltf.scene.rotation.y = modelCfg.rotationY
+                  gltf.scene.updateMatrixWorld(true)
+
+                  const scaledBox = new THREE.Box3().setFromObject(gltf.scene)
+                  const scaledCenter = new THREE.Vector3()
+                  scaledBox.getCenter(scaledCenter)
+                  gltf.scene.position.sub(scaledCenter)
+                  gltf.scene.position.y += SNEAKER_LAST_PARAMS.glbVerticalOffset
+
+                  const minY =
+                    scaledBox.min.y - scaledCenter.y + SNEAKER_LAST_PARAMS.glbVerticalOffset
+                  baseShadowY = Math.min(-0.46, minY - 0.055)
+                  syncShadowHeight(rotCurrent.current.pitch)
+
+                  pivotGroup.add(gltf.scene)
+                  applyColorsToRegistry(latestColorsRef.current)
+                  setIsLoading3D(false)
+                  wakeCameraLoop()
+                } else {
+                  disposeObject3DResources(gltf.scene)
+                  tryLoadGlb(urls, index + 1)
+                }
+              },
+              undefined,
+              () => tryLoadGlb(urls, index + 1)
+            )
+          }
+
+          tryLoadGlb(modelCfg.urls)
+        }
+
+        loadModelRef.current = loadModelById
+        loadModelById(latestModelIdRef.current)
+
+        const updateViewportSize = () => {
+          if (!container || disposed) return
+          const w = container.clientWidth || 340
+          const h = container.clientHeight || 205
+          camera.aspect = w / h
+          camera.updateProjectionMatrix()
+          renderer.setSize(w, h)
+          renderSingleFrame()
+        }
+
+        let resizeObserver: ResizeObserver | null = null
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(updateViewportSize)
+          resizeObserver.observe(container)
+        }
+        window.addEventListener('resize', updateViewportSize)
+
+        let intersectionObserver: IntersectionObserver | null = null
+        if (typeof IntersectionObserver !== 'undefined') {
+          intersectionObserver = new IntersectionObserver(
+            (entries) => {
+              const entry = entries[0]
+              if (!entry) return
+              isVisibleInViewport = entry.isIntersecting
+              if (!isVisibleInViewport && isLoopRunning) {
+                cancelAnimationFrame(frameId)
+                isLoopRunning = false
+              } else if (isVisibleInViewport) {
+                renderSingleFrame()
+              }
+            },
+            { threshold: 0.05 }
+          )
+          intersectionObserver.observe(container)
+        }
+
+        const onVisibilityChange = () => {
+          isDocumentVisible = !document.hidden
+          if (!isDocumentVisible && isLoopRunning) {
+            cancelAnimationFrame(frameId)
+            isLoopRunning = false
+          } else if (isDocumentVisible) {
+            renderSingleFrame()
+          }
+        }
+        document.addEventListener('visibilitychange', onVisibilityChange)
+
+        const domCanvas = renderer.domElement
+        const onContextLost = (e: Event) => {
+          e.preventDefault()
+          cancelAnimationFrame(frameId)
+          isLoopRunning = false
+        }
+        const onContextRestored = () => {
+          if (!disposed) {
+            setContextLostCount((c) => c + 1)
+          }
+        }
+        domCanvas.addEventListener('webglcontextlost', onContextLost, false)
+        domCanvas.addEventListener('webglcontextrestored', onContextRestored, false)
+
+        cleanupFn = () => {
+          window.removeEventListener('resize', updateViewportSize)
+          document.removeEventListener('visibilitychange', onVisibilityChange)
+          resizeObserver?.disconnect()
+          intersectionObserver?.disconnect()
+          domCanvas.removeEventListener('webglcontextlost', onContextLost)
+          domCanvas.removeEventListener('webglcontextrestored', onContextRestored)
+
+          disposeObject3DResources(pivotGroup)
+          shadowGeom.dispose()
+          shadowMat.dispose()
+          shadowTex.dispose()
+          Object.values(mats).forEach((m) => m.dispose())
+          renderer.dispose()
+
+          matsRef.current = null
+          zoneRegistryRef.current = null
+          shoeRootRef.current = null
+          shadowCanvasRef.current = null
+          shadowTexRef.current = null
+          requestSingleRenderRef.current = null
+          wakeCameraAnimationRef.current = null
+          loadModelRef.current = null
+        }
+      })
+      .catch((err) => {
+        if (import.meta.env.DEV) {
+          console.error('[Sneaker3D] Сбой загрузки 3D-модуля:', err)
+        }
+        if (!disposed) {
+          setWebglError(true)
+          setIsLoading3D(false)
+        }
+      })
+
+    return () => {
+      disposed = true
+      cancelAnimationFrame(frameId)
+      if (cleanupFn) cleanupFn()
+    }
+  }, [contextLostCount, applyColorsToRegistry])
+
+  useEffect(() => {
+    loadModelRef.current?.(modelId)
+  }, [modelId])
+
+  useEffect(() => {
+    applyColorsToRegistry(sneakerColors)
+  }, [sneakerColors, applyColorsToRegistry])
+
+  useEffect(() => {
+    if (shadowCanvasRef.current && shadowTexRef.current) {
+      drawShadowGradient(shadowCanvasRef.current, stageStyle.isDarkStage)
+      shadowTexRef.current.needsUpdate = true
+    }
+    requestSingleRenderRef.current?.()
+  }, [stageStyle.isDarkStage])
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    isInteracting.current = true
+    lastPointer.current = { x: e.clientX, y: e.clientY }
+    wakeCameraAnimationRef.current?.()
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {}
+  }
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isInteracting.current) return
+    const dx = e.clientX - lastPointer.current.x
+    const dy = e.clientY - lastPointer.current.y
+    lastPointer.current = { x: e.clientX, y: e.clientY }
+
+    rotTarget.current.yaw += dx * 0.012
+    rotTarget.current.pitch = Math.max(-0.35, Math.min(0.6, rotTarget.current.pitch + dy * 0.009))
+    wakeCameraAnimationRef.current?.()
+  }
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isInteracting.current = false
+    wakeCameraAnimationRef.current?.()
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {}
+  }
+
+  const handleResetClick = () => {
+    hapticReset()
+    rotTarget.current = { yaw: -0.26, pitch: 0.16 }
+    wakeCameraAnimationRef.current?.()
+    onResetAll?.()
+  }
+
+  const activeModel = getSneakerModelConfig(modelId)
+
+  return (
+    <div
+      className="relative overflow-hidden w-full select-none rounded-[20px] px-3 pt-1 pb-2 border transition-colors duration-200"
+      style={{
+        backgroundColor: stageStyle.bgHex,
+        borderColor: uiTokens.border,
+      }}
+    >
+      <div
+        className={
+          'relative w-full transition-[height] duration-200 ' +
+          (compact
+            ? 'h-[158px] sm:h-[192px] md:h-[400px] lg:h-[460px]'
+            : 'h-[194px] sm:h-[230px] md:h-[430px] lg:h-[510px]')
+        }
+      >
+        {webglError ? (
+          <SneakerFallbackCard
+            sneakerColors={sneakerColors}
+            isDarkStage={stageStyle.isDarkStage}
+            label={webglFallbackLabel}
+          />
+        ) : (
+          <div
+            ref={mountRef}
+            role="img"
+            aria-label={'3D ' + activeModel.name}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
+            style={{ touchAction: 'none' }}
+          />
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 mt-0.5 px-0.5">
+        <span
+          className="text-[11px] font-sans font-medium uppercase tracking-[0.2em] shrink-0"
+          style={{ color: stageStyle.labelColor }}
+        >
+          {activeModel.shortLabel}
+        </span>
+
+        <span
+          className="h-px flex-1"
+          style={{ backgroundColor: stageStyle.dividerColor }}
+          aria-hidden="true"
+        />
+
+        <button
+          type="button"
+          onClick={handleResetClick}
+          title={resetLabel || '360°'}
+          className="cw-press flex items-center gap-1.5 px-3.5 h-8 rounded-full border text-[12px] font-sans font-medium tracking-[0.04em] cursor-pointer shrink-0"
+          style={{
+            backgroundColor: stageStyle.btnBg,
+            borderColor: stageStyle.btnBorder,
+            color: stageStyle.btnText,
+          }}
+        >
+          <span>360°</span>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 11-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
+        </button>
+      </div>
+
+      {isLoading3D && !webglError && (
+        <RainbowTilesLoader
+          isDark={isDark}
+          label={loading3DLabel || '3D • ' + activeModel.name + '...'}
+        />
+      )}
+    </div>
+  )
+})
+
+export const Sneaker3D = memo(
+  forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sneaker3D(props, ref) {
+    const uiTokens = getThemeTokens(props.isDark)
+    const stageStyle = resolveStudioStageStyle(
+      props.studioBgHex || uiTokens.pageBg,
+      props.autoContrast ?? true,
+      uiTokens
+    )
+    return (
+      <SneakerErrorBoundary
+        sneakerColors={props.sneakerColors}
+        isDarkStage={stageStyle.isDarkStage}
+        fallbackLabel={props.webglFallbackLabel}
+      >
+        <Sneaker3DCanvas ref={ref} {...props} />
+      </SneakerErrorBoundary>
+    )
+  })
+)
