@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 import { resolveStudioStageStyle } from './themeSystem'
 
 export type RainbowTilesLoaderProps = {
@@ -6,31 +6,34 @@ export type RainbowTilesLoaderProps = {
   label?: string
 }
 
-const COLS = 12
-const ROWS = 6
-
-const KEYFRAMES_CSS = `
-@keyframes cwPrismFlow {
-  0% {
-    transform: scale(0.76);
-    opacity: 0.52;
-    filter: hue-rotate(0deg) saturate(1.05);
-  }
-  50% {
-    transform: scale(1);
-    opacity: 0.96;
-    filter: hue-rotate(140deg) saturate(1.22);
-  }
-  100% {
-    transform: scale(0.76);
-    opacity: 0.52;
-    filter: hue-rotate(360deg) saturate(1.05);
-  }
+const AURORA_CSS = `
+@keyframes cwOrbA {
+  0%   { transform: translate3d(-18%, -12%, 0) scale(1) rotate(0deg); }
+  50%  { transform: translate3d(22%, 14%, 0) scale(1.18) rotate(120deg); }
+  100% { transform: translate3d(-18%, -12%, 0) scale(1) rotate(360deg); }
 }
 
-@keyframes cwSilkSheen {
-  0% { transform: translate3d(-120%, 0, 0) skewX(-18deg); }
-  100% { transform: translate3d(220%, 0, 0) skewX(-18deg); }
+@keyframes cwOrbB {
+  0%   { transform: translate3d(20%, 16%, 0) scale(1.1) rotate(0deg); }
+  50%  { transform: translate3d(-22%, -10%, 0) scale(0.92) rotate(-140deg); }
+  100% { transform: translate3d(20%, 16%, 0) scale(1.1) rotate(-360deg); }
+}
+
+@keyframes cwOrbC {
+  0%   { transform: translate3d(-8%, 20%, 0) scale(0.95); }
+  50%  { transform: translate3d(16%, -18%, 0) scale(1.22); }
+  100% { transform: translate3d(-8%, 20%, 0) scale(0.95); }
+}
+
+@keyframes cwOrbD {
+  0%   { transform: translate3d(14%, -16%, 0) scale(1.05); }
+  50%  { transform: translate3d(-16%, 18%, 0) scale(1.15); }
+  100% { transform: translate3d(14%, -16%, 0) scale(1.05); }
+}
+
+@keyframes cwHairlineGlide {
+  0%   { transform: translate3d(-100%, 0, 0); }
+  100% { transform: translate3d(220%, 0, 0); }
 }
 `
 
@@ -39,25 +42,9 @@ export const RainbowTilesLoader: React.FC<RainbowTilesLoaderProps> = ({
   label,
 }) => {
   const stage = resolveStudioStageStyle(undefined, true, isDark)
-  const lTop = stage.isDarkStage ? 58 : 68
-  const lBot = stage.isDarkStage ? 46 : 56
+  const dark = stage.isDarkStage
 
-  const tiles = useMemo(() => {
-    const items: { key: string; gradient: string; delay: string }[] = []
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const hueA = Math.round(((c / COLS) * 280 + r * 24) % 360)
-        const hueB = (hueA + 38) % 360
-        const delayMs = (c * 75 + r * 95)
-        items.push({
-          key: r + '_' + c,
-          gradient: `linear-gradient(135deg, hsl(${hueA} 84% ${lTop}%), hsl(${hueB} 82% ${lBot}%))`,
-          delay: delayMs + 'ms',
-        })
-      }
-    }
-    return items
-  }, [lTop, lBot])
+  const cleanLabel = label ? label.replace(/^3D\s*·\s*/i, '').trim() : 'CORDWAINE'
 
   return (
     <div
@@ -65,47 +52,95 @@ export const RainbowTilesLoader: React.FC<RainbowTilesLoaderProps> = ({
       style={{ backgroundColor: stage.bgHex }}
       aria-busy="true"
     >
-      <style>{KEYFRAMES_CSS}</style>
+      <style>{AURORA_CSS}</style>
 
-      <div className="grid grid-cols-12 grid-rows-6 w-full h-full gap-[3px] p-[3px]">
-        {tiles.map((tile) => (
-          <div
-            key={tile.key}
-            className="w-full h-full rounded-[6px]"
-            style={{
-              backgroundImage: tile.gradient,
-              animation: 'cwPrismFlow 2.8s ease-in-out infinite',
-              animationDelay: tile.delay,
-              willChange: 'transform, opacity, filter',
-            }}
-          />
-        ))}
+      {/* 4 живых перетекающих перламутровых потока */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          className="absolute -inset-1/4 rounded-full"
+          style={{
+            background: dark
+              ? 'radial-gradient(circle at 35% 40%, rgba(214, 168, 108, 0.55) 0%, rgba(196, 122, 168, 0.28) 38%, transparent 70%)'
+              : 'radial-gradient(circle at 35% 40%, rgba(232, 184, 118, 0.72) 0%, rgba(226, 154, 188, 0.42) 40%, transparent 72%)',
+            filter: 'blur(34px)',
+            animation: 'cwOrbA 6.4s ease-in-out infinite',
+            willChange: 'transform',
+          }}
+        />
+
+        <div
+          className="absolute -inset-1/4 rounded-full"
+          style={{
+            background: dark
+              ? 'radial-gradient(circle at 68% 58%, rgba(102, 148, 224, 0.54) 0%, rgba(132, 104, 214, 0.30) 40%, transparent 70%)'
+              : 'radial-gradient(circle at 68% 58%, rgba(126, 174, 242, 0.68) 0%, rgba(168, 142, 232, 0.40) 42%, transparent 72%)',
+            filter: 'blur(36px)',
+            animation: 'cwOrbB 7.2s ease-in-out infinite',
+            willChange: 'transform',
+          }}
+        />
+
+        <div
+          className="absolute -inset-1/4 rounded-full"
+          style={{
+            background: dark
+              ? 'radial-gradient(circle at 46% 68%, rgba(92, 196, 168, 0.48) 0%, rgba(168, 204, 126, 0.20) 38%, transparent 68%)'
+              : 'radial-gradient(circle at 46% 68%, rgba(118, 214, 184, 0.64) 0%, rgba(206, 224, 142, 0.32) 42%, transparent 70%)',
+            filter: 'blur(32px)',
+            animation: 'cwOrbC 5.6s ease-in-out infinite',
+            willChange: 'transform',
+          }}
+        />
+
+        <div
+          className="absolute -inset-1/4 rounded-full"
+          style={{
+            background: dark
+              ? 'radial-gradient(circle at 62% 30%, rgba(234, 124, 146, 0.42) 0%, transparent 62%)'
+              : 'radial-gradient(circle at 62% 30%, rgba(244, 162, 174, 0.54) 0%, transparent 64%)',
+            filter: 'blur(30px)',
+            animation: 'cwOrbD 6.8s ease-in-out infinite',
+            willChange: 'transform',
+          }}
+        />
+
+        {/* Тонкая фактура рифлёного архитектурного стекла (fluted glass) */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: dark
+              ? 'repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 14px)'
+              : 'repeating-linear-gradient(90deg, rgba(255,255,255,0.34) 0px, rgba(255,255,255,0.34) 1px, rgba(24,22,19,0.03) 2px, transparent 4px, transparent 14px)',
+          }}
+        />
       </div>
 
-      {/* Мягкий диагональный световой блик */}
-      <div
-        className="pointer-events-none absolute inset-y-0 w-1/3"
-        style={{
-          background: stage.isDarkStage
-            ? 'linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent)'
-            : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.42), transparent)',
-          animation: 'cwSilkSheen 2.1s ease-in-out infinite',
-          willChange: 'transform',
-        }}
-      />
-
-      {label && (
+      {/* Редакционная подпись по центру + скользящая тонкая линия */}
+      <div className="relative z-10 flex flex-col items-center gap-2.5 px-6 text-center">
         <div
-          className="absolute px-4 py-1.5 rounded-full border text-[11px] font-mono uppercase tracking-[0.14em] whitespace-nowrap shadow-sm"
+          className="text-[12px] font-mono uppercase tracking-[0.22em] whitespace-nowrap"
+          style={{ color: stage.textColor }}
+        >
+          {cleanLabel}
+        </div>
+        <div
+          className="relative w-28 h-[1.5px] rounded-full overflow-hidden"
           style={{
-            backgroundColor: stage.chipBg,
-            borderColor: stage.chipBorder,
-            color: stage.chipText,
+            backgroundColor: dark ? 'rgba(244,240,232,0.18)' : 'rgba(24,22,19,0.14)',
           }}
         >
-          {label}
+          <div
+            className="absolute inset-y-0 w-1/2 rounded-full"
+            style={{
+              background: dark
+                ? 'linear-gradient(90deg, transparent, #F4F0E8, transparent)'
+                : 'linear-gradient(90deg, transparent, #181613, transparent)',
+              animation: 'cwHairlineGlide 1.4s ease-in-out infinite',
+              willChange: 'transform',
+            }}
+          />
         </div>
-      )}
+      </div>
     </div>
   )
 }
