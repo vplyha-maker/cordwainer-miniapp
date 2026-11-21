@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { RotateCcw, Check, BookOpen, X } from 'lucide-react'
 import type { Lang } from '../../App'
 import {
@@ -23,9 +23,240 @@ function sanitizeHexDraft(raw: string): string {
   return '#' + hexOnly
 }
 
+/* ============================================================================
+   БЕЗОПАСНЫЙ МОБИЛЬНЫЙ ПОЛЗУНОК (НЕ СРАБАТЫВАЕТ ПРИ СКРОЛЛЕ + ТАКТИЛЬНЫЙ КЛИК)
+   ============================================================================ */
+
+type SafeTouchSliderProps = {
+  min: number
+  max: number
+  step?: number
+  value: number
+  onChange: (next: number) => void
+  hapticsEnabled?: boolean
+  hapticStep?: number
+  trackBackground?: string
+  trackColor?: string
+  fillColor?: string
+  thumbColor: string
+  thumbBorderColor: string
+  trackHeight?: number
+  ariaLabel: string
+}
+
+const SafeTouchSlider: React.FC<SafeTouchSliderProps> = ({
+  min,
+  max,
+  step = 1,
+  value,
+  onChange,
+  hapticsEnabled = true,
+  hapticStep,
+  trackBackground,
+  trackColor,
+  fillColor,
+  thumbColor,
+  thumbBorderColor,
+  trackHeight = 6,
+  ariaLabel,
+}) => {
+  const trackRef = useRef<HTMLDivElement | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const gestureRef = useRef<{
+    mode: 'idle' | 'pending' | 'dragging' | 'scroll'
+    pointerId: number
+    startX: number
+    startY: number
+  }>({
+    mode: 'idle',
+    pointerId: -1,
+    startX: 0,
+    startY: 0,
+  })
+
+  const clampedValue = Math.max(min, Math.min(max, value))
+  const percent = max > min ? ((clampedValue - min) / (max - min)) * 100 : 0
+
+  const lastHapticValRef = useRef<number>(clampedValue)
+  const lastHapticTimeRef = useRef<number>(0)
+
+  const emitChange = (next: number, forceHaptic = false) => {
+    if (next === clampedValue) return
+    onChange(next)
+    if (!hapticsEnabled) return
+
+    const now = Date.now()
+    const threshold = hapticStep ?? Math.max(1, Math.round((max - min) / 28))
+    if (
+      forceHaptic ||
+      (Math.abs(next - lastHapticValRef.current) >= threshold &&
+        now - lastHapticTimeRef.current >= 45)
+    ) {
+      lastHapticValRef.current = next
+      lastHapticTimeRef.current = now
+      triggerHaptic('select', true)
+    }
+  }
+
+  const valueFromClientX = (clientX: number): number => {
+    const el = trackRef.current
+    if (!el) return clampedValue
+    const rect = el.getBoundingClientRect()
+    if (rect.width <= 0) return clampedValue
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const raw = min + ratio * (max - min)
+    const snapped = Math.round((raw - min) / step) * step + min
+    return Math.max(min, Math.min(max, snapped))
+  }
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse') {
+      if (e.button !== 0) return
+      gestureRef.current = {
+        mode: 'dragging',
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+      }
+      setIsDragging(true)
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        // ignore
+      }
+      emitChange(valueFromClientX(e.clientX), true)
+      return
+    }
+
+    // На сенсорном экране не меняем значение при касании — ждём направления жеста
+    gestureRef.current = {
+      mode: 'pending',
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+    }
+  }
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current
+    if (g.pointerId !== e.pointerId || g.mode === 'idle' || g.mode === 'scroll') return
+
+    if (g.mode === 'pending') {
+      const dx = Math.abs(e.clientX - g.startX)
+      const dy = Math.abs(e.clientY - g.startY)
+
+      // Вертикальное движение — отдаём браузеру под скролл, ползунок не трогаем
+      if (dy > 6 && dy >= dx) {
+        g.mode = 'scroll'
+        return
+      }
+
+      // Явное горизонтальное движение — активируем перетаскивание ползунка
+      if (dx > 7 && dx > dy * 1.25) {
+        g.mode = 'dragging'
+        setIsDragging(true)
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId)
+        } catch {
+          // ignore
+        }
+        emitChange(valueFromClientX(e.clientX), true)
+      }
+      return
+    }
+
+    if (g.mode === 'dragging') {
+      emitChange(valueFromClientX(e.clientX), false)
+    }
+  }
+
+  const finishGesture = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current
+    if (g.pointerId !== e.pointerId) return
+    if (g.mode === 'dragging') {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        // ignore
+      }
+      setIsDragging(false)
+    }
+    gestureRef.current = {
+      mode: 'idle',
+      pointerId: -1,
+      startX: 0,
+      startY: 0,
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      emitChange(Math.max(min, clampedValue - step), true)
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      emitChange(Math.min(max, clampedValue + step), true)
+    }
+  }
+
+  return (
+    <div
+      ref={trackRef}
+      role="slider"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={clampedValue}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishGesture}
+      onPointerCancel={finishGesture}
+      onKeyDown={handleKeyDown}
+      className="relative w-full h-7 flex items-center select-none cursor-pointer focus:outline-none"
+      style={{ touchAction: 'pan-y' }}
+    >
+      <div
+        className="relative w-full rounded-full overflow-hidden"
+        style={{
+          height: trackHeight,
+          background: trackBackground || trackColor,
+        }}
+      >
+        {!trackBackground && fillColor && (
+          <div
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: percent + '%',
+              backgroundColor: fillColor,
+            }}
+          />
+        )}
+      </div>
+
+      <span
+        className="pointer-events-none absolute top-1/2 rounded-full border-2 shadow-sm transition-transform duration-100"
+        style={{
+          width: 18,
+          height: 18,
+          left: `calc(${percent}% - 9px)`,
+          transform: isDragging ? 'translateY(-50%) scale(1.16)' : 'translateY(-50%) scale(1)',
+          backgroundColor: thumbColor,
+          borderColor: thumbBorderColor,
+        }}
+      />
+    </div>
+  )
+}
+
+/* ============================================================================
+   ВСТРОЕННЫЙ ВИЗУАЛЬНЫЙ ВЫБОР ЦВЕТА OKLCH (БЕЗ СИСТЕМНОГО ОКНА ANDROID)
+   ============================================================================ */
+
 type InlineOklchPickerProps = {
   hex: string
   tokens: ThemeTokens
+  hapticsEnabled: boolean
   hueLabel: string
   lightnessLabel: string
   chromaLabel: string
@@ -35,6 +266,7 @@ type InlineOklchPickerProps = {
 const InlineOklchPicker: React.FC<InlineOklchPickerProps> = ({
   hex,
   tokens,
+  hapticsEnabled,
   hueLabel,
   lightnessLabel,
   chromaLabel,
@@ -93,9 +325,10 @@ const InlineOklchPicker: React.FC<InlineOklchPickerProps> = ({
 
   return (
     <div
-      className="pt-4 border-t space-y-3.5"
+      className="pt-4 border-t space-y-3"
       style={{ borderColor: tokens.border }}
     >
+      {/* Preview + HEX input (desktop & tablet only) */}
       <div className="hidden md:flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <span
@@ -131,75 +364,84 @@ const InlineOklchPicker: React.FC<InlineOklchPickerProps> = ({
         />
       </div>
 
-      <div className="space-y-1.5">
+      {/* 1. Hue spectrum bar */}
+      <div className="space-y-0.5">
         <div className="flex items-center justify-between text-[12px]">
           <span style={{ color: tokens.muted }}>{hueLabel}</span>
           <span className="font-mono tabular-nums" style={{ color: tokens.ink }}>
             {activeHue}°
           </span>
         </div>
-        <input
-          type="range"
+        <SafeTouchSlider
           min={0}
           max={359}
           step={1}
           value={activeHue}
-          onChange={(e) => handleHue(Number(e.target.value))}
-          className="w-full h-3 rounded-full appearance-none cursor-pointer"
-          style={{
-            background:
-              'linear-gradient(90deg, #E5485B 0%, #E58C38 14%, #D9C938 28%, #52C962 44%, #36B8C9 58%, #4F78E5 72%, #A652E5 86%, #E5485B 100%)',
-            accentColor: tokens.ink,
-          }}
+          onChange={handleHue}
+          hapticsEnabled={hapticsEnabled}
+          hapticStep={10}
+          trackHeight={10}
+          trackBackground="linear-gradient(90deg, #E5485B 0%, #E58C38 14%, #D9C938 28%, #52C962 44%, #36B8C9 58%, #4F78E5 72%, #A652E5 86%, #E5485B 100%)"
+          thumbColor={safeHex}
+          thumbBorderColor={tokens.isDark ? '#F4F0E8' : '#FFFFFF'}
+          ariaLabel={hueLabel}
         />
       </div>
 
-      <div className="space-y-1.5">
+      {/* 2. Lightness bar */}
+      <div className="space-y-0.5">
         <div className="flex items-center justify-between text-[12px]">
           <span style={{ color: tokens.muted }}>{lightnessLabel}</span>
           <span className="font-mono tabular-nums" style={{ color: tokens.ink }}>
             {activeL}%
           </span>
         </div>
-        <input
-          type="range"
+        <SafeTouchSlider
           min={12}
           max={96}
           step={1}
           value={activeL}
-          onChange={(e) => handleL(Number(e.target.value))}
-          className="w-full h-3 rounded-full appearance-none cursor-pointer"
-          style={{
-            background: `linear-gradient(90deg, ${lStart} 0%, ${lMid} 50%, ${lEnd} 100%)`,
-            accentColor: tokens.ink,
-          }}
+          onChange={handleL}
+          hapticsEnabled={hapticsEnabled}
+          hapticStep={4}
+          trackHeight={10}
+          trackBackground={`linear-gradient(90deg, ${lStart} 0%, ${lMid} 50%, ${lEnd} 100%)`}
+          thumbColor={safeHex}
+          thumbBorderColor={tokens.isDark ? '#F4F0E8' : '#FFFFFF'}
+          ariaLabel={lightnessLabel}
         />
       </div>
 
-      <div className="space-y-1.5">
+      {/* 3. Chroma bar */}
+      <div className="space-y-0.5">
         <div className="flex items-center justify-between text-[12px]">
           <span style={{ color: tokens.muted }}>{chromaLabel}</span>
           <span className="font-mono tabular-nums" style={{ color: tokens.ink }}>
             {Math.round((activeC / 22) * 100)}%
           </span>
         </div>
-        <input
-          type="range"
+        <SafeTouchSlider
           min={0}
           max={22}
           step={1}
           value={activeC}
-          onChange={(e) => handleC(Number(e.target.value))}
-          className="w-full h-3 rounded-full appearance-none cursor-pointer"
-          style={{
-            background: `linear-gradient(90deg, ${cStart} 0%, ${cEnd} 100%)`,
-            accentColor: tokens.ink,
-          }}
+          onChange={handleC}
+          hapticsEnabled={hapticsEnabled}
+          hapticStep={2}
+          trackHeight={10}
+          trackBackground={`linear-gradient(90deg, ${cStart} 0%, ${cEnd} 100%)`}
+          thumbColor={safeHex}
+          thumbBorderColor={tokens.isDark ? '#F4F0E8' : '#FFFFFF'}
+          ariaLabel={chromaLabel}
         />
       </div>
     </div>
   )
 }
+
+/* ============================================================================
+   1. РЕДАКЦИОННАЯ ПАНЕЛЬ ТОНА (OKLCH / RYB)
+   ============================================================================ */
 
 type ToneControlCardProps = {
   t: ColorsTranslation
@@ -248,6 +490,7 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
         min: 0,
         max: 359,
         step: 1,
+        hapticStep: 10,
         value: Math.round(baseHue),
         onSlider: (v: number) => onChangeHue(v),
         onMinus: () => stepHue(-5),
@@ -259,6 +502,7 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
         min: 0,
         max: 100,
         step: 1,
+        hapticStep: 4,
         value: Math.round(tintWhite * 100),
         onSlider: (v: number) => onChangeTint(v / 100),
         onMinus: () => stepPct(tintWhite, -0.05, onChangeTint),
@@ -270,6 +514,7 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
         min: 0,
         max: 100,
         step: 1,
+        hapticStep: 4,
         value: Math.round(shadeBlack * 100),
         onSlider: (v: number) => onChangeShade(v / 100),
         onMinus: () => stepPct(shadeBlack, -0.05, onChangeShade),
@@ -281,6 +526,7 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
         min: 15,
         max: 100,
         step: 1,
+        hapticStep: 4,
         value: Math.round(chromaScale * 100),
         onSlider: (v: number) => onChangeChroma(v / 100),
         onMinus: () => stepPct(chromaScale, -0.05, (v) => onChangeChroma(Math.max(0.15, v))),
@@ -313,10 +559,10 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {rows.map((row) => (
             <div key={row.label} className="min-w-0">
-              <div className="flex items-center justify-between gap-3 mb-2 min-w-0">
+              <div className="flex items-center justify-between gap-3 mb-1 min-w-0">
                 <span className="text-[13px] font-medium" style={{ color: tokens.ink }}>
                   {row.label}
                 </span>
@@ -355,18 +601,20 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
                   </button>
                 </div>
               </div>
-              <input
-                type="range"
+              <SafeTouchSlider
                 min={row.min}
                 max={row.max}
                 step={row.step}
                 value={row.value}
-                onChange={(e) => row.onSlider(Number(e.target.value))}
-                className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                style={{
-                  backgroundColor: tokens.trackBg,
-                  accentColor: tokens.activeTintBorder,
-                }}
+                onChange={row.onSlider}
+                hapticsEnabled={hapticsEnabled}
+                hapticStep={row.hapticStep}
+                trackHeight={6}
+                trackColor={tokens.trackBg}
+                fillColor={tokens.activeTintBorder}
+                thumbColor={tokens.activeTintBorder}
+                thumbBorderColor={tokens.pageBg}
+                ariaLabel={row.label}
               />
             </div>
           ))}
@@ -375,6 +623,10 @@ export const ToneControlCard: React.FC<ToneControlCardProps> = React.memo(
     )
   }
 )
+
+/* ============================================================================
+   2. НЕЗАВИСИМАЯ ПОДОШВА (ПРЕСЕТЫ + ВИЗУАЛЬНЫЙ ВЫБОР ЛЮБОГО ЦВЕТА)
+   ============================================================================ */
 
 type SoleColorCardProps = {
   t: ColorsTranslation
@@ -466,9 +718,11 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
         })}
       </div>
 
+      {/* Визуальный выбор любого цвета подошвы (оттенок / светлота / насыщенность) */}
       <InlineOklchPicker
         hex={soleConfig.customHex}
         tokens={tokens}
+        hapticsEnabled={hapticsEnabled}
         hueLabel={t.hueLabel}
         lightnessLabel={t.tintLabel}
         chromaLabel={t.chromaLabel}
@@ -477,6 +731,10 @@ export const SoleColorCard: React.FC<SoleColorCardProps> = ({
     </div>
   )
 }
+
+/* ============================================================================
+   3. НЕЗАВИСИМЫЙ ФОН СТУДИИ (ПРЕСЕТЫ + ВИЗУАЛЬНЫЙ ВЫБОР + АВТО-КОНТРАСТ)
+   ============================================================================ */
 
 type StudioBgCardProps = {
   t: ColorsTranslation
@@ -573,6 +831,7 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
         <InlineOklchPicker
           hex={studioBg.customHex}
           tokens={tokens}
+          hapticsEnabled={hapticsEnabled}
           hueLabel={t.hueLabel}
           lightnessLabel={t.tintLabel}
           chromaLabel={t.chromaLabel}
@@ -616,6 +875,10 @@ export const StudioBgCard: React.FC<StudioBgCardProps> = ({
     </div>
   )
 }
+
+/* ============================================================================
+   4. НАСТРОЙКИ СТУДИИ
+   ============================================================================ */
 
 type StudioSettingsViewProps = {
   t: ColorsTranslation
@@ -794,6 +1057,10 @@ export const StudioSettingsView: React.FC<StudioSettingsViewProps> = ({
     </div>
   )
 }
+
+/* ============================================================================
+   5. РЕДАКЦИОННЫЙ ГИД ПО СТУДИИ
+   ============================================================================ */
 
 type GuideModalProps = {
   t: ColorsTranslation
