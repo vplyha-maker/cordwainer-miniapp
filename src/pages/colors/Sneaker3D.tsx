@@ -669,7 +669,7 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
 
   return (
     <div
-      className="w-full select-none rounded-[20px] px-3 pt-1 pb-2 border transition-colors duration-200"
+      className="relative overflow-hidden w-full select-none rounded-[20px] px-3 pt-1 pb-2 border transition-colors duration-200"
       style={{
         backgroundColor: stageStyle.bgHex,
         borderColor: uiTokens.border,
@@ -700,13 +700,6 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
             onPointerCancel={onPointerUp}
             className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
             style={{ touchAction: 'none' }}
-          />
-        )}
-
-        {isLoading3D && !webglError && (
-          <RainbowTilesLoader
-            isDark={stageStyle.isDarkStage}
-            label={loading3DLabel || '3D • ' + activeModel.name + '...'}
           />
         )}
       </div>
@@ -753,6 +746,13 @@ const Sneaker3DCanvas = forwardRef<Sneaker3DHandle, Sneaker3DProps>(function Sne
           </svg>
         </button>
       </div>
+
+      {isLoading3D && !webglError && (
+        <RainbowTilesLoader
+          isDark={isDark}
+          label={loading3DLabel || '3D • ' + activeModel.name + '...'}
+        />
+      )}
     </div>
   )
 })
