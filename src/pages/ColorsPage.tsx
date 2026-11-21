@@ -77,12 +77,21 @@ type ColorsPageProps = {
 }
 
 type StudioBgId = 'auto' | 'cream' | 'white' | 'gray' | 'graphite' | 'black'
+type SoleThemeId = 'auto' | 'cream' | 'black' | 'gum' | 'stone'
 
 type StudioBgOption = {
   id: StudioBgId
   hex: string | null
   swatchHex: string
   isDarkStage: boolean | null
+  label: string
+}
+
+type SoleOption = {
+  id: Exclude<SoleThemeId, 'auto'>
+  midsole: string
+  outsole: string
+  encapNeutral: string
   label: string
 }
 
@@ -94,7 +103,39 @@ const STUDIO_BG_OPTIONS: readonly StudioBgOption[] = [
   { id: 'black', hex: '#050505', swatchHex: '#050505', isDarkStage: true, label: 'Black' },
 ]
 
+const SOLE_OPTIONS: readonly SoleOption[] = [
+  {
+    id: 'cream',
+    midsole: '#FAF8F4',
+    outsole: '#2C2825',
+    encapNeutral: '#E5E0D6',
+    label: 'Cream EVA',
+  },
+  {
+    id: 'black',
+    midsole: '#1F1E1D',
+    outsole: '#111010',
+    encapNeutral: '#2F2D2B',
+    label: 'Triple Black',
+  },
+  {
+    id: 'gum',
+    midsole: '#F4EFE4',
+    outsole: '#A87943',
+    encapNeutral: '#D8C9AE',
+    label: 'Gum Rubber',
+  },
+  {
+    id: 'stone',
+    midsole: '#D6D3CD',
+    outsole: '#454340',
+    encapNeutral: '#B9B4AC',
+    label: 'Stone',
+  },
+]
+
 const VALID_BG_IDS: readonly StudioBgId[] = ['auto', 'cream', 'white', 'gray', 'graphite', 'black']
+const VALID_SOLE_IDS: readonly SoleThemeId[] = ['auto', 'cream', 'black', 'gum', 'stone']
 
 type PersistedColorsState = {
   baseHue: number
@@ -106,6 +147,7 @@ type PersistedColorsState = {
   mappingPreset: FootwearMappingPreset
   modelId: SneakerModelId
   studioBg: StudioBgId
+  soleTheme: SoleThemeId
 }
 
 const STORAGE_KEY = 'cordwainer_colors_state_v1'
@@ -141,6 +183,7 @@ const DEFAULT_STATE: PersistedColorsState = {
   mappingPreset: 'classic',
   modelId: 'aerostrap',
   studioBg: 'auto',
+  soleTheme: 'auto',
 }
 
 function loadSavedColorsState(): PersistedColorsState {
@@ -181,6 +224,12 @@ function loadSavedColorsState(): PersistedColorsState {
         ? (parsed.studioBg as StudioBgId)
         : DEFAULT_STATE.studioBg
 
+    const soleTheme: SoleThemeId =
+      typeof parsed.soleTheme === 'string' &&
+      VALID_SOLE_IDS.includes(parsed.soleTheme as SoleThemeId)
+        ? (parsed.soleTheme as SoleThemeId)
+        : DEFAULT_STATE.soleTheme
+
     return {
       baseHue: Math.round(clamp(parsed.baseHue, 0, 359, DEFAULT_STATE.baseHue)),
       whiteAmount: clamp(parsed.whiteAmount, 0, 1, DEFAULT_STATE.whiteAmount),
@@ -191,6 +240,7 @@ function loadSavedColorsState(): PersistedColorsState {
       mappingPreset,
       modelId,
       studioBg,
+      soleTheme,
     }
   } catch {
     return DEFAULT_STATE
@@ -230,6 +280,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   )
   const [modelId, setModelId] = useState<SneakerModelId>(initialSaved.modelId)
   const [studioBg, setStudioBg] = useState<StudioBgId>(initialSaved.studioBg)
+  const [soleTheme, setSoleTheme] = useState<SoleThemeId>(initialSaved.soleTheme)
 
   const [baseHue, setBaseHue] = useState(initialSaved.baseHue)
   const [whiteAmount, setWhiteAmount] = useState(initialSaved.whiteAmount)
@@ -296,6 +347,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         mappingPreset,
         modelId,
         studioBg,
+        soleTheme,
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
     } catch {}
@@ -309,6 +361,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     mappingPreset,
     modelId,
     studioBg,
+    soleTheme,
     isProPurchased,
   ])
 
@@ -371,6 +424,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     setChromaAmount(DEFAULT_STATE.chromaAmount)
     setMappingPreset(DEFAULT_STATE.mappingPreset)
     setStudioBg('auto')
+    setSoleTheme('auto')
   }, [])
 
   const copyToClipboard = useCallback(
@@ -407,20 +461,37 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     [baseHue, whiteAmount, blackAmount, chromaAmount, scheme, modelMode]
   )
 
-  const sneakerColors = useMemo(
-    () =>
-      mapPaletteToFootwear(
-        colors,
-        baseHue,
-        whiteAmount,
-        blackAmount,
-        chromaAmount,
-        modelMode,
-        mappingPreset,
-        isDark
-      ),
-    [colors, baseHue, whiteAmount, blackAmount, chromaAmount, modelMode, mappingPreset, isDark]
-  )
+  // Базовый расчёт гармоники Иттена + независимый выбор нейтральной подошвы (не влияет на схемы)
+  const sneakerColors = useMemo(() => {
+    const base = mapPaletteToFootwear(
+      colors,
+      baseHue,
+      whiteAmount,
+      blackAmount,
+      chromaAmount,
+      modelMode,
+      mappingPreset,
+      isDark
+    )
+    const chosenSole = SOLE_OPTIONS.find((s) => s.id === soleTheme)
+    if (!chosenSole) return base
+    return {
+      ...base,
+      midsole: chosenSole.midsole,
+      outsole: chosenSole.outsole,
+      encap: mappingPreset === 'neutral-sole' ? chosenSole.encapNeutral : base.encap,
+    }
+  }, [
+    colors,
+    baseHue,
+    whiteAmount,
+    blackAmount,
+    chromaAmount,
+    modelMode,
+    mappingPreset,
+    isDark,
+    soleTheme,
+  ])
 
   const harmonyEvaluation = useMemo(() => {
     const res = evaluateHarmonyContrast(colors, sneakerColors)
@@ -574,6 +645,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
     WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
   }
+
+  const soleLabel = localLang === 'de' ? 'Sohle' : localLang === 'uk' ? 'Підошва' : 'Подошва'
 
   return (
     <motion.div
@@ -789,7 +862,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* 2. 3D-МОДЕЛЬ + ВЫБОР СТУДИЙНОГО ФОНА */}
+        {/* 2. 3D-МОДЕЛЬ + ВЫБОР ПОДОШВЫ (ВЕРХ СЛЕВА) И СТУДИЙНОГО ФОНА (НИЗ СЛЕВА) */}
         <div
           className={
             'relative my-1 rounded-[4px] overflow-hidden transition-colors duration-300 ' +
@@ -806,6 +879,61 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             loading3DLabel={'3D • ' + activeModel.name + '...'}
             webglFallbackLabel={t.webglFallback}
           />
+
+          {/* Выбор цвета нейтральной подошвы (не влияет на схемы Иттена) */}
+          <div
+            className="absolute top-1.5 left-2 z-[5] flex items-center gap-1.5 px-2 py-1 rounded-full"
+            style={{
+              backgroundColor: stageIsDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.72)',
+            }}
+            aria-label={soleLabel}
+          >
+            <span
+              className={
+                'text-[7px] font-sans uppercase tracking-[0.14em] pr-0.5 ' +
+                (stageIsDark ? 'text-[#F4F0E8]/70' : 'text-[#1C1816]/70')
+              }
+            >
+              {soleLabel}
+            </span>
+            {SOLE_OPTIONS.map((opt) => {
+              const isSelected =
+                soleTheme === opt.id ||
+                (soleTheme === 'auto' && ((isDark && opt.id === 'black') || (!isDark && opt.id === 'cream')))
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light')
+                    setSoleTheme(opt.id)
+                  }}
+                  aria-label={opt.label}
+                  title={opt.label}
+                  className={
+                    'w-3.5 h-3.5 rounded-full cursor-pointer transition-transform ' +
+                    (isSelected
+                      ? 'scale-110 ring-1 ring-offset-1 ' +
+                        (stageIsDark
+                          ? 'ring-white ring-offset-black'
+                          : 'ring-black ring-offset-white')
+                      : 'opacity-80 hover:opacity-100')
+                  }
+                  style={{
+                    background:
+                      'linear-gradient(180deg, ' +
+                      opt.midsole +
+                      ' 50%, ' +
+                      opt.outsole +
+                      ' 50%)',
+                    border:
+                      '1px solid ' +
+                      (stageIsDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'),
+                  }}
+                />
+              )
+            })}
+          </div>
 
           {/* 5 студийных фонов в левом нижнем углу 3D-сцены */}
           <div
@@ -840,7 +968,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   }
                   style={{
                     backgroundColor: opt.swatchHex,
-                    border: '1px solid ' + (opt.isDarkStage ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'),
+                    border:
+                      '1px solid ' +
+                      (opt.isDarkStage ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'),
                   }}
                 />
               )
