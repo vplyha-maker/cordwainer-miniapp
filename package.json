@@ -15,6 +15,7 @@
     "scrape:macro": "node scripts/macro-sync.mjs"
   },
   "dependencies": {
+    "echarts": "^5.6.0",
     "@neondatabase/serverless": "^1.1.0",
     "@tma.js/sdk": "^3.3.0",
     "@tma.js/sdk-react": "^3.0.23",
