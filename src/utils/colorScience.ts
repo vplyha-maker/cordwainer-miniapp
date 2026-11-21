@@ -296,16 +296,18 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * Точная обратимая поправка Саундерсона (1942) для 45°/0° FORS-спектроскопии
- * (зеркальный блик исключён геометрически, поэтому k1 мал и не выбеливает глубокие тени).
+ * Поправка Саундерсона (1942) в режиме SCI → SCE:
+ * входные FORS-спектры содержат ~3.4% френелевского блика прибора (SCI),
+ * а выход моделирует реальную диффузную поверхность кожи без блика (SCE).
  */
-const K1_DRY = 0.0025
-const K1_WET = 0.0005
-const K2_INTERNAL = 0.4
-const R_INT_MIN = 0.0003
+const K1_FORS_IN = 0.034
+const K1_OUT_DRY = 0.006
+const K1_OUT_WET = 0.002
+const K2_INTERNAL = 0.42
+const R_INT_MIN = 0.0004
 const R_INT_MAX = 0.999
 
-export function measuredToInternalR(rMeasUnit: number, k1 = K1_DRY): number {
+export function measuredToInternalR(rMeasUnit: number, k1 = K1_FORS_IN): number {
   const rM = Math.max(0, Math.min(1, Number.isFinite(rMeasUnit) ? rMeasUnit : 0))
   const num = rM - k1
   if (num <= 0) return R_INT_MIN
@@ -316,7 +318,7 @@ export function measuredToInternalR(rMeasUnit: number, k1 = K1_DRY): number {
 
 export function internalToMeasuredR(rIntUnit: number, isWet = false): number {
   const rI = Math.max(R_INT_MIN, Math.min(R_INT_MAX, Number.isFinite(rIntUnit) ? rIntUnit : R_INT_MIN))
-  const k1 = isWet ? K1_WET : K1_DRY
+  const k1 = isWet ? K1_OUT_WET : K1_OUT_DRY
   const out = k1 + ((1 - k1) * (1 - K2_INTERNAL) * rI) / (1 - K2_INTERNAL * rI)
   return Math.max(0, Math.min(1, out))
 }
@@ -409,8 +411,6 @@ export function mixSpectra(components: MixComponent[], isWet = false): SpectrumP
     fractions[c] = colorParts[c].volume / colorVol
   }
 
-  // Молочное рассеяние эмульсии присутствует только пока акрил мокрый;
-  // после высыхания полимерная плёнка биндера оптически прозрачна.
   const binderRatio = binderVol / (colorVol + binderVol)
   const emulsionS = isWet ? 0.02 + binderRatio * 0.02 : 0
 
@@ -421,7 +421,7 @@ export function mixSpectra(components: MixComponent[], isWet = false): SpectrumP
     let totalS = 0
 
     for (let c = 0; c < n; c++) {
-      const rInt = measuredToInternalR(rBuffers[c][i], K1_DRY)
+      const rInt = measuredToInternalR(rBuffers[c][i], K1_FORS_IN)
       const ks = ((1 - rInt) * (1 - rInt)) / (2 * rInt)
       const sLambda = fractions[c] * sBuffers[c][i]
       totalK += sLambda * ks
