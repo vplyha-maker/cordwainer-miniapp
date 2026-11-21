@@ -102,7 +102,7 @@ describe('SizeCalcPage — интеграционные тесты', () => {
     render(<SizeCalcPage onBack={vi.fn()} lang="ru" />)
 
     fireEvent.click(screen.getAllByText('270')[0])
-    const input = screen.getByDisplayValue('270')
+    const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: '280' } })
     fireEvent.keyDown(input, { key: 'Enter' })
 
