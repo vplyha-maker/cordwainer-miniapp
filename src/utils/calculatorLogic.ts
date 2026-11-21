@@ -49,27 +49,47 @@ export function getPigmentCategory(id: string, lang: Lang) {
   return lang === 'de' ? 'Organisch / Sonstige' : lang === 'uk' ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
+const LAB_EPSILON = 216 / 24389
+const LAB_KAPPA = 24389 / 27
+
 export function rgbToLab(r: number, g: number, b: number) {
-  let r_ = r / 255, g_ = g / 255, b_ = b / 255
+  let r_ = r / 255
+  let g_ = g / 255
+  let b_ = b / 255
   r_ = r_ > 0.04045 ? Math.pow((r_ + 0.055) / 1.055, 2.4) : r_ / 12.92
   g_ = g_ > 0.04045 ? Math.pow((g_ + 0.055) / 1.055, 2.4) : g_ / 12.92
   b_ = b_ > 0.04045 ? Math.pow((b_ + 0.055) / 1.055, 2.4) : b_ / 12.92
-  let x = (r_ * 0.4124 + g_ * 0.3576 + b_ * 0.1805) * 100
-  let y = (r_ * 0.2126 + g_ * 0.7152 + b_ * 0.0722) * 100
-  let z = (r_ * 0.0193 + g_ * 0.1192 + b_ * 0.9505) * 100
-  x /= 95.047; y /= 100.0; z /= 108.883
-  x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116
-  y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116
-  z = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116
-  return { L: 116 * y - 16, a: 500 * (x - y), b: 200 * (y - z) }
+
+  // Точная матрица IEC 61966-2-1 sRGB -> CIE XYZ (D65)
+  let x = (r_ * 0.4124564 + g_ * 0.3575761 + b_ * 0.1804375) * 100
+  let y = (r_ * 0.2126729 + g_ * 0.7151522 + b_ * 0.0721750) * 100
+  let z = (r_ * 0.0193339 + g_ * 0.1191920 + b_ * 0.9503041) * 100
+
+  x /= 95.047
+  y /= 100.0
+  z /= 108.883
+
+  const fx = x > LAB_EPSILON ? Math.cbrt(x) : (LAB_KAPPA * x + 16) / 116
+  const fy = y > LAB_EPSILON ? Math.cbrt(y) : (LAB_KAPPA * y + 16) / 116
+  const fz = z > LAB_EPSILON ? Math.cbrt(z) : (LAB_KAPPA * z + 16) / 116
+
+  return { L: 116 * fy - 16, a: 500 * (fx - fy), b: 200 * (fy - fz) }
 }
 
-export function calculateDeltaE2000(lab1: { L: number; a: number; b: number }, lab2: { L: number; a: number; b: number }): number {
-  const { L: L1, a: a1, b: b1 } = lab1, { L: L2, a: a2, b: b2 } = lab2
-  const C1 = Math.sqrt(a1 * a1 + b1 * b1), C2 = Math.sqrt(a2 * a2 + b2 * b2), Cbar = (C1 + C2) / 2
+export function calculateDeltaE2000(
+  lab1: { L: number; a: number; b: number },
+  lab2: { L: number; a: number; b: number }
+): number {
+  const { L: L1, a: a1, b: b1 } = lab1
+  const { L: L2, a: a2, b: b2 } = lab2
+  const C1 = Math.sqrt(a1 * a1 + b1 * b1)
+  const C2 = Math.sqrt(a2 * a2 + b2 * b2)
+  const Cbar = (C1 + C2) / 2
   const G = 0.5 * (1 - Math.sqrt(Math.pow(Cbar, 7) / (Math.pow(Cbar, 7) + Math.pow(25, 7))))
-  const a1Prime = a1 * (1 + G), a2Prime = a2 * (1 + G)
-  const C1Prime = Math.sqrt(a1Prime * a1Prime + b1 * b1), C2Prime = Math.sqrt(a2Prime * a2Prime + b2 * b2)
+  const a1Prime = a1 * (1 + G)
+  const a2Prime = a2 * (1 + G)
+  const C1Prime = Math.sqrt(a1Prime * a1Prime + b1 * b1)
+  const C2Prime = Math.sqrt(a2Prime * a2Prime + b2 * b2)
   const CbarPrime = (C1Prime + C2Prime) / 2
   const h1Prime = b1 === 0 && a1Prime === 0 ? 0 : ((Math.atan2(b1, a1Prime) * 180) / Math.PI + 360) % 360
   const h2Prime = b2 === 0 && a2Prime === 0 ? 0 : ((Math.atan2(b2, a2Prime) * 180) / Math.PI + 360) % 360
@@ -78,27 +98,44 @@ export function calculateDeltaE2000(lab1: { L: number; a: number; b: number }, l
     if (Math.abs(h1Prime - h2Prime) > 180) HbarPrime = HbarPrime < 360 ? HbarPrime + 360 : HbarPrime - 360
     HbarPrime /= 2
   }
-  const T = 1 - 0.17 * Math.cos(((HbarPrime - 30) * Math.PI) / 180) + 0.24 * Math.cos((2 * HbarPrime * Math.PI) / 180) + 0.32 * Math.cos(((3 * HbarPrime + 6) * Math.PI) / 180) - 0.2 * Math.cos(((4 * HbarPrime - 63) * Math.PI) / 180)
+  const T =
+    1 -
+    0.17 * Math.cos(((HbarPrime - 30) * Math.PI) / 180) +
+    0.24 * Math.cos((2 * HbarPrime * Math.PI) / 180) +
+    0.32 * Math.cos(((3 * HbarPrime + 6) * Math.PI) / 180) -
+    0.2 * Math.cos(((4 * HbarPrime - 63) * Math.PI) / 180)
   let deltahPrime = 0
   if (C1Prime * C2Prime !== 0) {
     if (Math.abs(h2Prime - h1Prime) <= 180) deltahPrime = h2Prime - h1Prime
     else if (h2Prime - h1Prime > 180) deltahPrime = h2Prime - h1Prime - 360
     else deltahPrime = h2Prime - h1Prime + 360
   }
-  const deltaLPrime = L2 - L1, deltaCPrime = C2Prime - C1Prime, deltaHPrime = 2 * Math.sqrt(C1Prime * C2Prime) * Math.sin((deltahPrime * Math.PI) / 360)
+  const deltaLPrime = L2 - L1
+  const deltaCPrime = C2Prime - C1Prime
+  const deltaHPrime = 2 * Math.sqrt(C1Prime * C2Prime) * Math.sin((deltahPrime * Math.PI) / 360)
   const LbarPrime = (L1 + L2) / 2
   const S_L = 1 + (0.015 * Math.pow(LbarPrime - 50, 2)) / Math.sqrt(20 + Math.pow(LbarPrime - 50, 2))
-  const S_C = 1 + 0.045 * CbarPrime, S_H = 1 + 0.015 * CbarPrime * T
+  const S_C = 1 + 0.045 * CbarPrime
+  const S_H = 1 + 0.015 * CbarPrime * T
   const deltaTheta = 30 * Math.exp(-Math.pow((HbarPrime - 275) / 25, 2))
   const R_C = 2 * Math.sqrt(Math.pow(CbarPrime, 7) / (Math.pow(CbarPrime, 7) + Math.pow(25, 7)))
   const R_T = -Math.sin((2 * deltaTheta * Math.PI) / 180) * R_C
-  return Math.sqrt(Math.pow(deltaLPrime / S_L, 2) + Math.pow(deltaCPrime / S_C, 2) + Math.pow(deltaHPrime / S_H, 2) + R_T * (deltaCPrime / S_C) * (deltaHPrime / S_H))
+  return Math.sqrt(
+    Math.pow(deltaLPrime / S_L, 2) +
+      Math.pow(deltaCPrime / S_C, 2) +
+      Math.pow(deltaHPrime / S_H, 2) +
+      R_T * (deltaCPrime / S_C) * (deltaHPrime / S_H)
+  )
 }
 
 export function hexToRgbObj(hex: string) {
   let c = hex.replace(/^#/, '')
   if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
-  return { r: parseInt(c.substring(0, 2), 16) || 0, g: parseInt(c.substring(2, 4), 16) || 0, b: parseInt(c.substring(4, 6), 16) || 0 }
+  return {
+    r: parseInt(c.substring(0, 2), 16) || 0,
+    g: parseInt(c.substring(2, 4), 16) || 0,
+    b: parseInt(c.substring(4, 6), 16) || 0,
+  }
 }
 
 function combinations(n: number, k: number): number[][] {
@@ -117,12 +154,24 @@ function combinations(n: number, k: number): number[][] {
   return result
 }
 
-export interface RecipeItem { pigment: Pigment; ml: number; isBinder?: boolean }
-export interface RecipeResult { recipe: RecipeItem[]; resultRgb: { r: number; g: number; b: number }; resultHex: string; deltaE: number; system: CoverageSystem; approximate?: boolean }
+export interface RecipeItem {
+  pigment: Pigment
+  ml: number
+  isBinder?: boolean
+}
+
+export interface RecipeResult {
+  recipe: RecipeItem[]
+  resultRgb: { r: number; g: number; b: number }
+  resultHex: string
+  deltaE: number
+  system: CoverageSystem
+  approximate?: boolean
+}
 
 function getDominantShifts(baseRatios: number[][]): number[][] {
   const unique = new Map<string, number[]>()
-  baseRatios.forEach(r => {
+  baseRatios.forEach((r) => {
     for (let i = 0; i < r.length; i++) {
       const copy = [...r]
       const dom = copy.shift()!
@@ -137,12 +186,17 @@ const RATIOS_2 = getDominantShifts([[50, 50], [75, 25], [88, 12], [95, 5], [98, 
 const RATIOS_3 = getDominantShifts([[34, 33, 33], [55, 25, 20], [75, 15, 10], [88, 8, 4], [94, 4, 2], [98, 1.3, 0.7], [99, 0.6, 0.4]])
 const RATIOS_4 = getDominantShifts([[25, 25, 25, 25], [45, 25, 15, 15], [65, 18, 10, 7], [82, 10, 5, 3], [92, 4, 2.5, 1.5], [97, 1.5, 1, 0.5]])
 
-export function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L: number; a: number; b: number }, isWet = false) {
+export function optimizeCombo(
+  indices: number[],
+  candidates: Pigment[],
+  targetLab: { L: number; a: number; b: number },
+  isWet = false
+) {
   const n = indices.length
   let minDE = Infinity
   let bestVols = Array(n).fill(100 / n)
 
-  const spectra = indices.map(idx => candidates[idx].spectrum!)
+  const spectra = indices.map((idx) => candidates[idx].spectrum!)
 
   const evalVols = (v: number[]) => {
     const components = spectra.map((spec, idx) => ({ spectrum: spec, volume: v[idx] }))
@@ -200,6 +254,11 @@ export function optimizeCombo(indices: number[], candidates: Pigment[], targetLa
   return { vols: bestVols, deltaE: minDE }
 }
 
+function hueDistance(h1: number, h2: number): number {
+  const d = Math.abs(h1 - h2) % 360
+  return d > 180 ? 360 - d : d
+}
+
 export function findRecipeByHex(
   targetHex: string,
   pigments: Pigment[],
@@ -211,9 +270,10 @@ export function findRecipeByHex(
 ): RecipeResult | null {
   if (!pigments.length || !targetHex) return null
 
-  const binderPigment = system === 'acrylic'
-    ? pigments.find((p) => p.id === 'acrylic_binder' || (p as { isBinder?: boolean }).isBinder === true)
-    : undefined
+  const binderPigment =
+    system === 'acrylic'
+      ? pigments.find((p) => p.id === 'acrylic_binder' || (p as { isBinder?: boolean }).isBinder === true)
+      : undefined
 
   const validPigments = pigments.filter(
     (p) =>
@@ -227,38 +287,87 @@ export function findRecipeByHex(
 
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
+  const targetHue = ((Math.atan2(targetLab.b, targetLab.a) * 180) / Math.PI + 360) % 360
 
-  const isWhite = (id: string) => id.toLowerCase().includes('white') || id.toLowerCase().startsWith('pw_') || ['lithopone', 'chalk', 'gypsum'].includes(id)
+  const isWhite = (id: string) =>
+    id.toLowerCase().includes('white') ||
+    id.toLowerCase().startsWith('pw_') ||
+    ['lithopone', 'chalk', 'gypsum'].includes(id)
   const isBlack = (id: string) => id.toLowerCase().includes('black') || id.toLowerCase().startsWith('pbk_')
 
   let candidates: Pigment[] = []
   if (validPigments.length <= 14) {
     candidates = validPigments
   } else {
-    const whites = validPigments.filter(p => isWhite(p.id)).slice(0, 2)
-    const blacks = validPigments.filter(p => isBlack(p.id)).slice(0, 2)
-    const chromatics = validPigments.filter(p => !isWhite(p.id) && !isBlack(p.id))
+    const allWhites = validPigments.filter((p) => isWhite(p.id))
+    const primaryWhite =
+      allWhites.find((p) => p.id === 'titanium_white' || p.id === 'pw_6_anatase') || allWhites[0]
+    const whites = primaryWhite ? [primaryWhite] : []
 
-    const analyzed = chromatics.map(p => {
-      const mixed = mixSpectra([{ spectrum: p.spectrum!, volume: 100 }], isWet)
-      const rgb = spectrumToRGB(mixed)
-      const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-      const hue = ((Math.atan2(lab.b, lab.a) * 180) / Math.PI + 360) % 360
-      const chroma = Math.sqrt(lab.a * lab.a + lab.b * lab.b)
-      return { pigment: p, dist: calculateDeltaE2000(targetLab, lab), hue, chroma }
+    const allBlacks = validPigments.filter((p) => isBlack(p.id))
+    const blacks = allBlacks.slice(0, 2)
+    const chromatics = validPigments.filter((p) => !isWhite(p.id) && !isBlack(p.id))
+
+    // Оцениваем каждый пигмент И в чистом виде, И в разбеле с белилами (20% + 80% белил),
+    // чтобы сильные тёмные органики (Хинакридон маджента PR122, Родамин B/6G, Фтало) раскрывались.
+    const analyzed = chromatics.map((p) => {
+      const massMix = mixSpectra([{ spectrum: p.spectrum!, volume: 100 }], isWet)
+      const massRgb = spectrumToRGB(massMix)
+      const massLab = rgbToLab(massRgb.r, massRgb.g, massRgb.b)
+      const massDist = calculateDeltaE2000(targetLab, massLab)
+      const massChroma = Math.sqrt(massLab.a * massLab.a + massLab.b * massLab.b)
+      const massHue = ((Math.atan2(massLab.b, massLab.a) * 180) / Math.PI + 360) % 360
+
+      let tintDist = Infinity
+      let tintChroma = 0
+      let tintHue = massHue
+
+      if (primaryWhite?.spectrum) {
+        const tintMix = mixSpectra(
+          [
+            { spectrum: p.spectrum!, volume: 20 },
+            { spectrum: primaryWhite.spectrum, volume: 80 },
+          ],
+          isWet
+        )
+        const tintRgb = spectrumToRGB(tintMix)
+        const tintLab = rgbToLab(tintRgb.r, tintRgb.g, tintRgb.b)
+        tintDist = calculateDeltaE2000(targetLab, tintLab)
+        tintChroma = Math.sqrt(tintLab.a * tintLab.a + tintLab.b * tintLab.b)
+        tintHue = ((Math.atan2(tintLab.b, tintLab.a) * 180) / Math.PI + 360) % 360
+      }
+
+      const useTint = tintChroma > massChroma * 1.05
+      const bestHue = useTint ? tintHue : massHue
+      const bestChroma = Math.max(massChroma, tintChroma)
+      const bestDist = Math.min(massDist, tintDist)
+      const hDiff = Math.min(hueDistance(targetHue, massHue), hueDistance(targetHue, tintHue))
+
+      return { pigment: p, dist: bestDist, hue: bestHue, chroma: bestChroma, hDiff }
     })
 
-    analyzed.sort((a, b) => a.dist - b.dist)
-    const closest = analyzed.slice(0, 6).map(x => x.pigment)
+    // 1. Ближайшие по ΔE (с учётом разбела)
+    const byDist = [...analyzed].sort((a, b) => a.dist - b.dist)
+    const closest = byDist.slice(0, 6).map((x) => x.pigment)
 
+    // 2. Самые чистые (высокохроматичные) в окрестности целевого тона (±45°)
+    const nearHueChamps = analyzed
+      .filter((x) => x.hDiff <= 45)
+      .sort((a, b) => b.chroma - a.chroma)
+      .slice(0, 4)
+      .map((x) => x.pigment)
+
+    // 3. Чемпионы по 12 секторам круга (шаг 30°), чтобы иметь чистую базу для коррекции оттенка
     const sectorChamps: Pigment[] = []
-    for (let s = 0; s < 6; s++) {
-      const inSector = analyzed.filter(x => x.hue >= s * 60 && x.hue < (s + 1) * 60)
+    for (let s = 0; s < 12; s += 2) {
+      const inSector = analyzed.filter((x) => x.hue >= s * 30 && x.hue < (s + 2) * 30)
       inSector.sort((a, b) => b.chroma - a.chroma)
       if (inSector[0]) sectorChamps.push(inSector[0].pigment)
     }
 
-    candidates = Array.from(new Set([...whites, ...blacks, ...closest, ...sectorChamps]))
+    candidates = Array.from(
+      new Set([...whites, ...blacks, ...closest, ...nearHueChamps, ...sectorChamps])
+    ).slice(0, 16)
   }
 
   const n = candidates.length
@@ -312,7 +421,6 @@ export function findRecipeByHex(
     if (binderMl > 0) recipe.push({ pigment: binderPigment, ml: binderMl, isBinder: true })
   }
 
-  // Считаем финальный цвет строго по округленному рецепту (включая биндер), чтобы Mix и Pro совпадали 1 в 1
   const finalMixed = mixSpectra(
     recipe.map((item) => ({
       spectrum: item.pigment.spectrum!,
@@ -339,8 +447,6 @@ export function simulateLayersKM(
   paintSpectrum: SpectrumPoint[],
   system: CoverageSystem
 ) {
-  let strength = system === 'aniline' ? 28 : 48
-
   const baseRgb = spectrumToRGB(baseSpectrum)
   const paintRgb = spectrumToRGB(paintSpectrum)
 
@@ -348,45 +454,42 @@ export function simulateLayersKM(
   const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
   const deltaL = Math.abs(paintL - baseL)
 
-  if (deltaL > 0.45) strength *= 0.85
-  else if (deltaL < 0.12) strength *= 1.12
+  const paintLighterOverDark = paintL > baseL + 0.15
+  let opacityPerCoat = system === 'aniline' ? 0.28 : 0.56
+  if (paintLighterOverDark) {
+    opacityPerCoat *= deltaL > 0.5 ? 0.76 : 0.86
+  } else if (deltaL < 0.15) {
+    opacityPerCoat *= 1.1
+  }
+  opacityPerCoat = Math.max(0.18, Math.min(0.75, opacityPerCoat))
 
-  strength = Math.max(20, Math.min(55, strength))
-
-  const p1 = strength / 100
-  const p2 = (strength * 0.95) / 100
-  const p3 = (strength * 0.92) / 100
-
-  const cov1 = p1
-  const cov2 = 1 - (1 - p1) * (1 - p2)
-  const cov3 = 1 - (1 - p1) * (1 - p2) * (1 - p3)
-
-  const blendCoat = (c: number): SpectrumPoint[] => {
+  const buildCoat = (coats: number): SpectrumPoint[] => {
+    const coverage = 1 - Math.pow(1 - opacityPerCoat, coats)
     const out: SpectrumPoint[] = new Array(SPECTRUM_LEN)
     for (let i = 0; i < SPECTRUM_LEN; i++) {
       const wl = WL_START + i * WL_STEP
-      const rB = Math.max(0.001, Math.min(0.999, interpolateReflectance(baseSpectrum, wl) * 0.01))
-      const rP = Math.max(0.001, Math.min(0.999, interpolateReflectance(paintSpectrum, wl) * 0.01))
-      let rMix: number
+      const rB = Math.max(0.004, Math.min(0.995, interpolateReflectance(baseSpectrum, wl) * 0.01))
+      const rP = Math.max(0.004, Math.min(0.995, interpolateReflectance(paintSpectrum, wl) * 0.01))
+
+      let rCoat: number
       if (system === 'acrylic') {
-        // Кроющий слой поверх подложки: верхняя плёнка отражает свет до прохождения к базе
-        rMix = (1 - c) * rB + c * rP
+        rCoat = (1 - coverage) * rB + coverage * rP
       } else {
-        // Анилин (лессировка): полупрозрачный фильтр поверх исходной кожи
-        const rGlaze = Math.pow(rB, 1 - c) * Math.pow(rP, c)
-        rMix = 0.65 * rGlaze + 0.35 * ((1 - c) * rB + c * rP)
+        const glaze = Math.pow(rB, 1 - coverage) * Math.pow(rP, coverage)
+        const linear = (1 - coverage) * rB + coverage * rP
+        rCoat = 0.65 * glaze + 0.35 * linear
       }
-      out[i] = { wavelength: wl, reflectance: Math.max(0.1, Math.min(99.9, rMix * 100)) }
+      out[i] = { wavelength: wl, reflectance: Math.max(0.2, Math.min(99.8, rCoat * 100)) }
     }
     return out
   }
 
   return {
-    layer1: blendCoat(cov1),
-    layer2: blendCoat(cov2),
-    layer3: blendCoat(cov3),
+    layer1: buildCoat(1),
+    layer2: buildCoat(2),
+    layer3: buildCoat(3),
     final: paintSpectrum,
-    strength: Math.round(strength),
+    strength: Math.round(opacityPerCoat * 100),
     deltaL,
   }
 }
