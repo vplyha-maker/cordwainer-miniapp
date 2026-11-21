@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Lang } from '../../App'
 import type { Pigment } from '../../data/pigments'
@@ -173,7 +173,6 @@ export function MatchingPanel({
   onSendRecipeToMix,
   onInspectPigment,
 }: MatchingPanelProps) {
-  const grainId = useId().replace(/:/g, '')
   const copy = MATCH_COPY[lang] || MATCH_COPY.ru
   const validColorValue = /^#[0-9A-Fa-f]{6}$/.test(targetHex) ? targetHex : '#8B4513'
   const hairline = 'color-mix(in srgb, var(--color-ink, #F4F0E8) 10%, transparent)'
@@ -186,7 +185,7 @@ export function MatchingPanel({
   const [showFloatingBar, setShowFloatingBar] = useState(false)
 
   const svBoxRef = useRef<HTMLDivElement | null>(null)
-  const targetAnchorRef = useRef<HTMLDivElement | null>(null)
+  const targetSwatchRef = useRef<HTMLDivElement | null>(null)
   const lastHapticRef = useRef<number>(0)
 
   useEffect(() => {
@@ -196,14 +195,14 @@ export function MatchingPanel({
   }, [targetHex, draggingSV])
 
   useEffect(() => {
-    const el = targetAnchorRef.current
+    const el = targetSwatchRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0]
-        setShowFloatingBar(!entry.isIntersecting && entry.boundingClientRect.top < 0)
+        setShowFloatingBar(!entry.isIntersecting && entry.boundingClientRect.bottom <= 48)
       },
-      { threshold: 0.08 }
+      { threshold: 0.05 }
     )
     observer.observe(el)
     return () => observer.disconnect()
@@ -211,7 +210,7 @@ export function MatchingPanel({
 
   const fireThrottledTick = () => {
     const now = Date.now()
-    if (now - lastHapticRef.current >= 45) {
+    if (now - lastHapticRef.current >= 55) {
       hapticSelect()
       lastHapticRef.current = now
     }
@@ -270,31 +269,19 @@ export function MatchingPanel({
 
   return (
     <div className="flex flex-col gap-5 relative">
-      <svg className="absolute w-0 h-0 pointer-events-none" aria-hidden="true">
-        <defs>
-          <filter id={grainId} x="0%" y="0%" width="100%" height="100%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="11" stitchTiles="stitch" />
-            <feColorMatrix type="saturate" values="0" />
-            <feComponentTransfer>
-              <feFuncA type="linear" slope="0.22" />
-            </feComponentTransfer>
-          </filter>
-        </defs>
-      </svg>
-
-      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА */}
+      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА (без тяжёлого backdrop-blur) */}
       <AnimatePresence>
         {showFloatingBar && (
           <motion.div
-            initial={{ opacity: 0, y: -14 }}
+            initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
-            transition={{ duration: 0.16 }}
-            className="fixed left-4 right-4 z-40 max-w-[680px] mx-auto px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 backdrop-blur-md shadow-lg"
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.14 }}
+            className="fixed left-4 right-4 z-40 max-w-[680px] mx-auto px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 shadow-lg"
             style={{
               top: 'calc(10px + env(safe-area-inset-top, 0px))',
-              background: 'color-mix(in srgb, var(--color-surface, #141416) 94%, transparent)',
-              borderColor: hairline,
+              background: 'var(--color-surface, #141416)',
+              borderColor: 'color-mix(in srgb, var(--color-accent, #C9A86A) 38%, transparent)',
             }}
           >
             <div className="flex items-center gap-3 min-w-0">
@@ -346,9 +333,8 @@ export function MatchingPanel({
         )}
       </AnimatePresence>
 
-      {/* ЕДИНАЯ КАРТА ПОДБОРА: ЭТАЛОН + ПИКЕР + ПАРАМЕТРЫ */}
+      {/* ЕДИНАЯ КАРТА ПОДБОРА */}
       <section
-        ref={targetAnchorRef}
         className="rounded-2xl border overflow-hidden"
         style={{
           background: 'var(--color-surface, #141416)',
@@ -366,7 +352,7 @@ export function MatchingPanel({
         </div>
 
         <div className="p-4 sm:p-5 flex flex-col gap-4">
-          <div className="flex items-stretch gap-3">
+          <div ref={targetSwatchRef} className="flex items-stretch gap-3">
             <button
               type="button"
               onClick={() => {
@@ -379,9 +365,7 @@ export function MatchingPanel({
                 borderColor: pickerOpen ? 'var(--color-accent, #C9A86A)' : hairline,
               }}
               aria-label={copy.customColorBtn}
-            >
-              <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-70" style={{ filter: `url(#${grainId})` }} />
-            </button>
+            />
 
             <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
               <div className="flex items-center gap-2">
@@ -411,7 +395,7 @@ export function MatchingPanel({
                     hapticTap()
                     setPickerOpen((o) => !o)
                   }}
-                  className="h-10 px-3.5 rounded-xl border text-[12.5px] font-sans font-medium flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+                  className="h-10 px-3.5 rounded-xl border text-[12.5px] font-sans font-medium flex items-center gap-1.5 shrink-0 cursor-pointer"
                   style={{
                     borderColor: 'var(--color-accent, #C9A86A)',
                     background: pickerOpen ? 'var(--color-accent, #C9A86A)' : 'transparent',
@@ -435,7 +419,7 @@ export function MatchingPanel({
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.18 }}
+                transition={{ duration: 0.16 }}
                 className="overflow-hidden"
               >
                 <div className="pt-1 flex flex-col gap-3">
@@ -465,9 +449,9 @@ export function MatchingPanel({
                       style={{
                         left: `${hsv.s * 100}%`,
                         top: `${(1 - hsv.v) * 100}%`,
-                        transform: `translate(-50%, -50%) scale(${draggingSV ? 1.2 : 1})`,
+                        transform: `translate(-50%, -50%) scale(${draggingSV ? 1.15 : 1})`,
                         backgroundColor: validColorValue,
-                        boxShadow: '0 0 0 1.5px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.4)',
+                        boxShadow: '0 0 0 1.5px rgba(0,0,0,0.45)',
                       }}
                     />
                   </div>
@@ -490,7 +474,7 @@ export function MatchingPanel({
                         style={{
                           left: `${(hsv.h / 360) * 100}%`,
                           backgroundColor: `hsl(${hsv.h}, 100%, 50%)`,
-                          boxShadow: '0 0 0 1px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.35)',
+                          boxShadow: '0 0 0 1px rgba(0,0,0,0.35)',
                         }}
                       />
                       <input
@@ -510,7 +494,6 @@ export function MatchingPanel({
             )}
           </AnimatePresence>
 
-          {/* Классические оттенки кожи — чистые тактильные образцы */}
           <div className="flex flex-wrap gap-x-4 gap-y-2.5 pt-1">
             {LEATHER_PRESETS.map((preset) => {
               const active = targetHex.toUpperCase() === preset.hex
@@ -522,7 +505,7 @@ export function MatchingPanel({
                     hapticSelect()
                     onTargetHexChange(preset.hex)
                   }}
-                  className="inline-flex items-center gap-2 text-[12.5px] font-sans cursor-pointer bg-transparent border-none p-0 transition-opacity"
+                  className="inline-flex items-center gap-2 text-[12.5px] font-sans cursor-pointer bg-transparent border-none p-0"
                   style={{
                     color: active ? 'var(--color-ink, #F4F0E8)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 68%, transparent)',
                     fontWeight: active ? 600 : 400,
@@ -544,11 +527,7 @@ export function MatchingPanel({
           </div>
         </div>
 
-        {/* Параметры синтеза: единая сегментная полоса */}
-        <div
-          className="grid grid-cols-2 border-t divide-x"
-          style={{ borderColor: hairline }}
-        >
+        <div className="grid grid-cols-2 border-t divide-x" style={{ borderColor: hairline }}>
           {([3, 4] as const).map((num) => {
             const active = maxComponents === num
             return (
@@ -556,7 +535,7 @@ export function MatchingPanel({
                 key={num}
                 type="button"
                 onClick={() => onMaxComponentsChange(num)}
-                className="py-3 text-[12.5px] font-sans font-medium transition-colors cursor-pointer"
+                className="py-3 text-[12.5px] font-sans font-medium cursor-pointer"
                 style={{
                   borderColor: hairline,
                   background: active ? 'var(--color-ink, #F4F0E8)' : 'transparent',
@@ -569,10 +548,7 @@ export function MatchingPanel({
           })}
         </div>
 
-        <div
-          className="grid grid-cols-2 border-t divide-x"
-          style={{ borderColor: hairline }}
-        >
+        <div className="grid grid-cols-2 border-t divide-x" style={{ borderColor: hairline }}>
           {(['acrylic', 'aniline'] as const).map((sys) => {
             const active = system === sys
             return (
@@ -580,7 +556,7 @@ export function MatchingPanel({
                 key={sys}
                 type="button"
                 onClick={() => onSystemChange(sys)}
-                className="py-3 px-2 text-[12.5px] font-sans font-medium transition-colors cursor-pointer"
+                className="py-3 px-2 text-[12.5px] font-sans font-medium cursor-pointer"
                 style={{
                   borderColor: hairline,
                   background: active
@@ -605,7 +581,7 @@ export function MatchingPanel({
               !/^#[0-9A-Fa-f]{6}$/.test(targetHex) ||
               inventoryIds.length === 0
             }
-            className="w-full h-12 rounded-xl text-[13px] font-sans uppercase tracking-[0.14em] font-semibold transition-opacity disabled:opacity-35 cursor-pointer"
+            className="w-full h-12 rounded-xl text-[13px] font-sans uppercase tracking-[0.14em] font-semibold disabled:opacity-35 cursor-pointer"
             style={{
               background: 'var(--color-ink, #F4F0E8)',
               color: 'var(--color-bg, #0B0B0C)',
@@ -637,7 +613,6 @@ export function MatchingPanel({
           >
             <div className="grid grid-cols-2 h-36 relative">
               <div className="p-3.5 flex flex-col justify-between relative" style={{ backgroundColor: targetHex }}>
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-70" style={{ filter: `url(#${grainId})` }} />
                 <span className="relative z-10 text-[11px] font-mono bg-black/55 text-white px-2.5 py-0.5 rounded-md w-fit">
                   {dict.target}
                 </span>
@@ -647,7 +622,6 @@ export function MatchingPanel({
               </div>
 
               <div className="p-3.5 flex flex-col justify-between relative" style={{ backgroundColor: recipeResult.resultHex || '#333' }}>
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-70" style={{ filter: `url(#${grainId})` }} />
                 <div className="relative z-10 flex justify-end">
                   <span
                     className="text-[12px] font-mono font-semibold px-2.5 py-0.5 rounded-md whitespace-nowrap"
@@ -806,7 +780,7 @@ export function MatchingPanel({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.18 }}
+              transition={{ duration: 0.16 }}
               className="overflow-hidden border-t"
               style={{ borderColor: hairline }}
             >
@@ -820,7 +794,7 @@ export function MatchingPanel({
                           key={cat}
                           type="button"
                           onClick={() => setActiveCategory(cat)}
-                          className="h-8 px-3 rounded-lg text-[12px] font-sans font-medium whitespace-nowrap border transition-colors cursor-pointer"
+                          className="h-8 px-3 rounded-lg text-[12px] font-sans font-medium whitespace-nowrap border cursor-pointer"
                           style={{
                             borderColor: active ? 'var(--color-ink, #F4F0E8)' : hairline,
                             background: active ? 'var(--color-ink, #F4F0E8)' : 'transparent',
@@ -850,7 +824,7 @@ export function MatchingPanel({
                     return (
                       <div
                         key={p.id}
-                        className="flex items-center rounded-lg border transition-colors overflow-hidden"
+                        className="flex items-center rounded-lg border overflow-hidden"
                         style={{
                           background: on
                             ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 15%, transparent)'
