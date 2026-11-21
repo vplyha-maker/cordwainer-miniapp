@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type MutableRefObject } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { Lang } from '../../App'
 import type { Pigment } from '../../data/pigments'
 import { getPigmentLore } from '../../data/pigmentLore'
@@ -60,24 +61,33 @@ interface FormulaPanelProps {
 
 const ILLUMINANT_ORDER: IlluminantType[] = ['D65', 'A', 'cool', 'twilight']
 
-const SUBSTRATE_COPY: Record<Lang, { title: string; custom: string; raw: string; slideHint: string }> = {
+const SUBSTRATE_COPY: Record<
+  Lang,
+  { title: string; custom: string; raw: string; dryShort: string; wetShort: string; fullShort: string }
+> = {
   ru: {
     title: 'Исходная кожа',
     custom: 'Своя',
     raw: 'Кожа до',
-    slideHint: 'Потяните шторку',
+    dryShort: 'Сухая',
+    wetShort: 'Мокрая',
+    fullShort: 'Полн. ∞',
   },
   uk: {
     title: 'Вихідна шкіра',
     custom: 'Своя',
     raw: 'Шкіра до',
-    slideHint: 'Потягніть шторку',
+    dryShort: 'Суха',
+    wetShort: 'Мокра',
+    fullShort: 'Повн. ∞',
   },
   de: {
     title: 'Grundleder',
     custom: 'Eigene',
     raw: 'Vorher',
-    slideHint: 'Regler ziehen',
+    dryShort: 'Trocken',
+    wetShort: 'Nass',
+    fullShort: 'Voll ∞',
   },
 }
 
@@ -191,21 +201,20 @@ export function FormulaPanel({
   const leftCompareHex = activeTarget || rawSubstrateHex
   const leftCompareLabel = activeTarget ? `${dict.target} · ${activeTarget}` : subCopy.raw
 
-  // Сбрасываем шторку на 50% при появлении целевого цвета
   useEffect(() => {
     setSplitPct(activeTarget ? 50 : 28)
   }, [activeTarget])
 
-  // Плавающая полоска оттенка при скролле вниз к ползункам
+  // Отслеживаем уход главной выкраски за верхнюю границу экрана
   useEffect(() => {
     const el = swatchAnchorRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0]
-        setShowStickySwatch(!entry.isIntersecting)
+        setShowStickySwatch(!entry.isIntersecting && entry.boundingClientRect.top < 0)
       },
-      { threshold: 0.12 }
+      { threshold: 0.08 }
     )
     observer.observe(el)
     return () => observer.disconnect()
@@ -265,7 +274,6 @@ export function FormulaPanel({
     hapticTap()
   }
 
-  // Сегменты для «мерного стакана» пропорций
   const activeSegments = paints
     .map((p) => {
       const val = parseFloat(p.amount) || 0
@@ -280,7 +288,7 @@ export function FormulaPanel({
 
   return (
     <div className="flex flex-col gap-4 relative">
-      {/* Скрытый SVG-фильтр для живой фактуры натуральной кожи */}
+      {/* SVG-фильтр для живой фактуры натуральной кожи */}
       <svg className="absolute w-0 h-0 pointer-events-none" aria-hidden="true">
         <defs>
           <filter id={grainFilterId} x="0%" y="0%" width="100%" height="100%">
@@ -299,66 +307,74 @@ export function FormulaPanel({
         </defs>
       </svg>
 
-      {/* ПЛАВАЮЩИЙ ЖИВОЙ ПРЕВЬЮ-БАР ПРИ ПРОКРУТКЕ К ПОЛЗУНКАМ */}
-      {showStickySwatch && (
-        <div
-          className="sticky top-2 z-30 -mb-2 px-3 py-2 rounded-2xl border flex items-center justify-between gap-2.5 backdrop-blur-md shadow-lg transition-all duration-200"
-          style={{
-            background: 'color-mix(in srgb, var(--color-surface, #141416) 86%, transparent)',
-            borderColor: 'color-mix(in srgb, var(--color-accent, #C9A86A) 35%, transparent)',
-          }}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className="w-9 h-9 rounded-xl shrink-0 relative overflow-hidden border border-black/25 transition-colors duration-200"
-              style={{ backgroundColor: squareColor }}
-            >
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{ background: ILLUMINANT_GLOW[illuminant] }}
-              />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-serif text-[17px] leading-none tabular-nums">
-                  {displayHex || '#------'}
-                </span>
-                {liveDeltaE !== null && (
-                  <span
-                    className="px-1.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold"
-                    style={{
-                      backgroundColor: 'rgba(0,0,0,0.55)',
-                      color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
-                    }}
-                  >
-                    ΔE {liveDeltaE.toFixed(1)}
-                  </span>
-                )}
-              </div>
-              <span className="block text-[10px] font-sans opacity-60 truncate">
-                {activeCoat ? activeCoat.label : dict.mix} · {activeIllInfo.short} ·{' '}
-                {totalAmount >= 1000
-                  ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
-                  : `${totalAmount.toFixed(1)} ${dict.ml}`}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onCopyHex}
-            disabled={!displayHex}
-            className="h-8 px-3 rounded-full text-[10px] font-sans uppercase tracking-[0.12em] font-semibold border shrink-0 cursor-pointer disabled:opacity-30"
+      {/* ПЛАВАЮЩАЯ FIXED-ПЛАШКА ОТТЕНКА (не зависит от overflow-hidden) */}
+      <AnimatePresence>
+        {showStickySwatch && (
+          <motion.div
+            initial={{ opacity: 0, y: -18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -18 }}
+            transition={{ duration: 0.18 }}
+            className="fixed left-3.5 right-3.5 z-40 max-w-[640px] mx-auto px-3 py-2 rounded-2xl border flex items-center justify-between gap-2.5 backdrop-blur-xl shadow-xl"
             style={{
-              borderColor: 'var(--color-accent, #C9A86A)',
-              background: copied ? 'var(--color-accent, #C9A86A)' : 'transparent',
-              color: copied ? 'var(--color-bg, #0B0B0C)' : 'var(--color-accent, #C9A86A)',
+              top: 'calc(10px + env(safe-area-inset-top, 0px))',
+              background: 'color-mix(in srgb, var(--color-surface, #141416) 90%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--color-accent, #C9A86A) 42%, transparent)',
             }}
           >
-            {copied ? dict.copied : dict.copy}
-          </button>
-        </div>
-      )}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div
+                className="w-10 h-10 rounded-xl shrink-0 relative overflow-hidden border border-black/25 transition-colors duration-200"
+                style={{ backgroundColor: squareColor }}
+              >
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: ILLUMINANT_GLOW[illuminant] }}
+                />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-serif text-[18px] leading-none tabular-nums">
+                    {displayHex || '#------'}
+                  </span>
+                  {liveDeltaE !== null && (
+                    <span
+                      className="px-1.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold whitespace-nowrap"
+                      style={{
+                        backgroundColor: 'rgba(0,0,0,0.62)',
+                        color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
+                      }}
+                    >
+                      ΔE {liveDeltaE.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <span className="block text-[10px] font-sans opacity-65 truncate mt-0.5">
+                  {activeCoat ? (activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label) : dict.mix} ·{' '}
+                  {isWet ? subCopy.wetShort : subCopy.dryShort} ·{' '}
+                  {totalAmount >= 1000
+                    ? `${(totalAmount / 1000).toFixed(2)} ${dict.l}`
+                    : `${totalAmount.toFixed(1)} ${dict.ml}`}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onCopyHex}
+              disabled={!displayHex}
+              className="h-8 px-3 rounded-full text-[10px] font-sans uppercase tracking-[0.1em] font-semibold border shrink-0 cursor-pointer disabled:opacity-30"
+              style={{
+                borderColor: 'var(--color-accent, #C9A86A)',
+                background: copied ? 'var(--color-accent, #C9A86A)' : 'transparent',
+                color: copied ? 'var(--color-bg, #0B0B0C)' : 'var(--color-accent, #C9A86A)',
+              }}
+            >
+              {copied ? dict.copied : dict.copy}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ЖИВАЯ КАРТА ОТТЕНКА */}
       <section
@@ -370,7 +386,7 @@ export function FormulaPanel({
         }}
       >
         <div
-          className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b"
+          className="px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b"
           style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 9%, transparent)' }}
         >
           <div className="flex items-center gap-2">
@@ -410,7 +426,7 @@ export function FormulaPanel({
               <button
                 type="button"
                 onClick={onClearTarget}
-                className="text-[10px] font-sans uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border cursor-pointer"
+                className="text-[9.5px] font-sans uppercase tracking-[0.08em] px-2 py-0.5 rounded-full border cursor-pointer"
                 style={{
                   borderColor: 'color-mix(in srgb, var(--color-danger, #f87171) 45%, transparent)',
                   color: 'var(--color-danger, #f87171)',
@@ -421,25 +437,43 @@ export function FormulaPanel({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleWet}
-            className="text-[10px] font-sans tracking-[0.08em] uppercase font-semibold px-3 py-1 rounded-full border transition-colors cursor-pointer"
+          {/* Явный 2-позиционный тумблер: Сухая | Мокрая */}
+          <div
+            className="inline-flex p-0.5 rounded-full border"
             style={{
-              borderColor: isWet
-                ? 'var(--color-accent, #C9A86A)'
-                : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 16%, transparent)',
-              color: isWet ? 'var(--color-accent, #C9A86A)' : 'var(--color-ink, #F4F0E8)',
-              background: isWet
-                ? 'color-mix(in srgb, var(--color-accent, #C9A86A) 14%, transparent)'
-                : 'transparent',
+              background: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 4%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--color-ink, #F4F0E8) 14%, transparent)',
             }}
           >
-            {isWet ? dict.wet : dict.dry}
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isWet) onToggleWet()
+              }}
+              className="px-2.5 py-1 rounded-full text-[10px] font-sans uppercase tracking-[0.06em] font-semibold transition-colors cursor-pointer"
+              style={{
+                background: !isWet ? 'var(--color-ink, #F4F0E8)' : 'transparent',
+                color: !isWet ? 'var(--color-bg, #0B0B0C)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 65%, transparent)',
+              }}
+            >
+              {subCopy.dryShort}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isWet) onToggleWet()
+              }}
+              className="px-2.5 py-1 rounded-full text-[10px] font-sans uppercase tracking-[0.06em] font-semibold transition-colors cursor-pointer"
+              style={{
+                background: isWet ? 'var(--color-accent, #C9A86A)' : 'transparent',
+                color: isWet ? 'var(--color-bg, #0B0B0C)' : 'color-mix(in srgb, var(--color-ink, #F4F0E8) 65%, transparent)',
+              }}
+            >
+              {subCopy.wetShort}
+            </button>
+          </div>
         </div>
 
-        {/* Раскрываемая справка (убрана с основного экрана, чтобы не перегружать) */}
         {showNotes && (
           <div
             className="px-4 py-2.5 text-[11px] font-sans opacity-80 border-b flex flex-col gap-1"
@@ -478,13 +512,11 @@ export function FormulaPanel({
               cursor: hasComparisonCurtain ? 'ew-resize' : 'default',
             }}
           >
-            {/* Правый слой: окрашенная кожа (результат смеси) */}
             <div
               className="absolute inset-0 transition-colors duration-300"
               style={{ backgroundColor: squareColor }}
             />
 
-            {/* Левый слой: исходная кожа (или цель) под шторкой */}
             {hasComparisonCurtain && (
               <div
                 className="absolute inset-0 transition-colors duration-300"
@@ -495,7 +527,6 @@ export function FormulaPanel({
               />
             )}
 
-            {/* Живая текстура зерна натуральной кожи поверх обоих слоёв */}
             <div
               className="absolute inset-0 pointer-events-none mix-blend-overlay"
               style={{
@@ -504,13 +535,11 @@ export function FormulaPanel({
               }}
             />
 
-            {/* Направленный свет осветителя (2856K / 4200K / D65 / 9000K) */}
             <div
               className="absolute inset-0 pointer-events-none transition-opacity duration-300"
               style={{ background: ILLUMINANT_GLOW[illuminant] }}
             />
 
-            {/* Лаковый блик при мокрой краске / матовая глубина при сухой */}
             {isWet && (
               <div
                 className="absolute inset-0 pointer-events-none transition-opacity duration-300"
@@ -521,7 +550,6 @@ export function FormulaPanel({
               />
             )}
 
-            {/* Вертикальная шторка с ручкой */}
             {hasComparisonCurtain && (
               <div
                 className="absolute top-0 bottom-0 pointer-events-none z-20"
@@ -550,7 +578,6 @@ export function FormulaPanel({
               </div>
             )}
 
-            {/* Верхние бейджи: свет + ΔE₀₀ */}
             <div className="relative z-10 p-3 flex items-center justify-between w-full gap-2 pointer-events-none">
               <span
                 className="px-2.5 py-0.5 rounded-full text-[9.5px] font-mono uppercase tracking-[0.1em] text-white backdrop-blur-sm"
@@ -561,7 +588,7 @@ export function FormulaPanel({
 
               {liveDeltaE !== null && (
                 <span
-                  className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold tracking-[0.06em] backdrop-blur-sm"
+                  className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold tracking-[0.06em] backdrop-blur-sm whitespace-nowrap"
                   style={{
                     backgroundColor: 'rgba(0,0,0,0.62)',
                     color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
@@ -572,11 +599,10 @@ export function FormulaPanel({
               )}
             </div>
 
-            {/* Нижние подписи по краям шторки */}
             <div className="absolute bottom-2.5 left-3 right-3 z-10 flex items-end justify-between gap-2 pointer-events-none">
               {hasComparisonCurtain ? (
                 <span
-                  className="px-2 py-0.5 rounded-full text-[9px] uppercase tracking-[0.12em] font-mono text-white backdrop-blur-sm truncate max-w-[42%]"
+                  className="px-2 py-0.5 rounded-full text-[9px] uppercase tracking-[0.12em] font-mono text-white backdrop-blur-sm truncate max-w-[44%]"
                   style={{ backgroundColor: 'rgba(0,0,0,0.48)' }}
                 >
                   {leftCompareLabel}
@@ -586,10 +612,11 @@ export function FormulaPanel({
               )}
 
               <span
-                className="px-2.5 py-0.5 rounded-full text-[9.5px] uppercase tracking-[0.12em] font-mono text-white backdrop-blur-sm"
+                className="px-2.5 py-0.5 rounded-full text-[9.5px] uppercase tracking-[0.12em] font-mono text-white backdrop-blur-sm whitespace-nowrap"
                 style={{ backgroundColor: 'rgba(0,0,0,0.52)' }}
               >
-                {activeCoat ? activeCoat.label : dict.mix} · {displayHex || 'UNMIXED'}
+                {activeCoat ? (activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label) : dict.mix} ·{' '}
+                {displayHex || 'UNMIXED'}
               </span>
             </div>
           </div>
@@ -707,6 +734,7 @@ export function FormulaPanel({
             <div className="grid grid-cols-4 gap-1.5">
               {layerSwatches.map((ls, idx) => {
                 const isSelectedCoat = selectedCoatIdx === idx
+                const displayLabel = ls.short === '∞' ? subCopy.fullShort : ls.label
                 return (
                   <button
                     key={ls.short}
@@ -730,14 +758,14 @@ export function FormulaPanel({
                       }}
                     />
                     <span
-                      className="text-[9.5px] font-sans truncate"
+                      className="text-[9.5px] font-sans whitespace-nowrap"
                       style={{
                         fontWeight: isSelectedCoat ? 600 : 500,
                         opacity: isSelectedCoat ? 1 : 0.72,
                         color: 'var(--color-ink, #F4F0E8)',
                       }}
                     >
-                      {ls.label}
+                      {displayLabel}
                     </span>
                   </button>
                 )
@@ -753,7 +781,7 @@ export function FormulaPanel({
         >
           <div className="flex flex-col">
             <span className="text-[9.5px] font-sans uppercase tracking-[0.16em] opacity-50">
-              HEX / CIELAB {activeCoat ? `· ${activeCoat.label}` : ''}
+              HEX / CIELAB {activeCoat ? `· ${activeCoat.short === '∞' ? subCopy.fullShort : activeCoat.label}` : ''}
             </span>
             <div className="flex items-baseline gap-2.5 mt-0.5">
               <span className="font-serif text-[25px] leading-none tracking-tight tabular-nums">
@@ -1022,7 +1050,6 @@ export function FormulaPanel({
                       </span>
                     </div>
 
-                    {/* Кастомная анимированная шкала */}
                     <div className="relative h-7 flex items-center select-none touch-none">
                       <div
                         className="w-full h-1.5 rounded-full overflow-hidden relative"
@@ -1089,7 +1116,7 @@ export function FormulaPanel({
                       />
                     </div>
 
-                    <div className="relative h-3.5 mt-0.5 text-[9.5px] font-mono tabular-nums select-none">
+                    <div className="relative h-4 mt-0.5 text-[9.5px] font-mono tabular-nums select-none">
                       {SLIDER_TICKS.map((tick) => {
                         const isNear =
                           (tick.ml === 0 && currentAmount === 0) ||
@@ -1105,7 +1132,7 @@ export function FormulaPanel({
                         return (
                           <span
                             key={tick.ml}
-                            className="absolute top-0 transition-colors duration-150"
+                            className="absolute top-0 whitespace-nowrap transition-colors duration-150"
                             style={{
                               ...alignStyle,
                               color: isNear
