@@ -42,7 +42,7 @@ import {
   ToneControlCard,
 } from './colors/ColorLabPanels'
 import { Sneaker3D } from './colors/Sneaker3D'
-import { DEFAULT_SNEAKER_MODEL, type SneakerModelId } from './colors/sneakerGeometry'
+import type { SneakerModelId } from './colors/sneakerGeometry'
 import {
   StudioBgConfig,
   ThemeMode,
@@ -85,6 +85,7 @@ type SavedPalette = {
 }
 
 const PRO_PRICE_STARS = 250
+const DEFAULT_MODEL_ID: SneakerModelId = 'aerostrap'
 const FREE_SCHEMES: readonly Scheme[] = ['complementary', 'analogous', 'monochromatic']
 const ALL_SCHEMES: readonly Scheme[] = [
   'complementary',
@@ -350,9 +351,9 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
       if (saved.modelId === 'aerostrap' || saved.modelId === 'nexus' || saved.modelId === 'monolith') {
         return saved.modelId
       }
-      return DEFAULT_SNEAKER_MODEL
+      return DEFAULT_MODEL_ID
     } catch {
-      return DEFAULT_SNEAKER_MODEL
+      return DEFAULT_MODEL_ID
     }
   })
   const [soleConfig, setSoleConfig] = useState<SoleColorConfig>(() => {
@@ -863,7 +864,6 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
               sneakerColors={sneakerColors}
               modelId={modelId}
               isDark={darkCanvas}
-              studioBg={studioBgHex}
               resetLabel="360°"
             />
           </div>
