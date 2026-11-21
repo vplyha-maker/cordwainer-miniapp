@@ -8,13 +8,9 @@ import {
   Sun,
   Moon,
   Monitor,
-  MoreVertical,
+  SlidersHorizontal,
   HelpCircle,
   Lock,
-  ShieldCheck,
-  Palette,
-  Layers,
-  Sparkles,
 } from 'lucide-react'
 import type { Lang } from '../App'
 import {
@@ -520,7 +516,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
 
   const showToast = useCallback((msg: string) => {
     setToastText(msg)
-    window.setTimeout(() => setToastText(null), 1900)
+    window.setTimeout(() => setToastText(null), 1800)
   }, [])
 
   const copyText = useCallback(
@@ -668,12 +664,540 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
     return `conic-gradient(from 0deg, ${stops.join(', ')})`
   }, [modelMode])
 
-  const tabIndex = activeTab === 'colors' ? 0 : activeTab === 'models' ? 1 : activeTab === 'harmonies' ? 2 : 3
   const ThemeIcon = themeMode === 'day' ? Sun : themeMode === 'night' ? Moon : Monitor
+
+  const swatchStrip = (
+    <div
+      className="flex h-12 w-full overflow-hidden border-t"
+      style={{ borderColor: tokens.border }}
+    >
+      {[
+        { key: 'primary', hex: slotPrimary, share: '60%', angle: wheelAngles[0], flex: 'flex-[6]' },
+        { key: 'secondary', hex: slotSecondary, share: '30%', angle: wheelAngles[1] ?? wheelAngles[0], flex: 'flex-[3.4]' },
+        { key: 'accent', hex: slotAccent, share: '10%', angle: wheelAngles[wheelAngles.length - 1] ?? wheelAngles[0], flex: 'flex-[2.4]' },
+      ].map((slot) => (
+        <button
+          key={slot.key}
+          type="button"
+          onClick={() => copyText(slot.key, slot.hex)}
+          className={`${slot.flex} relative h-full flex items-end justify-between px-2.5 py-1.5 text-left transition-opacity active:opacity-85`}
+          style={{ backgroundColor: slot.hex }}
+          title={t.copyHex}
+        >
+          <span className="px-1.5 py-0.5 rounded bg-black/50 text-white text-[11px] font-mono font-medium leading-none">
+            {copiedKey === slot.key ? t.copied : slot.hex}
+          </span>
+          <span className="hidden sm:inline-block px-1 py-0.5 rounded bg-black/35 text-white/90 text-[10px] font-mono leading-none">
+            {slot.share} · {Math.round(slot.angle)}°
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+
+  const inspectorContent = showSettings ? (
+    <StudioSettingsView
+      t={t}
+      tokens={tokens}
+      lang={lang}
+      modelMode={modelMode}
+      hapticsEnabled={hapticsEnabled}
+      studioBg={studioBg}
+      soleConfig={soleConfig}
+      onChangeStudioBg={(next) => {
+        setStudioBg(next)
+        saveStudioBg(next)
+      }}
+      onChangeSole={setSoleConfig}
+      onResetSole={() => setSoleConfig(DEFAULT_SOLE_CONFIG)}
+      onChangeModelMode={setModelMode}
+      onToggleHaptics={() => {
+        const next = !hapticsEnabled
+        setHapticsEnabled(next)
+        saveHapticsEnabled(next)
+        if (next) triggerHaptic('select', true)
+      }}
+      onChangeLang={setLang}
+      onOpenGuide={() => setShowGuide(true)}
+    />
+  ) : (
+    <>
+      {activeTab === 'colors' && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between gap-2 border-b pb-0" style={{ borderColor: tokens.border }}>
+            <div className="flex items-center gap-5">
+              {(
+                [
+                  { id: 'tone', label: t.subTabs.tone },
+                  { id: 'sole', label: t.subTabs.sole },
+                  { id: 'bg', label: t.subTabs.bg },
+                ] as const
+              ).map(({ id, label }) => {
+                const active = subTool === id
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('select', hapticsEnabled)
+                      setSubTool(id)
+                    }}
+                    className="pb-2.5 text-[14px] font-medium border-b-2 -mb-px transition-colors"
+                    style={{
+                      borderColor: active ? tokens.activeTintBorder : 'transparent',
+                      color: active ? tokens.ink : tokens.muted,
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+
+            <span className="pb-2.5 text-[12px] font-mono tabular-nums" style={{ color: tokens.muted }}>
+              {modelMode.toUpperCase()} {Math.round(baseHue)}° · Δ {contrast.ratioText}
+            </span>
+          </div>
+
+          {subTool === 'tone' && (
+            <div className="space-y-6">
+              <div className="space-y-2.5">
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                  {ALL_SCHEMES.map((sc) => {
+                    const active = scheme === sc
+                    const locked = !isPro && !FREE_SCHEMES.includes(sc)
+                    return (
+                      <button
+                        key={sc}
+                        type="button"
+                        onClick={() => handleSelectScheme(sc)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium whitespace-nowrap shrink-0 transition-colors"
+                        style={{
+                          backgroundColor: active ? tokens.activeTintBg : 'transparent',
+                          borderColor: active ? tokens.activeTintBorder : tokens.border,
+                          color: active ? tokens.ink : tokens.muted,
+                        }}
+                      >
+                        {locked && <Lock className="w-3 h-3 opacity-75" />}
+                        {t.schemes[sc].short}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                  {ALL_PRESETS.map((pr) => {
+                    const active = preset === pr
+                    return (
+                      <button
+                        key={pr}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic('select', hapticsEnabled)
+                          setPreset(pr)
+                        }}
+                        className="px-3 py-1 rounded-md text-[12px] font-medium whitespace-nowrap shrink-0 transition-colors"
+                        style={{
+                          backgroundColor: active ? tokens.elevatedBg : 'transparent',
+                          color: active ? tokens.ink : tokens.subtle,
+                        }}
+                      >
+                        {t.presets[pr]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-5">
+                <div
+                  ref={wheelRef}
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId)
+                    updateHueFromPointer(e.clientX, e.clientY)
+                  }}
+                  onPointerMove={(e) => {
+                    if (e.buttons === 1 || e.pointerType === 'touch') {
+                      updateHueFromPointer(e.clientX, e.clientY)
+                    }
+                  }}
+                  className="relative w-32 h-32 rounded-full touch-none select-none cursor-crosshair shrink-0 border"
+                  style={{
+                    background: wheelGradient,
+                    borderColor: tokens.strongBorder,
+                  }}
+                >
+                  <div
+                    className="absolute inset-7 rounded-full border"
+                    style={{
+                      backgroundColor: slotPrimary,
+                      borderColor: 'rgba(255,255,255,0.45)',
+                    }}
+                  />
+                  {wheelAngles.map((ang, idx) => {
+                    const rad = ((ang - 90) * Math.PI) / 180
+                    const r = 50
+                    const cx = 64 + Math.cos(rad) * r
+                    const cy = 64 + Math.sin(rad) * r
+                    const isPrimaryMarker = idx === 0
+                    return (
+                      <span
+                        key={idx}
+                        className="absolute rounded-full border-2 border-white shadow pointer-events-none"
+                        style={{
+                          width: isPrimaryMarker ? 16 : 11,
+                          height: isPrimaryMarker ? 16 : 11,
+                          left: cx - (isPrimaryMarker ? 8 : 5.5),
+                          top: cy - (isPrimaryMarker ? 8 : 5.5),
+                          backgroundColor:
+                            idx === 0
+                              ? slotPrimary
+                              : idx === 1
+                                ? slotSecondary
+                                : slotAccent,
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+
+                <div className="flex-1 min-w-0 space-y-2.5">
+                  <div>
+                    <div className="text-[14px] font-medium truncate" style={{ color: tokens.ink }}>
+                      {t.schemes[scheme].name}
+                    </div>
+                    <div className="text-[12px] mt-0.5" style={{ color: tokens.muted }}>
+                      {t.contrastLabel}: {contrast.ratioText} · {t.contrastLevels[contrast.level]}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSavePalette}
+                    className="w-full py-2.5 px-3.5 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                    style={{
+                      backgroundColor: tokens.primaryBtnBg,
+                      color: tokens.primaryBtnInk,
+                    }}
+                  >
+                    <Bookmark className="w-3.5 h-3.5" />
+                    {t.savePalette}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopySpec}
+                    className="w-full py-2 px-3.5 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                    style={{
+                      backgroundColor: tokens.cardBg,
+                      borderColor: tokens.border,
+                      color: tokens.ink,
+                    }}
+                  >
+                    {copiedKey === 'spec' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedKey === 'spec' ? t.copied : t.copySpec}
+                  </button>
+                </div>
+              </div>
+
+              <ToneControlCard
+                t={t}
+                tokens={tokens}
+                primaryHex={slotPrimary}
+                baseHue={baseHue}
+                tintWhite={tintWhite}
+                shadeBlack={shadeBlack}
+                chromaScale={chromaScale}
+                hapticsEnabled={hapticsEnabled}
+                onChangeHue={setBaseHue}
+                onChangeTint={setTintWhite}
+                onChangeShade={setShadeBlack}
+                onChangeChroma={setChromaScale}
+              />
+
+              <div className="xl:hidden pt-5 border-t" style={{ borderColor: tokens.border }}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[13px] font-medium" style={{ color: tokens.ink }}>
+                    {t.specTitle}
+                  </span>
+                  <span className="text-[12px]" style={{ color: tokens.subtle }}>
+                    {t.honestBadge}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {SPEC_ZONES.map((z) => (
+                    <button
+                      key={z}
+                      type="button"
+                      onClick={() => copyText(z, sneakerColors[z])}
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-colors min-w-0"
+                      style={{
+                        backgroundColor: tokens.cardBg,
+                        borderColor: tokens.border,
+                      }}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-4 h-4 rounded shrink-0 border"
+                          style={{ backgroundColor: sneakerColors[z], borderColor: tokens.strongBorder }}
+                        />
+                        <span className="text-[12px] truncate" style={{ color: tokens.ink }}>
+                          {t.zones[z]}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono shrink-0" style={{ color: tokens.muted }}>
+                        {copiedKey === z ? t.copied : sneakerColors[z]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {subTool === 'sole' && (
+            <SoleColorCard
+              t={t}
+              tokens={tokens}
+              soleConfig={soleConfig}
+              hapticsEnabled={hapticsEnabled}
+              onChangeSole={setSoleConfig}
+              onResetSole={() => setSoleConfig(DEFAULT_SOLE_CONFIG)}
+            />
+          )}
+
+          {subTool === 'bg' && (
+            <StudioBgCard
+              t={t}
+              tokens={tokens}
+              studioBg={studioBg}
+              hapticsEnabled={hapticsEnabled}
+              onChangeStudioBg={(next) => {
+                setStudioBg(next)
+                saveStudioBg(next)
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'models' && (
+        <div className="divide-y" style={{ borderColor: tokens.border }}>
+          {MODEL_OPTIONS.map((m) => {
+            const active = modelId === m.id
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  triggerHaptic('harmony', hapticsEnabled)
+                  setModelId(m.id)
+                }}
+                className="w-full py-4 px-1 text-left flex items-center justify-between gap-4 transition-colors"
+                style={{ borderColor: tokens.border }}
+              >
+                <div className="min-w-0">
+                  <div
+                    className="text-[16px] font-medium tracking-tight"
+                    style={{
+                      fontFamily: "'Playfair Display', Georgia, serif",
+                      color: active ? tokens.activeTintBorder : tokens.ink,
+                    }}
+                  >
+                    {m.name}
+                  </div>
+                  <div className="text-[13px] mt-1 leading-relaxed" style={{ color: tokens.muted }}>
+                    {t.modelNotes[m.id]}
+                  </div>
+                </div>
+                <span
+                  className="w-6 h-6 rounded-full border flex items-center justify-center shrink-0"
+                  style={{
+                    backgroundColor: active ? tokens.activeTintBorder : 'transparent',
+                    borderColor: active ? tokens.activeTintBorder : tokens.strongBorder,
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {active && <Check className="w-3.5 h-3.5" />}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {activeTab === 'harmonies' && (
+        <div className="divide-y" style={{ borderColor: tokens.border }}>
+          {ALL_SCHEMES.map((sc) => {
+            const active = scheme === sc
+            const locked = !isPro && !FREE_SCHEMES.includes(sc)
+            const preview = generateHarmonyPalette(
+              baseHue,
+              tintWhite,
+              shadeBlack,
+              chromaScale,
+              sc,
+              modelMode
+            )
+            return (
+              <button
+                key={sc}
+                type="button"
+                onClick={() => handleSelectScheme(sc)}
+                className="w-full py-4 px-1 text-left flex items-center justify-between gap-4 transition-colors"
+                style={{ borderColor: tokens.border }}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-[15px] font-medium"
+                      style={{ color: active ? tokens.activeTintBorder : tokens.ink }}
+                    >
+                      {t.schemes[sc].name}
+                    </span>
+                    {locked && (
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider"
+                        style={{
+                          backgroundColor: tokens.elevatedBg,
+                          color: tokens.activeTintBorder,
+                        }}
+                      >
+                        {t.proBadge}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[13px] mt-1 leading-relaxed" style={{ color: tokens.muted }}>
+                    {t.schemes[sc].desc}
+                  </div>
+                </div>
+                <div className="flex items-center -space-x-1.5 shrink-0">
+                  {preview.slice(0, 3).map((hex, i) => (
+                    <span
+                      key={i}
+                      className="w-6 h-6 rounded-full border-2"
+                      style={{
+                        backgroundColor: hex,
+                        borderColor: tokens.pageBg,
+                      }}
+                    />
+                  ))}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {activeTab === 'palette' && (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={handleSavePalette}
+            className="w-full py-3 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2"
+            style={{
+              backgroundColor: tokens.primaryBtnBg,
+              color: tokens.primaryBtnInk,
+            }}
+          >
+            <Bookmark className="w-4 h-4" />
+            {t.savePalette}
+          </button>
+
+          {savedPalettes.length === 0 ? (
+            <div className="py-8 text-center text-[13px] leading-relaxed" style={{ color: tokens.muted }}>
+              {t.savedEmpty}
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: tokens.border }}>
+              {savedPalettes.map((item) => (
+                <div
+                  key={item.id}
+                  className="py-3.5 flex items-center justify-between gap-3"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex -space-x-1.5 shrink-0">
+                      {item.colors.map((c, idx) => (
+                        <span
+                          key={idx}
+                          className="w-7 h-7 rounded-full border-2"
+                          style={{ backgroundColor: c, borderColor: tokens.pageBg }}
+                        />
+                      ))}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-medium truncate" style={{ color: tokens.ink }}>
+                        {t.schemes[item.scheme]?.name ?? item.scheme}
+                      </div>
+                      <div className="text-[12px] font-mono truncate" style={{ color: tokens.muted }}>
+                        {item.modelId.toUpperCase()} · {item.baseHue}° · {t.presets[item.preset]}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('harmony', hapticsEnabled)
+                        setScheme(item.scheme)
+                        setPreset(item.preset)
+                        setModelId(item.modelId)
+                        setBaseHue(item.baseHue)
+                        setTintWhite(item.tintWhite)
+                        setShadeBlack(item.shadeBlack)
+                        setChromaScale(item.chromaScale)
+                        setModelMode(item.modelMode === 'hsl' ? 'oklch' : item.modelMode)
+                        if (item.sole) setSoleConfig(item.sole)
+                        setActiveTab('colors')
+                      }}
+                      className="px-3 py-1.5 rounded-lg border text-[12px] font-medium"
+                      style={{
+                        backgroundColor: tokens.activeTintBg,
+                        borderColor: tokens.activeTintBorder,
+                        color: tokens.activeTintInk,
+                      }}
+                    >
+                      {t.applyPalette}
+                    </button>
+
+                    {confirmDeleteId === item.id ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePalette(item.id)}
+                        className="px-2.5 py-1.5 rounded-lg text-[12px] font-medium bg-red-600 text-white"
+                      >
+                        {t.confirmDelete}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(item.id)}
+                        aria-label={t.deletePalette}
+                        className="w-8 h-8 rounded-lg border flex items-center justify-center"
+                        style={{
+                          backgroundColor: tokens.cardBg,
+                          borderColor: tokens.border,
+                          color: tokens.muted,
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div
-      className="fixed inset-0 z-30 overflow-y-auto transition-colors duration-200"
+      className="fixed inset-0 z-30 h-[100dvh] flex flex-col overflow-hidden transition-colors duration-200"
       style={{
         backgroundColor: tokens.pageBg,
         color: tokens.ink,
@@ -681,40 +1205,41 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
       }}
     >
       <header
-        className="sticky top-0 z-40 border-b backdrop-blur-md"
+        className="shrink-0 z-40 border-b"
         style={{
           backgroundColor: tokens.headerBg,
           borderColor: tokens.border,
           paddingTop: 'env(safe-area-inset-top, 0px)',
         }}
       >
-        <div className="max-w-6xl mx-auto px-3.5 h-13 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="h-12 px-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={handleStepBack}
-              className="inline-flex items-center gap-1 pl-1.5 pr-3 h-9 rounded-full border text-[13px] font-medium transition-colors"
-              style={{
-                backgroundColor: tokens.cardBg,
-                borderColor: tokens.border,
-                color: tokens.ink,
-              }}
+              className="inline-flex items-center gap-1 text-[14px] font-medium transition-opacity active:opacity-70"
+              style={{ color: tokens.ink }}
             >
-              <ChevronLeft className="w-4 h-4" />
-              <span className="truncate">{showSettings ? t.settingsTitle : t.title}</span>
+              <ChevronLeft className="w-5 h-5 -ml-1" />
+              <span
+                className="text-[18px] tracking-tight truncate"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              >
+                {showSettings ? t.settingsTitle : t.title}
+              </span>
             </button>
 
             {!isTelegram && (
               <span
-                className="hidden sm:inline-block ml-2 text-[15px] font-semibold tracking-tight"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif", color: tokens.ink }}
+                className="hidden md:inline-block text-[12px] uppercase tracking-[0.18em] pl-3 border-l"
+                style={{ color: tokens.muted, borderColor: tokens.border }}
               >
-                Cordwaine
+                Cordwaine Studio
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 relative">
+          <div className="flex items-center gap-1 relative">
             <button
               type="button"
               onClick={() => {
@@ -722,19 +1247,18 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 setShowThemeMenu((v) => !v)
               }}
               aria-label="Theme"
-              className="w-9 h-9 rounded-full border flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
               style={{
-                backgroundColor: showThemeMenu ? tokens.activeTintBg : tokens.cardBg,
-                borderColor: showThemeMenu ? tokens.activeTintBorder : tokens.border,
+                backgroundColor: showThemeMenu ? tokens.elevatedBg : 'transparent',
                 color: tokens.ink,
               }}
             >
-              <ThemeIcon className="w-4 h-4" />
+              <ThemeIcon className="w-[18px] h-[18px]" />
             </button>
 
             {showThemeMenu && (
               <div
-                className="absolute right-0 top-11 z-50 p-1.5 rounded-2xl border flex items-center gap-1"
+                className="absolute right-0 top-11 z-50 p-1 rounded-xl border flex items-center gap-1"
                 style={{
                   backgroundColor: tokens.cardBg,
                   borderColor: tokens.strongBorder,
@@ -753,7 +1277,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                         saveThemeMode(m)
                         setShowThemeMenu(false)
                       }}
-                      className="px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium whitespace-nowrap transition-colors"
                       style={{
                         backgroundColor: active ? tokens.activeTintBg : 'transparent',
                         color: active ? tokens.activeTintInk : tokens.muted,
@@ -774,14 +1298,10 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 setShowGuide(true)
               }}
               aria-label={t.guide}
-              className="w-9 h-9 rounded-full border flex items-center justify-center transition-colors"
-              style={{
-                backgroundColor: tokens.cardBg,
-                borderColor: tokens.border,
-                color: tokens.ink,
-              }}
+              className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+              style={{ color: tokens.ink }}
             >
-              <HelpCircle className="w-4 h-4" />
+              <HelpCircle className="w-[18px] h-[18px]" />
             </button>
 
             <button
@@ -792,32 +1312,111 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 setShowSettings((v) => !v)
               }}
               aria-label={t.settingsTitle}
-              className="w-9 h-9 rounded-full border flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
               style={{
-                backgroundColor: showSettings ? tokens.activeTintBg : tokens.cardBg,
-                borderColor: showSettings ? tokens.activeTintBorder : tokens.border,
-                color: tokens.ink,
+                backgroundColor: showSettings ? tokens.activeTintBg : 'transparent',
+                color: showSettings ? tokens.activeTintBorder : tokens.ink,
               }}
             >
-              <MoreVertical className="w-4 h-4" />
+              <SlidersHorizontal className="w-[18px] h-[18px]" />
             </button>
           </div>
         </div>
       </header>
 
-      <main
-        className="max-w-6xl mx-auto px-3.5 pt-3 pb-10 min-[820px]:grid min-[820px]:grid-cols-12 min-[820px]:gap-5 min-[820px]:items-start"
-        style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 0px))' }}
-      >
-        <section className="min-[820px]:col-span-6 min-[820px]:sticky min-[820px]:top-16 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div
-              className="inline-flex p-1 rounded-full border overflow-x-auto max-w-full"
-              style={{
-                backgroundColor: tokens.cardBg,
-                borderColor: tokens.border,
-              }}
-            >
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
+        <aside
+          className="hidden xl:flex xl:w-[272px] shrink-0 flex-col border-r overflow-y-auto px-5 py-5 space-y-6"
+          style={{
+            backgroundColor: tokens.pageBg,
+            borderColor: tokens.border,
+          }}
+        >
+          <nav className="space-y-1">
+            {(['colors', 'models', 'harmonies', 'palette'] as MainTab[]).map((tab) => {
+              const active = !showSettings && activeTab === tab
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('select', hapticsEnabled)
+                    setShowSettings(false)
+                    setActiveTab(tab)
+                  }}
+                  className="w-full px-3 py-2.5 rounded-lg text-left text-[14px] font-medium flex items-center justify-between transition-colors"
+                  style={{
+                    backgroundColor: active ? tokens.activeTintBg : 'transparent',
+                    color: active ? tokens.ink : tokens.muted,
+                  }}
+                >
+                  <span>{t.tabs[tab]}</span>
+                  {active && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: tokens.activeTintBorder }}
+                    />
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+
+          <div className="pt-5 border-t space-y-2.5" style={{ borderColor: tokens.border }}>
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-medium uppercase tracking-wider" style={{ color: tokens.muted }}>
+                {t.specTitle}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopySpec}
+                className="text-[12px] font-medium"
+                style={{ color: tokens.activeTintBorder }}
+              >
+                {copiedKey === 'spec' ? t.copied : t.copyHex}
+              </button>
+            </div>
+            <div className="space-y-1">
+              {SPEC_ZONES.map((z) => (
+                <button
+                  key={z}
+                  type="button"
+                  onClick={() => copyText(z, sneakerColors[z])}
+                  className="w-full flex items-center justify-between gap-2 py-1.5 px-2 rounded-md text-left transition-colors hover:opacity-85"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-3.5 h-3.5 rounded-sm shrink-0 border"
+                      style={{ backgroundColor: sneakerColors[z], borderColor: tokens.strongBorder }}
+                    />
+                    <span className="text-[12px] truncate" style={{ color: tokens.ink }}>
+                      {t.zones[z]}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono shrink-0" style={{ color: tokens.muted }}>
+                    {copiedKey === z ? t.copied : sneakerColors[z]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <section
+          className="shrink-0 md:flex-1 flex flex-col border-b md:border-b-0 md:border-r overflow-hidden"
+          style={{
+            borderColor: tokens.border,
+            backgroundColor: studioBgHex,
+          }}
+        >
+          <div
+            className="shrink-0 px-4 py-2 flex items-center justify-between gap-2 border-b"
+            style={{
+              backgroundColor: tokens.pageBg,
+              borderColor: tokens.border,
+            }}
+          >
+            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
               {MODEL_OPTIONS.map((m) => {
                 const active = modelId === m.id
                 return (
@@ -828,10 +1427,11 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                       triggerHaptic('harmony', hapticsEnabled)
                       setModelId(m.id)
                     }}
-                    className="px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide whitespace-nowrap transition-colors"
+                    className="text-[12px] font-medium tracking-wider whitespace-nowrap transition-colors"
                     style={{
-                      backgroundColor: active ? tokens.activeTintBg : 'transparent',
-                      color: active ? tokens.activeTintInk : tokens.muted,
+                      color: active ? tokens.ink : tokens.subtle,
+                      borderBottom: active ? `1.5px solid ${tokens.activeTintBorder}` : '1.5px solid transparent',
+                      paddingBottom: '2px',
                     }}
                   >
                     {m.shortName}
@@ -839,741 +1439,72 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 )
               })}
             </div>
-
-            <span
-              className="px-2.5 py-1 rounded-full border text-[11px] font-mono font-medium shrink-0"
-              style={{
-                backgroundColor: tokens.cardBg,
-                borderColor: tokens.border,
-                color: tokens.muted,
-              }}
-            >
-              Δ {contrast.ratioText}
+            <span className="text-[11px] font-mono shrink-0 hidden sm:inline" style={{ color: tokens.muted }}>
+              60 / 30 / 10
             </span>
           </div>
 
           <div
-            className="rounded-3xl overflow-hidden border"
-            style={{
-              backgroundColor: studioBgHex,
-              borderColor: tokens.border,
-              boxShadow: tokens.shadowCard,
-            }}
+            className="relative w-full h-[215px] sm:h-[250px] md:flex-1 md:h-auto flex items-center justify-center overflow-hidden"
+            style={{ backgroundColor: studioBgHex }}
           >
-            <Sneaker3D
-              sneakerColors={sneakerColors}
-              modelId={modelId}
-              isDark={darkCanvas}
-              resetLabel="360°"
-            />
+            <div className="w-full h-full">
+              <Sneaker3D
+                sneakerColors={sneakerColors}
+                modelId={modelId}
+                isDark={darkCanvas}
+                resetLabel="360°"
+              />
+            </div>
           </div>
+
+          {swatchStrip}
+        </section>
+
+        <section
+          className="flex-1 min-h-0 md:flex-none md:w-[390px] lg:w-[430px] xl:w-[400px] flex flex-col overflow-hidden"
+          style={{ backgroundColor: tokens.pageBg }}
+        >
+          {!showSettings && (
+            <nav
+              className="xl:hidden shrink-0 px-4 flex items-center justify-between border-b"
+              style={{ borderColor: tokens.border }}
+            >
+              {(['colors', 'models', 'harmonies', 'palette'] as MainTab[]).map((tab) => {
+                const active = activeTab === tab
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('select', hapticsEnabled)
+                      setActiveTab(tab)
+                    }}
+                    className="py-3 text-[13px] font-medium border-b-2 -mb-px transition-colors"
+                    style={{
+                      borderColor: active ? tokens.activeTintBorder : 'transparent',
+                      color: active ? tokens.ink : tokens.muted,
+                    }}
+                  >
+                    {t.tabs[tab]}
+                  </button>
+                )
+              })}
+            </nav>
+          )}
 
           <div
-            className="hidden min-[820px]:block rounded-3xl border p-4"
-            style={{
-              backgroundColor: tokens.cardBg,
-              borderColor: tokens.border,
-              boxShadow: tokens.shadowCard,
-            }}
+            className="flex-1 overflow-y-auto px-4 md:px-5 py-4"
+            style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
           >
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="text-[13px] font-semibold" style={{ color: tokens.ink }}>
-                {t.specTitle}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopySpec}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors"
-                style={{
-                  backgroundColor: tokens.elevatedBg,
-                  borderColor: tokens.border,
-                  color: tokens.ink,
-                }}
-              >
-                {copiedKey === 'spec' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedKey === 'spec' ? t.copied : t.copySpec}
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {SPEC_ZONES.map((z) => (
-                <button
-                  key={z}
-                  type="button"
-                  onClick={() => copyText(z, sneakerColors[z])}
-                  className="flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-colors min-w-0"
-                  style={{
-                    backgroundColor: tokens.elevatedBg,
-                    borderColor: tokens.border,
-                  }}
-                >
-                  <span
-                    className="w-4 h-4 rounded-md shrink-0 border"
-                    style={{ backgroundColor: sneakerColors[z], borderColor: tokens.strongBorder }}
-                  />
-                  <div className="min-w-0">
-                    <div className="text-[10px] truncate" style={{ color: tokens.muted }}>
-                      {t.zones[z]}
-                    </div>
-                    <div className="text-[11px] font-mono font-semibold truncate" style={{ color: tokens.ink }}>
-                      {copiedKey === z ? t.copied : sneakerColors[z]}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {inspectorContent}
           </div>
         </section>
-
-        <section className="min-[820px]:col-span-6 mt-3 min-[820px]:mt-0 space-y-3.5">
-          {showSettings ? (
-            <StudioSettingsView
-              t={t}
-              tokens={tokens}
-              lang={lang}
-              modelMode={modelMode}
-              hapticsEnabled={hapticsEnabled}
-              studioBg={studioBg}
-              soleConfig={soleConfig}
-              onChangeStudioBg={(next) => {
-                setStudioBg(next)
-                saveStudioBg(next)
-              }}
-              onChangeSole={setSoleConfig}
-              onResetSole={() => setSoleConfig(DEFAULT_SOLE_CONFIG)}
-              onChangeModelMode={setModelMode}
-              onToggleHaptics={() => {
-                const next = !hapticsEnabled
-                setHapticsEnabled(next)
-                saveHapticsEnabled(next)
-                if (next) triggerHaptic('select', true)
-              }}
-              onChangeLang={setLang}
-              onOpenGuide={() => setShowGuide(true)}
-            />
-          ) : (
-            <>
-              <div
-                className="relative grid grid-cols-4 p-1 rounded-2xl border"
-                style={{
-                  backgroundColor: tokens.cardBg,
-                  borderColor: tokens.border,
-                  boxShadow: tokens.shadowSoft,
-                }}
-              >
-                <div
-                  className="absolute top-1 bottom-1 left-1 rounded-xl border transition-transform duration-200 pointer-events-none"
-                  style={{
-                    width: 'calc(25% - 2px)',
-                    transform: `translate3d(${tabIndex * 100}%, 0, 0)`,
-                    backgroundColor: tokens.activeTintBg,
-                    borderColor: tokens.activeTintBorder,
-                  }}
-                />
-                {(['colors', 'models', 'harmonies', 'palette'] as MainTab[]).map((tab) => {
-                  const active = activeTab === tab
-                  return (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('select', hapticsEnabled)
-                        setActiveTab(tab)
-                      }}
-                      className="relative z-10 py-2 text-[12px] font-semibold transition-colors"
-                      style={{ color: active ? tokens.activeTintInk : tokens.muted }}
-                    >
-                      {t.tabs[tab]}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {activeTab === 'colors' && (
-                <div className="space-y-3.5">
-                  <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-                    {ALL_SCHEMES.map((sc) => {
-                      const active = scheme === sc
-                      const locked = !isPro && !FREE_SCHEMES.includes(sc)
-                      return (
-                        <button
-                          key={sc}
-                          type="button"
-                          onClick={() => handleSelectScheme(sc)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[12px] font-semibold whitespace-nowrap shrink-0 transition-colors"
-                          style={{
-                            backgroundColor: active ? tokens.primaryBtnBg : tokens.cardBg,
-                            borderColor: active ? tokens.primaryBtnBg : tokens.border,
-                            color: active ? tokens.primaryBtnInk : tokens.ink,
-                          }}
-                        >
-                          {locked && <Lock className="w-3 h-3 opacity-70" />}
-                          {t.schemes[sc].short}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-                    {ALL_PRESETS.map((pr) => {
-                      const active = preset === pr
-                      return (
-                        <button
-                          key={pr}
-                          type="button"
-                          onClick={() => {
-                            triggerHaptic('select', hapticsEnabled)
-                            setPreset(pr)
-                          }}
-                          className="px-3 py-1.5 rounded-full border text-[11px] font-semibold whitespace-nowrap shrink-0 transition-colors"
-                          style={{
-                            backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
-                            borderColor: active ? tokens.activeTintBorder : tokens.border,
-                            color: active ? tokens.activeTintInk : tokens.muted,
-                          }}
-                        >
-                          {t.presets[pr]}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      {
-                        key: 'primary',
-                        hex: slotPrimary,
-                        title: t.slots.primary,
-                        desc: t.slots.primaryDesc,
-                        angle: wheelAngles[0],
-                      },
-                      {
-                        key: 'secondary',
-                        hex: slotSecondary,
-                        title: t.slots.secondary,
-                        desc: t.slots.secondaryDesc,
-                        angle: wheelAngles[1] ?? wheelAngles[0],
-                      },
-                      {
-                        key: 'accent',
-                        hex: slotAccent,
-                        title: t.slots.accent,
-                        desc: t.slots.accentDesc,
-                        angle: wheelAngles[wheelAngles.length - 1] ?? wheelAngles[0],
-                      },
-                    ].map((card) => (
-                      <button
-                        key={card.key}
-                        type="button"
-                        onClick={() => copyText(card.key, card.hex)}
-                        className="rounded-2xl border p-2.5 text-left transition-colors min-w-0"
-                        style={{
-                          backgroundColor: tokens.cardBg,
-                          borderColor: tokens.border,
-                          boxShadow: tokens.shadowSoft,
-                        }}
-                      >
-                        <div
-                          className="h-11 rounded-xl mb-2 flex items-end justify-between p-1.5 border"
-                          style={{
-                            backgroundColor: card.hex,
-                            borderColor: 'rgba(0,0,0,0.08)',
-                          }}
-                        >
-                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-black/55 text-white">
-                            {copiedKey === card.key ? t.copied : card.hex}
-                          </span>
-                          <span className="px-1 py-0.5 rounded-md text-[9px] font-mono bg-black/45 text-white/90">
-                            {Math.round(card.angle)}°
-                          </span>
-                        </div>
-                        <div className="text-[11px] font-semibold truncate" style={{ color: tokens.ink }}>
-                          {card.title}
-                        </div>
-                        <div className="text-[10px] truncate" style={{ color: tokens.muted }}>
-                          {card.desc}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div
-                    className="rounded-2xl border px-3.5 py-2.5 flex items-start gap-2.5"
-                    style={{
-                      backgroundColor: tokens.elevatedBg,
-                      borderColor: tokens.border,
-                    }}
-                  >
-                    <ShieldCheck
-                      className="w-4 h-4 shrink-0 mt-0.5"
-                      style={{ color: tokens.activeTintBorder }}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-semibold" style={{ color: tokens.ink }}>
-                        {t.honestBadge}
-                      </div>
-                      <div className="text-[11px] leading-snug" style={{ color: tokens.muted }}>
-                        {t.honestSubtext}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="grid grid-cols-3 p-1 rounded-2xl border gap-1"
-                    style={{
-                      backgroundColor: tokens.cardBg,
-                      borderColor: tokens.border,
-                    }}
-                  >
-                    {(
-                      [
-                        { id: 'tone', label: t.subTabs.tone, Icon: Palette },
-                        { id: 'sole', label: t.subTabs.sole, Icon: Layers },
-                        { id: 'bg', label: t.subTabs.bg, Icon: Sparkles },
-                      ] as const
-                    ).map(({ id, label, Icon }) => {
-                      const active = subTool === id
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => {
-                            triggerHaptic('select', hapticsEnabled)
-                            setSubTool(id)
-                          }}
-                          className="py-2 px-2 rounded-xl border text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                          style={{
-                            backgroundColor: active ? tokens.activeTintBg : 'transparent',
-                            borderColor: active ? tokens.activeTintBorder : 'transparent',
-                            color: active ? tokens.activeTintInk : tokens.muted,
-                          }}
-                        >
-                          <Icon className="w-3.5 h-3.5" />
-                          {label}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {subTool === 'tone' && (
-                    <div className="space-y-3">
-                      <div
-                        className="rounded-3xl border p-4 flex flex-col sm:flex-row items-center gap-4"
-                        style={{
-                          backgroundColor: tokens.cardBg,
-                          borderColor: tokens.border,
-                          boxShadow: tokens.shadowCard,
-                        }}
-                      >
-                        <div className="flex flex-col items-center shrink-0">
-                          <div
-                            ref={wheelRef}
-                            onPointerDown={(e) => {
-                              e.currentTarget.setPointerCapture(e.pointerId)
-                              updateHueFromPointer(e.clientX, e.clientY)
-                            }}
-                            onPointerMove={(e) => {
-                              if (e.buttons === 1 || e.pointerType === 'touch') {
-                                updateHueFromPointer(e.clientX, e.clientY)
-                              }
-                            }}
-                            className="relative w-36 h-36 rounded-full touch-none select-none cursor-crosshair border"
-                            style={{
-                              background: wheelGradient,
-                              borderColor: tokens.strongBorder,
-                            }}
-                          >
-                            <div
-                              className="absolute inset-8 rounded-full border shadow-inner"
-                              style={{
-                                backgroundColor: slotPrimary,
-                                borderColor: 'rgba(255,255,255,0.45)',
-                              }}
-                            />
-                            {wheelAngles.map((ang, idx) => {
-                              const rad = ((ang - 90) * Math.PI) / 180
-                              const r = 56
-                              const cx = 72 + Math.cos(rad) * r
-                              const cy = 72 + Math.sin(rad) * r
-                              const isPrimaryMarker = idx === 0
-                              return (
-                                <span
-                                  key={idx}
-                                  className="absolute rounded-full border-2 border-white shadow pointer-events-none"
-                                  style={{
-                                    width: isPrimaryMarker ? 18 : 12,
-                                    height: isPrimaryMarker ? 18 : 12,
-                                    left: cx - (isPrimaryMarker ? 9 : 6),
-                                    top: cy - (isPrimaryMarker ? 9 : 6),
-                                    backgroundColor:
-                                      idx === 0
-                                        ? slotPrimary
-                                        : idx === 1
-                                          ? slotSecondary
-                                          : slotAccent,
-                                  }}
-                                />
-                              )
-                            })}
-                          </div>
-                          <div className="mt-2 text-[11px] font-mono" style={{ color: tokens.muted }}>
-                            {modelMode.toUpperCase()} · {Math.round(baseHue)}° · {t.schemes[scheme].short}
-                          </div>
-                        </div>
-
-                        <div className="flex-1 w-full space-y-2">
-                          <div className="flex items-center justify-between text-[12px]">
-                            <span style={{ color: tokens.muted }}>{t.contrastLabel}</span>
-                            <span className="font-mono font-semibold" style={{ color: tokens.ink }}>
-                              {contrast.ratioText} · {t.contrastLevels[contrast.level]}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleSavePalette}
-                            className="w-full py-2.5 px-4 rounded-2xl text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                            style={{
-                              backgroundColor: tokens.primaryBtnBg,
-                              color: tokens.primaryBtnInk,
-                            }}
-                          >
-                            <Bookmark className="w-3.5 h-3.5" />
-                            {t.savePalette}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCopySpec}
-                            className="w-full py-2.5 px-4 rounded-2xl border text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                            style={{
-                              backgroundColor: tokens.elevatedBg,
-                              borderColor: tokens.border,
-                              color: tokens.ink,
-                            }}
-                          >
-                            {copiedKey === 'spec' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                            {copiedKey === 'spec' ? t.copied : t.copySpec}
-                          </button>
-                        </div>
-                      </div>
-
-                      <ToneControlCard
-                        t={t}
-                        tokens={tokens}
-                        primaryHex={slotPrimary}
-                        baseHue={baseHue}
-                        tintWhite={tintWhite}
-                        shadeBlack={shadeBlack}
-                        chromaScale={chromaScale}
-                        hapticsEnabled={hapticsEnabled}
-                        onChangeHue={setBaseHue}
-                        onChangeTint={setTintWhite}
-                        onChangeShade={setShadeBlack}
-                        onChangeChroma={setChromaScale}
-                      />
-                    </div>
-                  )}
-
-                  {subTool === 'sole' && (
-                    <SoleColorCard
-                      t={t}
-                      tokens={tokens}
-                      soleConfig={soleConfig}
-                      hapticsEnabled={hapticsEnabled}
-                      onChangeSole={setSoleConfig}
-                      onResetSole={() => setSoleConfig(DEFAULT_SOLE_CONFIG)}
-                    />
-                  )}
-
-                  {subTool === 'bg' && (
-                    <StudioBgCard
-                      t={t}
-                      tokens={tokens}
-                      studioBg={studioBg}
-                      hapticsEnabled={hapticsEnabled}
-                      onChangeStudioBg={(next) => {
-                        setStudioBg(next)
-                        saveStudioBg(next)
-                      }}
-                    />
-                  )}
-
-                  <div
-                    className="min-[820px]:hidden rounded-3xl border p-3.5"
-                    style={{
-                      backgroundColor: tokens.cardBg,
-                      borderColor: tokens.border,
-                      boxShadow: tokens.shadowSoft,
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-2.5">
-                      <span className="text-[12px] font-semibold" style={{ color: tokens.ink }}>
-                        {t.specTitle}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleCopySpec}
-                        className="text-[11px] font-semibold"
-                        style={{ color: tokens.activeTintBorder }}
-                      >
-                        {copiedKey === 'spec' ? t.copied : t.copySpec}
-                      </button>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                      {SPEC_ZONES.map((z) => (
-                        <button
-                          key={z}
-                          type="button"
-                          onClick={() => copyText(z, sneakerColors[z])}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border shrink-0"
-                          style={{
-                            backgroundColor: tokens.elevatedBg,
-                            borderColor: tokens.border,
-                          }}
-                        >
-                          <span
-                            className="w-3.5 h-3.5 rounded-sm border"
-                            style={{ backgroundColor: sneakerColors[z], borderColor: tokens.strongBorder }}
-                          />
-                          <span className="text-[11px] font-medium" style={{ color: tokens.ink }}>
-                            {t.zones[z]}
-                          </span>
-                          <span className="text-[10px] font-mono" style={{ color: tokens.muted }}>
-                            {copiedKey === z ? t.copied : sneakerColors[z]}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'models' && (
-                <div className="space-y-2.5">
-                  {MODEL_OPTIONS.map((m) => {
-                    const active = modelId === m.id
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic('harmony', hapticsEnabled)
-                          setModelId(m.id)
-                        }}
-                        className="w-full rounded-3xl border p-4 text-left flex items-center justify-between gap-3 transition-colors"
-                        style={{
-                          backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
-                          borderColor: active ? tokens.activeTintBorder : tokens.border,
-                          boxShadow: tokens.shadowCard,
-                        }}
-                      >
-                        <div className="min-w-0">
-                          <div className="text-[14px] font-semibold tracking-tight" style={{ color: tokens.ink }}>
-                            {m.name}
-                          </div>
-                          <div className="text-[12px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
-                            {t.modelNotes[m.id]}
-                          </div>
-                        </div>
-                        {active && (
-                          <span
-                            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                            style={{
-                              backgroundColor: tokens.activeTintBorder,
-                              color: '#FFFFFF',
-                            }}
-                          >
-                            <Check className="w-4 h-4" />
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {activeTab === 'harmonies' && (
-                <div className="space-y-2.5">
-                  {ALL_SCHEMES.map((sc) => {
-                    const active = scheme === sc
-                    const locked = !isPro && !FREE_SCHEMES.includes(sc)
-                    const preview = generateHarmonyPalette(
-                      baseHue,
-                      tintWhite,
-                      shadeBlack,
-                      chromaScale,
-                      sc,
-                      modelMode
-                    )
-                    return (
-                      <button
-                        key={sc}
-                        type="button"
-                        onClick={() => handleSelectScheme(sc)}
-                        className="w-full rounded-3xl border p-4 text-left flex items-center justify-between gap-3 transition-colors"
-                        style={{
-                          backgroundColor: active ? tokens.activeTintBg : tokens.cardBg,
-                          borderColor: active ? tokens.activeTintBorder : tokens.border,
-                          boxShadow: tokens.shadowCard,
-                        }}
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[14px] font-semibold" style={{ color: tokens.ink }}>
-                              {t.schemes[sc].name}
-                            </span>
-                            {locked && (
-                              <span
-                                className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                                style={{
-                                  backgroundColor: tokens.elevatedBg,
-                                  color: tokens.activeTintBorder,
-                                }}
-                              >
-                                {t.proBadge}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[12px] mt-0.5 leading-snug" style={{ color: tokens.muted }}>
-                            {t.schemes[sc].desc}
-                          </div>
-                        </div>
-                        <div className="flex items-center -space-x-1.5 shrink-0">
-                          {preview.slice(0, 3).map((hex, i) => (
-                            <span
-                              key={i}
-                              className="w-6 h-6 rounded-full border-2"
-                              style={{
-                                backgroundColor: hex,
-                                borderColor: tokens.cardBg,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {activeTab === 'palette' && (
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={handleSavePalette}
-                    className="w-full py-3 rounded-2xl text-[13px] font-semibold flex items-center justify-center gap-2"
-                    style={{
-                      backgroundColor: tokens.primaryBtnBg,
-                      color: tokens.primaryBtnInk,
-                    }}
-                  >
-                    <Bookmark className="w-4 h-4" />
-                    {t.savePalette}
-                  </button>
-
-                  {savedPalettes.length === 0 ? (
-                    <div
-                      className="rounded-3xl border p-5 text-center text-[12px] leading-relaxed"
-                      style={{
-                        backgroundColor: tokens.cardBg,
-                        borderColor: tokens.border,
-                        color: tokens.muted,
-                      }}
-                    >
-                      {t.savedEmpty}
-                    </div>
-                  ) : (
-                    savedPalettes.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-3xl border p-3.5 flex items-center justify-between gap-3"
-                        style={{
-                          backgroundColor: tokens.cardBg,
-                          borderColor: tokens.border,
-                          boxShadow: tokens.shadowSoft,
-                        }}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex -space-x-1.5 shrink-0">
-                            {item.colors.map((c, idx) => (
-                              <span
-                                key={idx}
-                                className="w-7 h-7 rounded-full border-2"
-                                style={{ backgroundColor: c, borderColor: tokens.cardBg }}
-                              />
-                            ))}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[13px] font-semibold truncate" style={{ color: tokens.ink }}>
-                              {t.schemes[item.scheme]?.name ?? item.scheme}
-                            </div>
-                            <div className="text-[11px] font-mono truncate" style={{ color: tokens.muted }}>
-                              {item.modelId.toUpperCase()} · {item.baseHue}° · {t.presets[item.preset]}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              triggerHaptic('harmony', hapticsEnabled)
-                              setScheme(item.scheme)
-                              setPreset(item.preset)
-                              setModelId(item.modelId)
-                              setBaseHue(item.baseHue)
-                              setTintWhite(item.tintWhite)
-                              setShadeBlack(item.shadeBlack)
-                              setChromaScale(item.chromaScale)
-                              setModelMode(item.modelMode === 'hsl' ? 'oklch' : item.modelMode)
-                              if (item.sole) setSoleConfig(item.sole)
-                              setActiveTab('colors')
-                            }}
-                            className="px-3 py-1.5 rounded-full border text-[11px] font-semibold"
-                            style={{
-                              backgroundColor: tokens.activeTintBg,
-                              borderColor: tokens.activeTintBorder,
-                              color: tokens.activeTintInk,
-                            }}
-                          >
-                            {t.applyPalette}
-                          </button>
-
-                          {confirmDeleteId === item.id ? (
-                            <button
-                              type="button"
-                              onClick={() => handleDeletePalette(item.id)}
-                              className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold bg-red-600 text-white"
-                            >
-                              {t.confirmDelete}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteId(item.id)}
-                              aria-label={t.deletePalette}
-                              className="w-8 h-8 rounded-full border flex items-center justify-center"
-                              style={{
-                                backgroundColor: tokens.elevatedBg,
-                                borderColor: tokens.border,
-                                color: tokens.muted,
-                              }}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      </main>
+      </div>
 
       {toastText && (
         <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-[12px] font-semibold shadow-lg"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-[13px] font-medium shadow-md"
           style={{
             backgroundColor: tokens.primaryBtnBg,
             color: tokens.primaryBtnInk,
@@ -1587,40 +1518,42 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
 
       {showProModal && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6"
-          style={{ backgroundColor: 'rgba(10, 10, 12, 0.56)' }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+          style={{ backgroundColor: 'rgba(8, 8, 10, 0.64)' }}
           onClick={() => {
             if (!isPaymentBusy) setShowProModal(false)
           }}
         >
           <div
-            className="w-full max-w-md rounded-3xl border p-5"
+            className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border p-6"
             style={{
-              backgroundColor: tokens.cardBg,
+              backgroundColor: tokens.pageBg,
               borderColor: tokens.strongBorder,
-              boxShadow: tokens.shadowCard,
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-[16px] font-semibold mb-1.5" style={{ color: tokens.ink }}>
+            <div
+              className="text-[20px] font-medium mb-2"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif", color: tokens.ink }}
+            >
               {t.proTitle}
             </div>
-            <p className="text-[12px] leading-relaxed mb-3" style={{ color: tokens.muted }}>
+            <p className="text-[13px] leading-relaxed mb-4" style={{ color: tokens.muted }}>
               {t.proDesc}
             </p>
             {paymentError && (
-              <div className="mb-3 px-3 py-2 rounded-xl text-[11px] bg-red-500/10 text-red-500 border border-red-500/20">
+              <div className="mb-4 px-3 py-2 rounded-lg text-[12px] bg-red-500/10 text-red-400 border border-red-500/20">
                 {paymentError}
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2.5">
               <button
                 type="button"
                 disabled={isPaymentBusy}
                 onClick={() => setShowProModal(false)}
-                className="flex-1 py-2.5 rounded-2xl border text-[12px] font-semibold"
+                className="flex-1 py-3 rounded-xl border text-[13px] font-medium"
                 style={{
-                  backgroundColor: tokens.elevatedBg,
+                  backgroundColor: tokens.cardBg,
                   borderColor: tokens.border,
                   color: tokens.ink,
                 }}
@@ -1633,7 +1566,7 @@ export const ColorsPage: React.FC<Props> = ({ onBack, lang, setLang }) => {
                 onClick={() => {
                   void handleBuyPro()
                 }}
-                className="flex-1 py-2.5 rounded-2xl text-[12px] font-semibold"
+                className="flex-1 py-3 rounded-xl text-[13px] font-medium"
                 style={{
                   backgroundColor: tokens.primaryBtnBg,
                   color: tokens.primaryBtnInk,
