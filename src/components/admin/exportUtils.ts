@@ -1,236 +1,277 @@
-import type { StatsPayload } from './types'
+import type { AdminStats } from './types';
 
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 1500)
+export type ExportOutcome = 'shared' | 'downloaded' | 'preview';
+
+type TgWindow = {
+  Telegram?: {
+    WebApp?: {
+      initData?: string;
+    };
+  };
+};
+
+export function isTelegramWebView(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean((window as unknown as TgWindow).Telegram?.WebApp?.initData);
 }
 
-function escapeCsv(val: unknown): string {
-  const s = String(val ?? '')
-  if (/[",;\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
-  return s
+function csvCell(val: string | number | boolean): string {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
 }
 
-function escapeXml(val: unknown): string {
-  return String(val ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-function buildDateStamp(days: number): string {
-  const d = new Date().toISOString().slice(0, 10)
-  const p = days >= 3650 ? 'all' : `${days}d`
-  return `cordwaine-analytics-${p}-${d}`
-}
-
-export function exportUsersCsv(stats: StatsPayload) {
-  const headers = [
-    'user_id',
-    'source',
-    'username',
-    'first_name',
-    'platform',
-    'lang',
-    'events_count',
-    'active_days',
-    'pro_count',
-    'last_page',
-    'first_seen',
-    'last_seen',
-  ]
+export function buildUsersCsv(stats: AdminStats): string {
+  const header = ['user_id', 'username', 'first_name', 'source', 'platform', 'lang', 'last_page', 'events', 'pro_count', 'is_banned', 'last_seen'];
   const rows = stats.users.map((u) =>
     [
       u.user_id,
+      u.username,
+      u.first_name,
       u.source,
-      u.username || '',
-      u.first_name || '',
-      u.platform || '',
-      u.lang || '',
-      u.events_count,
-      u.active_days,
+      u.platform,
+      u.lang,
+      u.last_page,
+      u.events,
       u.pro_count,
-      u.last_page || '',
-      u.first_seen,
+      u.is_banned ? 'yes' : 'no',
       u.last_seen,
     ]
-      .map(escapeCsv)
-      .join(',')
-  )
-  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n')
-  triggerDownload(
-    new Blob([csv], { type: 'text/csv;charset=utf-8' }),
-    `${buildDateStamp(stats.days)}-users.csv`
-  )
+      .map(csvCell)
+      .join(','),
+  );
+  return '\uFEFF' + [header.join(','), ...rows].join('\n');
 }
 
-export function exportPagesCsv(stats: StatsPayload) {
-  const headers = ['page', 'tg_users', 'web_users', 'opens']
-  const rows = stats.topPages.map((p) =>
-    [p.page, p.tg_users, p.web_users, p.opens].map(escapeCsv).join(',')
-  )
-  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n')
-  triggerDownload(
-    new Blob([csv], { type: 'text/csv;charset=utf-8' }),
-    `${buildDateStamp(stats.days)}-pages.csv`
-  )
+export function buildPagesCsv(stats: AdminStats): string {
+  const header = ['page', 'tg_unique', 'web_unique', 'total_events'];
+  const rows = stats.pages.map((p) =>
+    [p.page, p.tg, p.web, p.events].map(csvCell).join(','),
+  );
+  return '\uFEFF' + [header.join(','), ...rows].join('\n');
 }
 
-function buildWorksheetXml(name: string, rows: (string | number)[][]): string {
-  const body = rows
+function xmlEsc(v: string | number): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function makeSheet(name: string, headers: string[], rows: Array<Array<string | number>>): string {
+  const headXml =
+    '<Row>' +
+    headers.map((h) => `<Cell><Data ss:Type="String">${xmlEsc(h)}</Data></Cell>`).join('') +
+    '</Row>';
+  const bodyXml = rows
     .map(
       (r) =>
         '<Row>' +
         r
-          .map((cell) => {
-            const isNum = typeof cell === 'number' && Number.isFinite(cell)
-            return `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(
-              cell
-            )}</Data></Cell>`
+          .map((c) => {
+            const isNum = typeof c === 'number' && Number.isFinite(c);
+            return `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${xmlEsc(c)}</Data></Cell>`;
           })
           .join('') +
-        '</Row>'
+        '</Row>',
     )
-    .join('')
-  return `<Worksheet ss:Name="${escapeXml(name)}"><Table>${body}</Table></Worksheet>`
+    .join('');
+  return `<Worksheet ss:Name="${xmlEsc(name)}"><Table>${headXml}${bodyXml}</Table></Worksheet>`;
 }
 
-export function exportWorkbookExcel(stats: StatsPayload) {
-  const summarySheet = buildWorksheetXml('Summary', [
-    ['Показатель', 'Значение'],
-    ['Период (дней)', stats.days],
-    ['Telegram уникальные', stats.summary.tg_users],
-    ['Web уникальные', stats.summary.web_users],
-    ['Новые пользователи', stats.summary.new_users],
-    ['Вернувшиеся пользователи', stats.summary.returning_users],
-    ['Всего событий', stats.summary.total_events],
-    ['Среднее событий / чел', stats.summary.avg_events_per_user],
-    ['Retention 30д (%)', stats.summary.retention_pct],
-    ['PRO-доступов в Neon', stats.summary.total_pro],
-    ['Оценка в Stars', stats.summary.total_stars],
-    ['Расчётный эквивалент USD', stats.summary.total_net_usd],
-  ])
+export function buildExcelXml(stats: AdminStats, days: number): string {
+  const summarySheet = makeSheet(
+    'Summary',
+    ['Metric', 'Value'],
+    [
+      ['Period (days)', days],
+      ['Telegram Unique', stats.summary.tgUnique],
+      ['Web Unique', stats.summary.webUnique],
+      ['Total Events', stats.summary.totalEvents],
+      ['New Users', stats.summary.newUsers],
+      ['Returning Users', stats.summary.returningUsers],
+      ['Retention 30d (%)', stats.summary.retention30d],
+      ['PRO Activations (Neon)', stats.summary.proTotal],
+      ['PRO Stars (est.)', stats.summary.proStars],
+      ['PRO USD (est.)', stats.summary.proUsdEst],
+    ],
+  );
 
-  const pagesSheet = buildWorksheetXml('Pages', [
-    ['Раздел', 'TG уник.', 'Web уник.', 'Открытия'],
-    ...stats.topPages.map((p) => [p.page, p.tg_users, p.web_users, p.opens]),
-  ])
+  const pagesSheet = makeSheet(
+    'Pages',
+    ['Page', 'TG Unique', 'Web Unique', 'Events'],
+    stats.pages.map((p) => [p.page, p.tg, p.web, p.events]),
+  );
 
-  const proSheet = buildWorksheetXml('PRO_Modules', [
-    ['Модуль', 'Активаций', 'Stars', 'Расчётный USD'],
-    ...stats.proBreakdown.map((r) => [r.product_id, r.count, r.stars, r.net_usd]),
-  ])
-
-  const usersSheet = buildWorksheetXml('Users', [
-    ['ID', 'Источник', 'Username', 'Имя', 'Платформа', 'Язык', 'Событий', 'PRO'],
-    ...stats.users.map((u) => [
+  const usersSheet = makeSheet(
+    'Users',
+    ['User ID', 'Username', 'Source', 'Platform', 'Last Page', 'Events', 'PRO', 'Banned'],
+    stats.users.map((u) => [
       u.user_id,
+      u.username || u.first_name || 'Guest',
       u.source,
-      u.username || '',
-      u.first_name || '',
-      u.platform || '',
-      u.lang || '',
-      u.events_count,
+      u.platform,
+      u.last_page,
+      u.events,
       u.pro_count,
+      u.is_banned ? 'YES' : 'NO',
     ]),
-  ])
+  );
 
-  const xml =
-    `<?xml version="1.0" encoding="UTF-8"?>` +
-    `<?mso-application progid="Excel.Sheet"?>` +
-    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
-    summarySheet +
-    pagesSheet +
-    proSheet +
-    usersSheet +
-    `</Workbook>`
-
-  triggerDownload(
-    new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' }),
-    `${buildDateStamp(stats.days)}.xls`
-  )
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+${summarySheet}${pagesSheet}${usersSheet}
+</Workbook>`;
 }
 
-export function exportEditorialPdfReport(stats: StatsPayload) {
-  const periodLabel = stats.days >= 3650 ? 'За всё время' : `За ${stats.days} дн.`
-  const html = `<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8" />
-<title>CORDWAINE Analytics Report</title>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #141413; background: #fff; margin: 0; padding: 32px; }
-  .eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #9a723c; font-weight: 700; }
-  h1 { font-size: 26px; margin: 6px 0 4px; }
-  .meta { font-size: 12px; color: #666; margin-bottom: 24px; }
-  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-  .kpi { border: 1px solid #e5e2dc; border-radius: 10px; padding: 12px; }
-  .kpi-label { font-size: 11px; color: #666; text-transform: uppercase; }
-  .kpi-val { font-size: 22px; font-weight: 700; margin-top: 4px; }
-  h2 { font-size: 15px; margin: 22px 0 10px; border-bottom: 1px solid #e5e2dc; padding-bottom: 6px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eee; }
-  th { font-size: 11px; text-transform: uppercase; color: #666; }
-  @media print { body { padding: 16px; } }
-</style>
-</head>
-<body>
-  <div class="eyebrow">CORDWAINE · COMMAND CENTER</div>
-  <h1>Аналитический отчёт</h1>
-  <div class="meta">Период: ${periodLabel} · Сформирован: ${new Date().toLocaleString('ru-RU')}</div>
+export function buildReportSummaryText(stats: AdminStats, days: number): string {
+  const periodLabel = days >= 3650 ? 'Всё время' : `${days} дн.`;
+  const topPages = stats.pages
+    .slice(0, 6)
+    .map((p, idx) => `${idx + 1}. ${p.page}: TG ${p.tg} · Web ${p.web} (${p.events} соб.)`)
+    .join('\n');
+  const proLines = stats.proBreakdown
+    .map((p) => `• ${p.product_id}: ${p.count} (${p.stars} ★)`)
+    .join('\n');
 
-  <div class="kpis">
-    <div class="kpi"><div class="kpi-label">Telegram уник.</div><div class="kpi-val">${stats.summary.tg_users}</div></div>
-    <div class="kpi"><div class="kpi-label">Web уник.</div><div class="kpi-val">${stats.summary.web_users}</div></div>
-    <div class="kpi"><div class="kpi-label">Retention 30д</div><div class="kpi-val">${stats.summary.retention_pct}%</div></div>
-    <div class="kpi"><div class="kpi-label">PRO-активаций</div><div class="kpi-val">${stats.summary.total_pro} (${stats.summary.total_stars} ⭐)</div></div>
-  </div>
+  return [
+    `CORDWAINE · Аналитический отчёт (${periodLabel})`,
+    `Сформирован: ${new Date().toLocaleString('ru-RU')}`,
+    '',
+    `— Telegram уник.: ${stats.summary.tgUnique}`,
+    `— Web уник.: ${stats.summary.webUnique}`,
+    `— Всего событий: ${stats.summary.totalEvents} (${stats.summary.avgEventsPerUser} / чел.)`,
+    `— Новые / Возвраты: ${stats.summary.newUsers} / ${stats.summary.returningUsers} (Retention 30д: ${stats.summary.retention30d}%)`,
+    `— PRO в Neon (всего): ${stats.summary.proTotal} · ${stats.summary.proStars} ★ (усл. ~$${stats.summary.proUsdEst})`,
+    '',
+    'Топ разделов:',
+    topPages || 'Нет данных',
+    '',
+    'PRO-модули (Neon):',
+    proLines || 'Нет активаций',
+  ].join('\n');
+}
 
-  <h2>Рейтинг разделов</h2>
-  <table>
-    <thead><tr><th>Раздел</th><th>Telegram</th><th>Web</th><th>Открытий</th></tr></thead>
-    <tbody>
-      ${stats.topPages
-        .map(
-          (p) =>
-            `<tr><td>${escapeXml(p.page)}</td><td>${p.tg_users}</td><td>${p.web_users}</td><td>${p.opens}</td></tr>`
-        )
-        .join('')}
-    </tbody>
-  </table>
+async function shareOrDownload(
+  filename: string,
+  content: string,
+  mimeType: string,
+): Promise<ExportOutcome> {
+  if (isTelegramWebView()) {
+    try {
+      const file = new File([content], filename, { type: mimeType });
+      const nav = navigator as Navigator & {
+        canShare?: (data: ShareData) => boolean;
+      };
+      if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [file] }))) {
+        await nav.share({ files: [file], title: filename });
+        return 'shared';
+      }
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') {
+        return 'shared';
+      }
+    }
+    return 'preview';
+  }
 
-  <h2>Распределение PRO-модулей</h2>
-  <table>
-    <thead><tr><th>Модуль</th><th>Активаций</th><th>Оценка (Stars)</th><th>Расчётный экв.</th></tr></thead>
-    <tbody>
-      ${stats.proBreakdown
-        .map(
-          (r) =>
-            `<tr><td>${escapeXml(r.product_id)}</td><td>${r.count}</td><td>${r.stars} ⭐</td><td>~$${r.net_usd}</td></tr>`
-        )
-        .join('')}
-    </tbody>
-  </table>
-</body>
-</html>`
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  return 'downloaded';
+}
 
-  const win = window.open('', '_blank')
-  if (win) {
-    win.document.write(html)
-    win.document.close()
-    setTimeout(() => win.print(), 300)
-  } else {
-    triggerDownload(
-      new Blob([html], { type: 'text/html;charset=utf-8' }),
-      `${buildDateStamp(stats.days)}-report.html`
+export async function exportUsersCsv(stats: AdminStats): Promise<ExportOutcome> {
+  const dateTag = new Date().toISOString().slice(0, 10);
+  return shareOrDownload(`cordwaine-users-${dateTag}.csv`, buildUsersCsv(stats), 'text/csv;charset=utf-8');
+}
+
+export async function exportPagesCsv(stats: AdminStats): Promise<ExportOutcome> {
+  const dateTag = new Date().toISOString().slice(0, 10);
+  return shareOrDownload(`cordwaine-pages-${dateTag}.csv`, buildPagesCsv(stats), 'text/csv;charset=utf-8');
+}
+
+export async function exportExcelWorkbook(stats: AdminStats, days: number): Promise<ExportOutcome> {
+  const dateTag = new Date().toISOString().slice(0, 10);
+  return shareOrDownload(
+    `cordwaine-report-${dateTag}.xls`,
+    buildExcelXml(stats, days),
+    'application/vnd.ms-excel',
+  );
+}
+
+export function printEditorialReport(stats: AdminStats, days: number): boolean {
+  if (isTelegramWebView()) return false;
+  const win = window.open('', '_blank', 'width=900,height=720');
+  if (!win) return false;
+
+  const periodLabel = days >= 3650 ? 'Всё время' : `${days} дн.`;
+  const pageRows = stats.pages
+    .map(
+      (p) =>
+        `<tr><td>${xmlEsc(p.page)}</td><td>${p.tg}</td><td>${p.web}</td><td>${p.events}</td></tr>`,
     )
+    .join('');
+
+  win.document.write(`<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>CORDWAINE Report</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; color: #171512; padding: 32px; max-width: 820px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .sub { color: #6B655D; font-size: 13px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .card { border: 1px solid #E5DFD5; border-radius: 10px; padding: 12px; }
+  .label { font-size: 11px; color: #7A746B; text-transform: uppercase; letter-spacing: 0.04em; }
+  .val { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th, td { border-bottom: 1px solid #EAE4DB; padding: 8px 6px; text-align: left; }
+  th { font-size: 11px; text-transform: uppercase; color: #7A746B; }
+</style></head><body>
+  <h1>CORDWAINE · Аналитический отчёт</h1>
+  <div class="sub">Период: ${periodLabel} · Сформирован: ${new Date().toLocaleString('ru-RU')}</div>
+  <div class="grid">
+    <div class="card"><div class="label">Telegram уник.</div><div class="val">${stats.summary.tgUnique}</div></div>
+    <div class="card"><div class="label">Web уник.</div><div class="val">${stats.summary.webUnique}</div></div>
+    <div class="card"><div class="label">События</div><div class="val">${stats.summary.totalEvents}</div></div>
+    <div class="card"><div class="label">PRO (Neon)</div><div class="val">${stats.summary.proTotal}</div></div>
+  </div>
+  <h3>Рейтинг разделов</h3>
+  <table><thead><tr><th>Раздел</th><th>Telegram</th><th>Web</th><th>Событий</th></tr></thead><tbody>${pageRows || '<tr><td colspan="4">Нет данных</td></tr>'}</tbody></table>
+</body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 250);
+  return true;
+}
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fallback below
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
   }
 }
-
