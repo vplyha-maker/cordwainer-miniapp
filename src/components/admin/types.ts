@@ -80,6 +80,7 @@ export type AdminStats = {
     returningUsers: number;
     retention30d: number;
     avgEventsPerUser: number;
+    proUsers?: number;
     proTotal: number;
     proStars: number;
     proUsdEst: number;
