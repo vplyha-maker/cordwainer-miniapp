@@ -377,10 +377,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
 
       const proRows = await sql`
-        SELECT product_id, COUNT(*)::int AS count
+        SELECT product_id, COUNT(DISTINCT user_id::text)::int AS count
         FROM user_purchases
+        WHERE user_id::text <> ${excludeId}
         GROUP BY product_id
         ORDER BY count DESC
+      `;
+
+      const proUsersRows = await sql`
+        SELECT COUNT(DISTINCT user_id::text)::int AS cnt
+        FROM user_purchases
+        WHERE user_id::text <> ${excludeId}
       `;
 
       let totalProCount = 0;
@@ -393,6 +400,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         totalStars += stars;
         return { product_id: pid, count: cnt, stars };
       });
+      const proUsersCount = Number(proUsersRows[0]?.cnt || 0);
 
       const usersRows = await sql`
         SELECT
@@ -409,7 +417,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           CASE WHEN b.user_id IS NOT NULL THEN true ELSE false END AS is_banned
         FROM app_events e
         LEFT JOIN (
-          SELECT user_id::text AS uid, COUNT(*)::int AS pro_count
+          SELECT user_id::text AS uid, COUNT(DISTINCT product_id)::int AS pro_count
           FROM user_purchases
           GROUP BY user_id::text
         ) p ON p.uid = e.user_id::text
@@ -469,6 +477,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           retention30d: retentionPct,
           avgEventsPerUser:
             totalUnique > 0 ? Number((Number(cur.total_events || 0) / totalUnique).toFixed(1)) : 0,
+          proUsers: proUsersCount,
           proTotal: totalProCount,
           proStars: totalStars,
           proUsdEst: Number((totalStars * 0.0123).toFixed(1)),
@@ -755,7 +764,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, mode, targetId });
     }
 
-    // Standard purchase check
     const userId = String(req.query.userId || '').trim();
     const productId = String(req.query.productId || '').trim();
 
