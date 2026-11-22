@@ -23,6 +23,8 @@ const ALL_CORE_PRO_IDS = [
   'pro_pigments',
 ];
 
+const WEB_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+
 type AuthResult = {
   ok: boolean;
   adminId: string;
@@ -60,15 +62,37 @@ function verifyTelegramInitData(initData: string, botToken: string): string | nu
   }
 }
 
-function verifyWebAdminKey(req: VercelRequest): boolean {
+function getWebSigningKey(botToken: string): Buffer {
+  return crypto.createHmac('sha256', 'CordwaineAdminWebSession').update(botToken).digest();
+}
+
+function createWebSessionToken(adminId: string, botToken: string): { token: string; expMs: number } {
+  const expMs = Date.now() + WEB_TOKEN_TTL_MS;
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const sig = crypto
+    .createHmac('sha256', getWebSigningKey(botToken))
+    .update(`${adminId}:${expMs}:${nonce}`)
+    .digest('hex');
+  return { token: `${expMs}.${nonce}.${sig}`, expMs };
+}
+
+function verifyWebSessionToken(token: string, adminId: string, botToken: string): boolean {
   try {
-    const expected = (process.env.ADMIN_WEB_KEY || '').trim();
-    if (!expected) return false;
-    const rawHeader = req.headers['x-admin-key'];
-    const provided = (Array.isArray(rawHeader) ? rawHeader[0] : rawHeader || '').trim();
-    if (!provided) return false;
-    const a = Buffer.from(provided, 'utf8');
-    const b = Buffer.from(expected, 'utf8');
+    if (!token || !adminId || !botToken) return false;
+    const parts = token.trim().split('.');
+    if (parts.length !== 3) return false;
+    const [expStr, nonce, sigHex] = parts;
+    const expMs = Number(expStr);
+    if (!Number.isFinite(expMs) || expMs <= Date.now()) return false;
+    if (!/^[0-9a-f]{32}$/i.test(nonce) || !/^[0-9a-f]{64}$/i.test(sigHex)) return false;
+
+    const expectedHex = crypto
+      .createHmac('sha256', getWebSigningKey(botToken))
+      .update(`${adminId}:${expMs}:${nonce}`)
+      .digest('hex');
+
+    const a = Buffer.from(sigHex, 'hex');
+    const b = Buffer.from(expectedHex, 'hex');
     if (a.length !== b.length) return false;
     return crypto.timingSafeEqual(a, b);
   } catch {
@@ -76,7 +100,7 @@ function verifyWebAdminKey(req: VercelRequest): boolean {
   }
 }
 
-function authorizeAdmin(req: VercelRequest): AuthResult {
+function authorizeTelegramOnly(req: VercelRequest): AuthResult {
   const expectedAdminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
   const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
   const rawInit = req.headers['x-telegram-init-data'];
@@ -88,9 +112,20 @@ function authorizeAdmin(req: VercelRequest): AuthResult {
       return { ok: true, adminId: expectedAdminId, via: 'telegram' };
     }
   }
+  return { ok: false, adminId: '', via: 'none' };
+}
 
-  if (verifyWebAdminKey(req)) {
-    return { ok: true, adminId: expectedAdminId || 'web_admin', via: 'web' };
+function authorizeAdmin(req: VercelRequest): AuthResult {
+  const tgAuth = authorizeTelegramOnly(req);
+  if (tgAuth.ok) return tgAuth;
+
+  const expectedAdminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
+  const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const rawTok = req.headers['x-admin-token'];
+  const token = Array.isArray(rawTok) ? rawTok[0] : rawTok || '';
+
+  if (token && verifyWebSessionToken(token, expectedAdminId, botToken)) {
+    return { ok: true, adminId: expectedAdminId, via: 'web' };
   }
 
   return { ok: false, adminId: '', via: 'none' };
@@ -105,13 +140,34 @@ function getSql() {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Telegram-Init-Data, X-Admin-Key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Telegram-Init-Data, X-Admin-Token');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = String(req.query.action || '').trim();
 
   try {
     const sql = getSql();
+
+    if (action === 'web-token' && req.method === 'POST') {
+      const tgAuth = authorizeTelegramOnly(req);
+      if (!tgAuth.ok) {
+        return res.status(403).json({ ok: false, error: 'Выпуск ссылки доступен только из Telegram' });
+      }
+      const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+      const { token, expMs } = createWebSessionToken(tgAuth.adminId, botToken);
+
+      await sql`
+        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+        VALUES (${tgAuth.adminId}, '', 'Admin', 'admin', 'telegram', 'ru', 'admin_web_token', 'chrome_session', '12h')
+      `;
+
+      return res.status(200).json({
+        ok: true,
+        token,
+        expiresAt: new Date(expMs).toISOString(),
+        ttlHours: 12,
+      });
+    }
 
     if (action === 'track' && req.method === 'POST') {
       const body = (req.body || {}) as Record<string, unknown>;
@@ -555,6 +611,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
       const latencyMs = Date.now() - t0;
       const row = counts[0] || {};
+      const hasAdmin = Boolean((process.env.ADMIN_TELEGRAM_ID || '').trim());
+      const hasBot = Boolean((process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim());
 
       return res.status(200).json({
         ok: true,
@@ -563,8 +621,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         purchasesCount: Number(row.purchases_count || 0),
         bannedCount: Number(row.banned_count || 0),
         lastEventAt: row.last_event_at ? String(row.last_event_at) : null,
-        adminIdConfigured: Boolean((process.env.ADMIN_TELEGRAM_ID || '').trim()),
-        webKeyConfigured: Boolean((process.env.ADMIN_WEB_KEY || '').trim()),
+        adminIdConfigured: hasAdmin,
+        webKeyConfigured: hasAdmin && hasBot,
         via: auth.via,
       });
     }
