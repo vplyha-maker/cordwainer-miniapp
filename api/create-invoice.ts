@@ -8,6 +8,7 @@ const MAX_AUTH_AGE_SECONDS = 86400; // 24 часа
 export const PRO_SIZES_PRICE_STARS = 150;
 export const PRO_MODULE_PRICE_STARS = 250;
 export const PRO_VIDEOS_PRICE_STARS = 350;
+export const PRO_PIGMENTS_PRICE_STARS = 450;
 
 interface VerifiedTelegramUser {
   id: number;
@@ -50,6 +51,12 @@ const PRODUCT_CATALOG: Record<string, ProductConfig> = {
     description: 'Пожизненный доступ к расширенным конструктивным данным обувной колодки',
     amount: PRO_MODULE_PRICE_STARS,
   },
+  pro_pigments: {
+    title: 'PRO: Cordwaine Spectral Atelier (146 пигментов)',
+    description:
+      'Пожизненный доступ к спектральному автоподбору CIEDE2000 по 146 FORS-пигментам, масштабированию партий до 1000 мл, техкартам, 4 источникам света и спектрофотометру',
+    amount: PRO_PIGMENTS_PRICE_STARS,
+  },
 };
 
 const DEFAULT_PRODUCT_CONFIG: ProductConfig = {
@@ -58,10 +65,6 @@ const DEFAULT_PRODUCT_CONFIG: ProductConfig = {
   amount: PRO_MODULE_PRICE_STARS,
 };
 
-/**
- * Криптографическая проверка подписи Telegram WebApp initData (HMAC-SHA256)
- * согласно официальной спецификации Telegram Mini Apps.
- */
 function verifyTelegramInitData(
   rawInitData: string,
   botToken: string
@@ -178,7 +181,6 @@ export default async function handler(req: any, res: any) {
 
   const verifiedUserId = String(verification.user.id);
 
-  // Защита от повторного выставления счёта, если продукт уже куплен
   const connectionString = process.env.DATABASE_URL;
   if (connectionString) {
     try {
@@ -201,7 +203,6 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // Цена строго берётся из серверного каталога PRODUCT_CATALOG (игнорируя клиентский amountStars)
   const productMeta = PRODUCT_CATALOG[rawProductId] ?? DEFAULT_PRODUCT_CONFIG;
   const url = `https://api.telegram.org/bot${token}/createInvoiceLink`;
 
