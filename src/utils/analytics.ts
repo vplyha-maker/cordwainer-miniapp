@@ -7,6 +7,8 @@ type TgWindow = {
   }
 }
 
+export const BANNED_EVENT_NAME = 'cordwaine:user-banned'
+
 function getOrCreateDeviceId(): string {
   try {
     const key = 'cordwainer_device_id'
@@ -38,7 +40,7 @@ export function trackEvent(
       headers['X-Telegram-Init-Data'] = initData
     }
 
-    void fetch('/api/check-purchase?action=track', {
+    fetch('/api/check-purchase?action=track', {
       method: 'POST',
       headers,
       keepalive: true,
@@ -49,9 +51,19 @@ export function trackEvent(
         deviceId: getOrCreateDeviceId(),
         meta,
       }),
-    }).catch(() => {})
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { banned?: boolean; reason?: string } | null) => {
+        if (data?.banned) {
+          window.dispatchEvent(
+            new CustomEvent(BANNED_EVENT_NAME, {
+              detail: data.reason || 'Доступ ограничен администратором',
+            })
+          )
+        }
+      })
+      .catch(() => {})
   } catch {
     // аналитика никогда не должна ломать интерфейс
   }
 }
-
