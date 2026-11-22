@@ -1,800 +1,734 @@
-import crypto from 'node:crypto';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
+import crypto from 'crypto';
 
-const PRODUCT_ID_REGEX = /^[a-z0-9_-]{2,32}$/i;
-const EVENT_REGEX = /^[a-z0-9_:-]{2,48}$/i;
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const MAX_AUTH_AGE_SECONDS = 86400;
-
-const ALL_PRO_PRODUCTS = [
-  'pro_sizes',
-  'pro_colors',
-  'pro_heel',
-  'pro_last',
-  'pro_videos',
-  'pro_pigments',
-] as const;
-
-const PRODUCT_PRICES_STARS: Record<string, number> = {
+const PRO_PRICES: Record<string, number> = {
   pro_sizes: 150,
   pro_colors: 250,
   pro_heel: 250,
   pro_last: 250,
   pro_videos: 350,
   pro_pigments: 1000,
+  pro_width_calc: 250,
+  pro_glossary: 250,
+  pro_market: 250,
 };
 
-interface VerifiedTelegramUser {
-  id: number;
-  first_name?: string;
-  username?: string;
-  language_code?: string;
-}
+const ALL_CORE_PRO_IDS = [
+  'pro_sizes',
+  'pro_colors',
+  'pro_heel',
+  'pro_last',
+  'pro_videos',
+  'pro_pigments',
+];
 
-function verifyTelegramInitData(
-  rawInitData: string,
-  botToken: string
-): { valid: true; user: VerifiedTelegramUser } | { valid: false; reason: string } {
+type AuthResult = {
+  ok: boolean;
+  adminId: string;
+  via: 'telegram' | 'web' | 'none';
+};
+
+function verifyTelegramInitData(initData: string, botToken: string): string | null {
   try {
-    const params = new URLSearchParams(rawInitData);
-    const receivedHash = params.get('hash');
-    if (!receivedHash || !/^[0-9a-f]{64}$/i.test(receivedHash)) {
-      return { valid: false, reason: 'Отсутствует или повреждён hash в initData' };
-    }
-    const authDate = Number(params.get('auth_date'));
-    if (!Number.isFinite(authDate) || authDate <= 0) {
-      return { valid: false, reason: 'Некорректный параметр auth_date' };
-    }
-    if (Math.floor(Date.now() / 1000) - authDate > MAX_AUTH_AGE_SECONDS) {
-      return { valid: false, reason: 'Сессия Telegram initData устарела' };
-    }
-    const pairs: string[] = [];
-    params.forEach((value, key) => {
-      if (key !== 'hash') pairs.push(`${key}=${value}`);
-    });
-    pairs.sort((a, b) => a.localeCompare(b));
+    if (!initData || !botToken) return null;
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) return null;
+    params.delete('hash');
+
+    const keys = Array.from(params.keys()).sort();
+    const dataCheckString = keys.map((k) => `${k}=${params.get(k) || ''}`).join('\n');
+
     const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
     const computedHash = crypto
       .createHmac('sha256', secretKey)
-      .update(pairs.join('\n'))
+      .update(dataCheckString)
       .digest('hex');
 
-    const a = Buffer.from(receivedHash.toLowerCase(), 'hex');
-    const b = Buffer.from(computedHash.toLowerCase(), 'hex');
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-      return { valid: false, reason: 'Неверная криптографическая подпись initData' };
-    }
+    const hashBuf = Buffer.from(hash, 'hex');
+    const compBuf = Buffer.from(computedHash, 'hex');
+    if (hashBuf.length !== compBuf.length) return null;
+    if (!crypto.timingSafeEqual(hashBuf, compBuf)) return null;
+
     const userRaw = params.get('user');
-    if (!userRaw) return { valid: false, reason: 'Отсутствует объект пользователя' };
-    const parsedUser = JSON.parse(userRaw) as VerifiedTelegramUser;
-    if (!parsedUser || !Number.isSafeInteger(parsedUser.id) || parsedUser.id <= 0) {
-      return { valid: false, reason: 'Некорректный Telegram ID' };
-    }
-    return { valid: true, user: parsedUser };
+    if (!userRaw) return null;
+    const userObj = JSON.parse(userRaw) as { id?: number | string };
+    return userObj.id != null ? String(userObj.id) : null;
   } catch {
-    return { valid: false, reason: 'Ошибка разбора Telegram initData' };
+    return null;
   }
 }
 
-function getVerifiedAdmin(
-  rawInitData: string,
-  botToken: string,
-  adminId: string
-): VerifiedTelegramUser | null {
-  if (!adminId || !botToken || !rawInitData) return null;
-  const v = verifyTelegramInitData(rawInitData, botToken);
-  if (!v.valid || String(v.user.id) !== adminId) return null;
-  return v.user;
-}
-
-async function logAdminAudit(
-  sql: any,
-  adminUser: VerifiedTelegramUser,
-  event: string,
-  meta: Record<string, unknown>
-) {
+function verifyWebAdminKey(req: VercelRequest): boolean {
   try {
-    await sql`
-      INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
-      VALUES (
-        ${String(adminUser.id)},
-        ${adminUser.username || null},
-        ${adminUser.first_name || 'Admin'},
-        'admin',
-        'command_center',
-        ${adminUser.language_code || 'ru'},
-        ${event},
-        'admin_crm',
-        ${JSON.stringify(meta)}::jsonb
-      )
-    `;
+    const expected = (process.env.ADMIN_WEB_KEY || '').trim();
+    if (!expected) return false;
+    const rawHeader = req.headers['x-admin-key'];
+    const provided = (Array.isArray(rawHeader) ? rawHeader[0] : rawHeader || '').trim();
+    if (!provided) return false;
+    const a = Buffer.from(provided, 'utf8');
+    const b = Buffer.from(expected, 'utf8');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
   } catch {
-    // не блокируем основную операцию при ошибке аудита
+    return false;
   }
 }
 
-export default async function handler(req: any, res: any) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+function authorizeAdmin(req: VercelRequest): AuthResult {
+  const expectedAdminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
+  const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const rawInit = req.headers['x-telegram-init-data'];
+  const initData = Array.isArray(rawInit) ? rawInit[0] : rawInit || '';
 
-  const rawAction = Array.isArray(req.query?.action)
-    ? req.query.action[0]
-    : req.query?.action;
-
-  const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
-  const connectionString = process.env.DATABASE_URL || '';
-  const adminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
-
-  if (!connectionString) {
-    return res.status(500).json({ error: 'Не настроена строка подключения к БД' });
+  if (initData && botToken && expectedAdminId) {
+    const tgUserId = verifyTelegramInitData(initData, botToken);
+    if (tgUserId && tgUserId === expectedAdminId) {
+      return { ok: true, adminId: expectedAdminId, via: 'telegram' };
+    }
   }
 
-  const headerInitData = req.headers?.['x-telegram-init-data'];
-  const queryInitData = req.query?.initData;
-  const rawInitData =
-    (typeof headerInitData === 'string' && headerInitData.trim()) ||
-    (typeof queryInitData === 'string' && queryInitData.trim()) ||
-    '';
+  if (verifyWebAdminKey(req)) {
+    return { ok: true, adminId: expectedAdminId || 'web_admin', via: 'web' };
+  }
 
-  // === 1. TRACK ===
-  if (rawAction === 'track' && req.method === 'POST') {
-    let body: Record<string, any> = {};
-    try {
-      body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
-    } catch {
-      return res.status(400).json({ error: 'Invalid JSON' });
-    }
+  return { ok: false, adminId: '', via: 'none' };
+}
 
-    const event = typeof body.event === 'string' ? body.event.trim() : '';
-    if (!EVENT_REGEX.test(event)) return res.status(400).json({ error: 'Invalid event' });
+function getSql() {
+  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  if (!dbUrl) throw new Error('DATABASE_URL is not configured');
+  return neon(dbUrl);
+}
 
-    const page = typeof body.page === 'string' ? body.page.slice(0, 64) : null;
-    const lang =
-      typeof body.lang === 'string'
-        ? body.lang.slice(0, 12)
-        : typeof body.meta?.lang === 'string'
-        ? String(body.meta.lang).slice(0, 12)
-        : null;
-    const platform = typeof body.platform === 'string' ? body.platform.slice(0, 32) : 'web';
-    const deviceId =
-      typeof body.deviceId === 'string' && body.deviceId.trim()
-        ? body.deviceId.trim().slice(0, 64)
-        : 'web_anon';
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Telegram-Init-Data, X-Admin-Key');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-    const verified =
-      rawInitData && botToken ? verifyTelegramInitData(rawInitData, botToken) : null;
-    const tgUser = verified && verified.valid ? verified.user : null;
+  const action = String(req.query.action || '').trim();
 
-    const source = tgUser ? 'telegram' : 'web';
-    const userId = tgUser ? String(tgUser.id) : deviceId;
-    const username = tgUser?.username || null;
-    const firstName = tgUser?.first_name || null;
-    const finalLang = lang || tgUser?.language_code || null;
-    const metaJson =
-      body.meta && typeof body.meta === 'object' ? JSON.stringify(body.meta) : null;
+  try {
+    const sql = getSql();
 
-    try {
-      const sql = neon(connectionString);
+    if (action === 'track' && req.method === 'POST') {
+      const body = (req.body || {}) as Record<string, unknown>;
+      const userId = String(body.userId || body.user_id || '').slice(0, 80);
+      const username = String(body.username || '').slice(0, 80);
+      const firstName = String(body.firstName || body.first_name || '').slice(0, 80);
+      const source = body.source === 'telegram' ? 'telegram' : 'web';
+      const platform = String(body.platform || 'unknown').slice(0, 40);
+      const lang = String(body.lang || 'unknown').slice(0, 16);
+      const eventName = String(body.event || 'page_view').slice(0, 64);
+      const page = String(body.page || 'welcome').slice(0, 64);
+      const meta = body.meta ? JSON.stringify(body.meta).slice(0, 1000) : null;
+
+      if (!userId) {
+        return res.status(200).json({ ok: true, banned: false });
+      }
+
+      const banRows = await sql`
+        SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
+      `;
+      if (banRows.length > 0) {
+        return res.status(200).json({
+          ok: true,
+          banned: true,
+          reason: String(banRows[0].reason || 'Доступ ограничен администратором'),
+        });
+      }
+
       await sql`
         INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
-        VALUES (${userId}, ${username}, ${firstName}, ${source}, ${platform}, ${finalLang}, ${event}, ${page}, ${metaJson}::jsonb)
+        VALUES (${userId}, ${username}, ${firstName}, ${source}, ${platform}, ${lang}, ${eventName}, ${page}, ${meta})
       `;
 
-      let banned = false;
-      let reason = '';
-      if (userId !== adminId) {
-        try {
-          const banRows = await sql`
-            SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
-          `;
-          if (banRows.length > 0) {
-            banned = true;
-            reason = String(banRows[0]?.reason || '');
-          }
-        } catch {
-          // ignore
-        }
-      }
-      return res.status(200).json({ ok: true, banned, reason });
-    } catch (err) {
-      console.error('[track] DB error:', err);
-      return res.status(500).json({ error: 'Failed to record event' });
+      return res.status(200).json({ ok: true, banned: false });
     }
-  }
 
-  // === 2. STATS (Advanced Analytics + Period Comparison + Audit Log) ===
-  if (rawAction === 'stats' && req.method === 'GET') {
-    const adminUser = getVerifiedAdmin(rawInitData, botToken, adminId);
-    if (!adminUser) return res.status(403).json({ isAdmin: false });
-    if (req.query?.check === '1') return res.status(200).json({ isAdmin: true });
-
-    const daysRaw = Number(req.query?.days ?? 7);
-    const days = [1, 7, 30, 3650].includes(daysRaw) ? daysRaw : 7;
-    const hideAdmin = String(req.query?.hideAdmin ?? '1') === '1';
-    const excludedId = hideAdmin ? adminId : '__none__';
-
-    const nowMs = Date.now();
-    const sinceIso = new Date(nowMs - days * 86400 * 1000).toISOString();
-    const prevSinceIso = new Date(nowMs - days * 2 * 86400 * 1000).toISOString();
-    const since14Iso = new Date(nowMs - 14 * 86400 * 1000).toISOString();
-    const since30Iso = new Date(nowMs - 30 * 86400 * 1000).toISOString();
-
-    try {
-      const sql = neon(connectionString);
-
-      const [
-        summaryRows,
-        prevSummaryRows,
-        newVsRetRows,
-        retentionRows,
-        dailyRows,
-        pagesRows,
-        langsRows,
-        platformsRows,
-        eventsRows,
-        proByProductRows,
-        usersRows,
-        auditRows,
-      ] = await Promise.all([
-        sql`
-          SELECT
-            COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg_users,
-            COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_users,
-            COUNT(DISTINCT user_id)::int AS total_users,
-            COUNT(*)::int AS total_events
-          FROM app_events
-          WHERE created_at >= ${sinceIso}::timestamptz
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-        `,
-        sql`
-          SELECT
-            COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg_users,
-            COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_users,
-            COUNT(DISTINCT user_id)::int AS total_users,
-            COUNT(*)::int AS total_events
-          FROM app_events
-          WHERE created_at >= ${prevSinceIso}::timestamptz
-            AND created_at < ${sinceIso}::timestamptz
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-        `,
-        sql`
-          WITH first_visits AS (
-            SELECT user_id, MIN(created_at) AS first_seen
-            FROM app_events
-            WHERE source <> 'admin' AND user_id <> ${excludedId}
-            GROUP BY user_id
-          ),
-          period_users AS (
-            SELECT DISTINCT user_id
-            FROM app_events
-            WHERE created_at >= ${sinceIso}::timestamptz
-              AND source <> 'admin'
-              AND user_id <> ${excludedId}
-          )
-          SELECT
-            COUNT(*) FILTER (WHERE fv.first_seen >= ${sinceIso}::timestamptz)::int AS new_users,
-            COUNT(*) FILTER (WHERE fv.first_seen < ${sinceIso}::timestamptz)::int AS returning_users
-          FROM period_users pu
-          JOIN first_visits fv ON fv.user_id = pu.user_id
-        `,
-        sql`
-          WITH per_user AS (
-            SELECT user_id, COUNT(DISTINCT DATE(created_at)) AS active_days
-            FROM app_events
-            WHERE created_at >= ${since30Iso}::timestamptz
-              AND source <> 'admin'
-              AND user_id <> ${excludedId}
-            GROUP BY user_id
-          )
-          SELECT
-            COUNT(*)::int AS total_30d,
-            COUNT(*) FILTER (WHERE active_days >= 2)::int AS returning_30d
-          FROM per_user
-        `,
-        sql`
-          SELECT
-            TO_CHAR(DATE(created_at), 'YYYY-MM-DD') AS day_iso,
-            TO_CHAR(DATE(created_at), 'DD.MM') AS day_label,
-            COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg_users,
-            COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_users,
-            COUNT(*)::int AS events
-          FROM app_events
-          WHERE created_at >= ${since14Iso}::timestamptz
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-          GROUP BY DATE(created_at)
-          ORDER BY DATE(created_at) ASC
-        `,
-        sql`
-          SELECT
-            COALESCE(page, 'unknown') AS page,
-            COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg_users,
-            COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_users,
-            COUNT(*)::int AS opens
-          FROM app_events
-          WHERE event = 'page_view'
-            AND created_at >= ${sinceIso}::timestamptz
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-          GROUP BY COALESCE(page, 'unknown')
-          ORDER BY opens DESC
-          LIMIT 16
-        `,
-        sql`
-          SELECT
-            COALESCE(NULLIF(lang, ''), 'unknown') AS lang,
-            COUNT(DISTINCT user_id)::int AS users
-          FROM app_events
-          WHERE created_at >= ${sinceIso}::timestamptz
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-          GROUP BY COALESCE(NULLIF(lang, ''), 'unknown')
-          ORDER BY users DESC
-          LIMIT 6
-        `,
-        sql`
-          SELECT
-            COALESCE(NULLIF(platform, ''), 'web') AS platform,
-            COUNT(DISTINCT user_id)::int AS users
-          FROM app_events
-          WHERE created_at >= ${sinceIso}::timestamptz
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-          GROUP BY COALESCE(NULLIF(platform, ''), 'web')
-          ORDER BY users DESC
-          LIMIT 6
-        `,
-        sql`
-          SELECT
-            event,
-            COUNT(DISTINCT user_id)::int AS unique_users,
-            COUNT(*)::int AS total
-          FROM app_events
-          WHERE created_at >= ${sinceIso}::timestamptz
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-          GROUP BY event
-          ORDER BY total DESC
-          LIMIT 14
-        `,
-        sql`
-          SELECT product_id, COUNT(*)::int AS count
-          FROM user_purchases
-          GROUP BY product_id
-          ORDER BY count DESC
-        `,
-        sql`
-          SELECT
-            e.user_id,
-            MAX(e.username) AS username,
-            MAX(e.first_name) AS first_name,
-            MAX(e.source) AS source,
-            MAX(e.platform) AS platform,
-            MAX(e.lang) AS lang,
-            COUNT(*)::int AS events_count,
-            COUNT(DISTINCT DATE(e.created_at))::int AS active_days,
-            MIN(e.created_at) AS first_seen,
-            MAX(e.created_at) AS last_seen,
-            (ARRAY_AGG(e.page ORDER BY e.created_at DESC))[1] AS last_page,
-            (
-              SELECT COUNT(*)::int
-              FROM user_purchases p
-              WHERE p.user_id::text = e.user_id::text
-            ) AS pro_count
-          FROM app_events e
-          WHERE e.source <> 'admin' AND e.user_id <> ${excludedId}
-          GROUP BY e.user_id
-          ORDER BY MAX(e.created_at) DESC
-          LIMIT 80
-        `,
-        sql`
-          SELECT id, user_id, username, first_name, event, meta, created_at
-          FROM app_events
-          WHERE source = 'admin'
-          ORDER BY created_at DESC
-          LIMIT 50
-        `,
-      ]);
-
-      let bannedUsers: any[] = [];
-      try {
-        bannedUsers = await sql`
-          SELECT user_id, reason, created_at
-          FROM banned_users
-          ORDER BY created_at DESC
-          LIMIT 60
-        `;
-      } catch {
-        bannedUsers = [];
+    if (action === 'stats') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) {
+        return res.status(403).json({ ok: false, error: 'Forbidden' });
       }
 
-      const proBreakdown = proByProductRows.map((row: any) => {
-        const pid = String(row.product_id);
-        const count = Number(row.count) || 0;
-        const unitStars = PRODUCT_PRICES_STARS[pid] ?? 250;
-        const stars = count * unitStars;
-        return {
-          product_id: pid,
-          count,
-          stars,
-          net_usd: Number((stars * 0.0123).toFixed(2)),
-        };
-      });
+      if (String(req.query.check || '') === '1') {
+        return res.status(200).json({ ok: true, admin: true, via: auth.via });
+      }
 
-      const totalProCount = proBreakdown.reduce((a, b) => a + b.count, 0);
-      const totalStars = proBreakdown.reduce((a, b) => a + b.stars, 0);
-      const totalNetUsd = Number((totalStars * 0.0123).toFixed(2));
+      const daysNum = Math.min(3650, Math.max(1, Number(req.query.days || 7) || 7));
+      const hideAdmin = String(req.query.hideAdmin || '1') !== '0';
+      const excludeId = hideAdmin && auth.adminId ? auth.adminId : '__none__';
 
-      const curTotalUsers = Number(summaryRows[0]?.total_users) || 0;
-      const curTotalEvents = Number(summaryRows[0]?.total_events) || 0;
-      const avgEvents =
-        curTotalUsers > 0 ? Number((curTotalEvents / curTotalUsers).toFixed(1)) : 0;
+      const now = Date.now();
+      const sinceIso = new Date(now - daysNum * 86400000).toISOString();
+      const prevSinceIso = new Date(now - daysNum * 2 * 86400000).toISOString();
+      const fourteenDaysIso = new Date(now - 14 * 86400000).toISOString();
+      const thirtyDaysIso = new Date(now - 30 * 86400000).toISOString();
 
-      const retTotal = Number(retentionRows[0]?.total_30d) || 0;
-      const retBack = Number(retentionRows[0]?.returning_30d) || 0;
-      const retentionPct = retTotal > 0 ? Math.round((retBack / retTotal) * 100) : 0;
+      const summaryRows = await sql`
+        SELECT
+          COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg_unique,
+          COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_unique,
+          COUNT(*)::int AS total_events
+        FROM app_events
+        WHERE created_at >= ${sinceIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+      `;
 
-      return res.status(200).json({
-        isAdmin: true,
-        days,
-        hideAdmin,
-        syncedAt: new Date().toISOString(),
-        summary: {
-          tg_users: Number(summaryRows[0]?.tg_users) || 0,
-          web_users: Number(summaryRows[0]?.web_users) || 0,
-          total_users: curTotalUsers,
-          total_events: curTotalEvents,
-          avg_events_per_user: avgEvents,
-          new_users: Number(newVsRetRows[0]?.new_users) || 0,
-          returning_users: Number(newVsRetRows[0]?.returning_users) || 0,
-          retention_pct: retentionPct,
-          total_pro: totalProCount,
-          total_stars: totalStars,
-          total_net_usd: totalNetUsd,
-        },
-        previous: {
-          tg_users: Number(prevSummaryRows[0]?.tg_users) || 0,
-          web_users: Number(prevSummaryRows[0]?.web_users) || 0,
-          total_users: Number(prevSummaryRows[0]?.total_users) || 0,
-          total_events: Number(prevSummaryRows[0]?.total_events) || 0,
-        },
-        daily: dailyRows,
-        topPages: pagesRows,
-        langs: langsRows,
-        platforms: platformsRows,
-        events: eventsRows,
-        proBreakdown,
-        users: usersRows,
-        bannedUsers,
-        auditLog: auditRows,
-      });
-    } catch (err: any) {
-      console.error('[stats] DB error:', err);
-      return res.status(500).json({
-        error: 'Failed to load stats',
-        detail: String(err?.message || err),
-      });
-    }
-  }
+      const prevSummaryRows = await sql`
+        SELECT
+          COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg_unique,
+          COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_unique,
+          COUNT(*)::int AS total_events
+        FROM app_events
+        WHERE created_at >= ${prevSinceIso}::timestamptz
+          AND created_at < ${sinceIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+      `;
 
-  // === 3. DAY DRILL-DOWN ===
-  if (rawAction === 'day' && req.method === 'GET') {
-    const adminUser = getVerifiedAdmin(rawInitData, botToken, adminId);
-    if (!adminUser) return res.status(403).json({ error: 'Forbidden' });
-
-    const dateStr = String(req.query?.date || '').trim();
-    if (!DATE_REGEX.test(dateStr)) {
-      return res.status(400).json({ error: 'Invalid date format YYYY-MM-DD' });
-    }
-    const hideAdmin = String(req.query?.hideAdmin ?? '1') === '1';
-    const excludedId = hideAdmin ? adminId : '__none__';
-
-    try {
-      const sql = neon(connectionString);
-      const [pages, users] = await Promise.all([
-        sql`
-          SELECT COALESCE(page, 'unknown') AS page, COUNT(*)::int AS opens
+      const retentionRows = await sql`
+        WITH first_seen AS (
+          SELECT user_id, MIN(created_at) AS first_at
           FROM app_events
-          WHERE DATE(created_at) = ${dateStr}::date
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
-          GROUP BY COALESCE(page, 'unknown')
-          ORDER BY opens DESC
-          LIMIT 10
-        `,
-        sql`
-          SELECT
-            user_id,
-            MAX(username) AS username,
-            MAX(first_name) AS first_name,
-            MAX(source) AS source,
-            COUNT(*)::int AS events_count
-          FROM app_events
-          WHERE DATE(created_at) = ${dateStr}::date
-            AND source <> 'admin'
-            AND user_id <> ${excludedId}
+          WHERE source IN ('telegram', 'web') AND user_id <> ${excludeId}
           GROUP BY user_id
-          ORDER BY COUNT(*) DESC
-          LIMIT 15
-        `,
-      ]);
-      return res.status(200).json({ date: dateStr, pages, users });
-    } catch (err) {
-      console.error('[day] DB error:', err);
-      return res.status(500).json({ error: 'Failed to load day details' });
-    }
-  }
-
-  // === 4. SYSTEM HEALTH ===
-  if (rawAction === 'health' && req.method === 'GET') {
-    const adminUser = getVerifiedAdmin(rawInitData, botToken, adminId);
-    if (!adminUser) return res.status(403).json({ error: 'Forbidden' });
-
-    const started = Date.now();
-    try {
-      const sql = neon(connectionString);
-      const [evMeta, purMeta] = await Promise.all([
-        sql`SELECT COUNT(*)::int AS count, MAX(created_at) AS last_at FROM app_events`,
-        sql`SELECT COUNT(*)::int AS count FROM user_purchases`,
-      ]);
-      let banCount: number | null = null;
-      try {
-        const b = await sql`SELECT COUNT(*)::int AS count FROM banned_users`;
-        banCount = Number(b[0]?.count) || 0;
-      } catch {
-        banCount = null;
-      }
-      const dbLatencyMs = Date.now() - started;
-      return res.status(200).json({
-        checkedAt: new Date().toISOString(),
-        apiStatus: 'ok',
-        dbStatus: dbLatencyMs > 1800 ? 'warn' : 'ok',
-        dbLatencyMs,
-        botTokenConfigured: Boolean(botToken),
-        adminIdConfigured: Boolean(adminId),
-        tables: {
-          app_events: Number(evMeta[0]?.count) || 0,
-          user_purchases: Number(purMeta[0]?.count) || 0,
-          banned_users: banCount,
-        },
-        lastEventAt: evMeta[0]?.last_at || null,
-      });
-    } catch (err: any) {
-      return res.status(200).json({
-        checkedAt: new Date().toISOString(),
-        apiStatus: 'ok',
-        dbStatus: 'error',
-        dbLatencyMs: Date.now() - started,
-        error: String(err?.message || 'DB unreachable'),
-        botTokenConfigured: Boolean(botToken),
-        adminIdConfigured: Boolean(adminId),
-        tables: { app_events: null, user_purchases: null, banned_users: null },
-        lastEventAt: null,
-      });
-    }
-  }
-
-  // === 5. USER PROFILE ===
-  if (rawAction === 'user' && req.method === 'GET') {
-    const adminUser = getVerifiedAdmin(rawInitData, botToken, adminId);
-    if (!adminUser) return res.status(403).json({ error: 'Forbidden' });
-
-    const targetId = String(req.query?.targetId || '').trim();
-    if (!targetId) return res.status(400).json({ error: 'Missing targetId' });
-
-    try {
-      const sql = neon(connectionString);
-      const [events, purchases, adminHistory] = await Promise.all([
-        sql`
-          SELECT event, page, platform, lang, created_at
+        ),
+        active_period AS (
+          SELECT DISTINCT user_id
           FROM app_events
-          WHERE user_id = ${targetId} AND source <> 'admin'
+          WHERE created_at >= ${sinceIso}::timestamptz
+            AND source IN ('telegram', 'web')
+            AND user_id <> ${excludeId}
+        ),
+        active_30 AS (
+          SELECT user_id, COUNT(DISTINCT DATE(created_at)) AS active_days
+          FROM app_events
+          WHERE created_at >= ${thirtyDaysIso}::timestamptz
+            AND source IN ('telegram', 'web')
+            AND user_id <> ${excludeId}
+          GROUP BY user_id
+        )
+        SELECT
+          COUNT(CASE WHEN f.first_at >= ${sinceIso}::timestamptz THEN 1 END)::int AS new_users,
+          COUNT(CASE WHEN f.first_at < ${sinceIso}::timestamptz THEN 1 END)::int AS returning_users,
+          (SELECT COUNT(*)::int FROM active_30 WHERE active_days > 1) AS retained_30d,
+          (SELECT COUNT(*)::int FROM active_30) AS total_30d
+        FROM active_period a
+        JOIN first_seen f ON f.user_id = a.user_id
+      `;
+
+      const dailyRows = await sql`
+        SELECT
+          TO_CHAR(DATE(created_at), 'YYYY-MM-DD') AS day_iso,
+          TO_CHAR(DATE(created_at), 'DD.MM') AS label,
+          COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg,
+          COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web,
+          COUNT(*)::int AS events
+        FROM app_events
+        WHERE created_at >= ${fourteenDaysIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+        GROUP BY DATE(created_at)
+        ORDER BY DATE(created_at) ASC
+      `;
+
+      const dailyMap: Record<string, { day_iso: string; label: string; tg: number; web: number; events: number }> = {};
+      for (const r of dailyRows) {
+        const iso = String(r.day_iso);
+        dailyMap[iso] = {
+          day_iso: iso,
+          label: String(r.label),
+          tg: Number(r.tg || 0),
+          web: Number(r.web || 0),
+          events: Number(r.events || 0),
+        };
+      }
+      const daily: Array<{ day_iso: string; label: string; tg: number; web: number; events: number }> = [];
+      for (let i = 13; i >= 0; i -= 1) {
+        const d = new Date(now - i * 86400000);
+        const iso = d.toISOString().slice(0, 10);
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        daily.push(
+          dailyMap[iso] || {
+            day_iso: iso,
+            label: `${dd}.${mm}`,
+            tg: 0,
+            web: 0,
+            events: 0,
+          },
+        );
+      }
+
+      const pagesRows = await sql`
+        SELECT
+          COALESCE(NULLIF(page, ''), 'welcome') AS page,
+          COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg,
+          COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web,
+          COUNT(*)::int AS events
+        FROM app_events
+        WHERE created_at >= ${sinceIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+        GROUP BY COALESCE(NULLIF(page, ''), 'welcome')
+        ORDER BY (COUNT(DISTINCT user_id)) DESC, COUNT(*) DESC
+        LIMIT 16
+      `;
+
+      const eventsRows = await sql`
+        SELECT
+          event,
+          COUNT(DISTINCT user_id)::int AS users,
+          COUNT(*)::int AS count
+        FROM app_events
+        WHERE created_at >= ${sinceIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+        GROUP BY event
+        ORDER BY COUNT(*) DESC
+        LIMIT 16
+      `;
+
+      const langRows = await sql`
+        SELECT
+          UPPER(COALESCE(NULLIF(lang, ''), 'UNKNOWN')) AS name,
+          COUNT(DISTINCT user_id)::int AS value
+        FROM app_events
+        WHERE created_at >= ${sinceIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+        GROUP BY UPPER(COALESCE(NULLIF(lang, ''), 'UNKNOWN'))
+        ORDER BY value DESC
+        LIMIT 8
+      `;
+
+      const platformRows = await sql`
+        SELECT
+          LOWER(COALESCE(NULLIF(platform, ''), 'unknown')) AS name,
+          COUNT(DISTINCT user_id)::int AS value
+        FROM app_events
+        WHERE created_at >= ${sinceIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+        GROUP BY LOWER(COALESCE(NULLIF(platform, ''), 'unknown'))
+        ORDER BY value DESC
+        LIMIT 8
+      `;
+
+      const proRows = await sql`
+        SELECT product_id, COUNT(*)::int AS count
+        FROM user_purchases
+        GROUP BY product_id
+        ORDER BY count DESC
+      `;
+
+      let totalProCount = 0;
+      let totalStars = 0;
+      const proBreakdown = proRows.map((r) => {
+        const pid = String(r.product_id);
+        const cnt = Number(r.count || 0);
+        const stars = cnt * (PRO_PRICES[pid] || 250);
+        totalProCount += cnt;
+        totalStars += stars;
+        return { product_id: pid, count: cnt, stars };
+      });
+
+      const usersRows = await sql`
+        SELECT
+          e.user_id,
+          MAX(e.username) AS username,
+          MAX(e.first_name) AS first_name,
+          MAX(e.source) AS source,
+          MAX(e.platform) AS platform,
+          MAX(e.lang) AS lang,
+          (ARRAY_AGG(e.page ORDER BY e.created_at DESC))[1] AS last_page,
+          COUNT(*)::int AS events,
+          MAX(e.created_at) AS last_seen,
+          COALESCE(p.pro_count, 0)::int AS pro_count,
+          CASE WHEN b.user_id IS NOT NULL THEN true ELSE false END AS is_banned
+        FROM app_events e
+        LEFT JOIN (
+          SELECT user_id::text AS uid, COUNT(*)::int AS pro_count
+          FROM user_purchases
+          GROUP BY user_id::text
+        ) p ON p.uid = e.user_id::text
+        LEFT JOIN banned_users b ON b.user_id::text = e.user_id::text
+        WHERE e.created_at >= ${sinceIso}::timestamptz
+          AND e.source IN ('telegram', 'web')
+          AND e.user_id <> ${excludeId}
+        GROUP BY e.user_id, p.pro_count, b.user_id
+        ORDER BY MAX(e.created_at) DESC
+        LIMIT 80
+      `;
+
+      const bannedRows = await sql`
+        SELECT user_id, reason, created_at
+        FROM banned_users
+        ORDER BY created_at DESC
+        LIMIT 50
+      `;
+
+      const auditRows = await sql`
+        SELECT id, user_id, event, page, platform, meta, created_at
+        FROM app_events
+        WHERE source = 'admin'
+        ORDER BY created_at DESC
+        LIMIT 40
+      `;
+
+      const cur = summaryRows[0] || { tg_unique: 0, web_unique: 0, total_events: 0 };
+      const prev = prevSummaryRows[0] || { tg_unique: 0, web_unique: 0, total_events: 0 };
+      const ret = retentionRows[0] || {
+        new_users: 0,
+        returning_users: 0,
+        retained_30d: 0,
+        total_30d: 0,
+      };
+
+      const totalUnique = Number(cur.tg_unique || 0) + Number(cur.web_unique || 0);
+      const retentionPct =
+        Number(ret.total_30d || 0) > 0
+          ? Math.round((Number(ret.retained_30d || 0) / Number(ret.total_30d || 1)) * 100)
+          : 0;
+
+      return res.status(200).json({
+        ok: true,
+        via: auth.via,
+        days: daysNum,
+        hideAdmin,
+        summary: {
+          tgUnique: Number(cur.tg_unique || 0),
+          webUnique: Number(cur.web_unique || 0),
+          totalEvents: Number(cur.total_events || 0),
+          prevTgUnique: Number(prev.tg_unique || 0),
+          prevWebUnique: Number(prev.web_unique || 0),
+          prevTotalEvents: Number(prev.total_events || 0),
+          newUsers: Number(ret.new_users || 0),
+          returningUsers: Number(ret.returning_users || 0),
+          retention30d: retentionPct,
+          avgEventsPerUser:
+            totalUnique > 0 ? Number((Number(cur.total_events || 0) / totalUnique).toFixed(1)) : 0,
+          proTotal: totalProCount,
+          proStars: totalStars,
+          proUsdEst: Number((totalStars * 0.0123).toFixed(1)),
+        },
+        daily,
+        pages: pagesRows.map((r) => ({
+          page: String(r.page),
+          tg: Number(r.tg || 0),
+          web: Number(r.web || 0),
+          events: Number(r.events || 0),
+        })),
+        events: eventsRows.map((r) => ({
+          event: String(r.event),
+          users: Number(r.users || 0),
+          count: Number(r.count || 0),
+        })),
+        languages: langRows.map((r) => ({
+          name: String(r.name),
+          value: Number(r.value || 0),
+        })),
+        platforms: platformRows.map((r) => ({
+          name: String(r.name),
+          value: Number(r.value || 0),
+        })),
+        proBreakdown,
+        users: usersRows.map((r) => ({
+          user_id: String(r.user_id),
+          username: String(r.username || ''),
+          first_name: String(r.first_name || ''),
+          source: String(r.source || 'web'),
+          platform: String(r.platform || 'unknown'),
+          lang: String(r.lang || 'unknown'),
+          last_page: String(r.last_page || 'welcome'),
+          events: Number(r.events || 0),
+          last_seen: String(r.last_seen || ''),
+          pro_count: Number(r.pro_count || 0),
+          is_banned: Boolean(r.is_banned),
+        })),
+        banned: bannedRows.map((r) => ({
+          user_id: String(r.user_id),
+          reason: String(r.reason || ''),
+          created_at: String(r.created_at || ''),
+        })),
+        auditLog: auditRows.map((r) => ({
+          id: Number(r.id || 0),
+          actor_id: String(r.user_id || ''),
+          event: String(r.event || ''),
+          target: String(r.page || ''),
+          via: String(r.platform || 'telegram'),
+          meta: String(r.meta || ''),
+          created_at: String(r.created_at || ''),
+        })),
+      });
+    }
+
+    if (action === 'day') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const dateStr = String(req.query.date || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return res.status(400).json({ ok: false, error: 'Invalid date' });
+      }
+      const hideAdmin = String(req.query.hideAdmin || '1') !== '0';
+      const excludeId = hideAdmin && auth.adminId ? auth.adminId : '__none__';
+
+      const startIso = `${dateStr}T00:00:00.000Z`;
+      const endIso = `${dateStr}T23:59:59.999Z`;
+
+      const totals = await sql`
+        SELECT
+          COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg,
+          COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web,
+          COUNT(*)::int AS events
+        FROM app_events
+        WHERE created_at >= ${startIso}::timestamptz
+          AND created_at <= ${endIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+      `;
+
+      const topPages = await sql`
+        SELECT COALESCE(NULLIF(page, ''), 'welcome') AS page, COUNT(*)::int AS count
+        FROM app_events
+        WHERE created_at >= ${startIso}::timestamptz
+          AND created_at <= ${endIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+        GROUP BY COALESCE(NULLIF(page, ''), 'welcome')
+        ORDER BY count DESC
+        LIMIT 8
+      `;
+
+      const recentUsers = await sql`
+        SELECT
+          user_id,
+          MAX(username) AS username,
+          MAX(first_name) AS first_name,
+          MAX(source) AS source,
+          COUNT(*)::int AS events
+        FROM app_events
+        WHERE created_at >= ${startIso}::timestamptz
+          AND created_at <= ${endIso}::timestamptz
+          AND source IN ('telegram', 'web')
+          AND user_id <> ${excludeId}
+        GROUP BY user_id
+        ORDER BY events DESC
+        LIMIT 12
+      `;
+
+      const row = totals[0] || { tg: 0, web: 0, events: 0 };
+      return res.status(200).json({
+        ok: true,
+        date: dateStr,
+        tg: Number(row.tg || 0),
+        web: Number(row.web || 0),
+        events: Number(row.events || 0),
+        topPages: topPages.map((p) => ({ page: String(p.page), count: Number(p.count || 0) })),
+        users: recentUsers.map((u) => ({
+          user_id: String(u.user_id),
+          username: String(u.username || ''),
+          first_name: String(u.first_name || ''),
+          source: String(u.source || 'web'),
+          events: Number(u.events || 0),
+        })),
+      });
+    }
+
+    if (action === 'health') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const t0 = Date.now();
+      const counts = await sql`
+        SELECT
+          (SELECT COUNT(*)::int FROM app_events) AS events_count,
+          (SELECT COUNT(*)::int FROM user_purchases) AS purchases_count,
+          (SELECT COUNT(*)::int FROM banned_users) AS banned_count,
+          (SELECT MAX(created_at) FROM app_events WHERE source IN ('telegram', 'web')) AS last_event_at
+      `;
+      const latencyMs = Date.now() - t0;
+      const row = counts[0] || {};
+
+      return res.status(200).json({
+        ok: true,
+        latencyMs,
+        eventsCount: Number(row.events_count || 0),
+        purchasesCount: Number(row.purchases_count || 0),
+        bannedCount: Number(row.banned_count || 0),
+        lastEventAt: row.last_event_at ? String(row.last_event_at) : null,
+        adminIdConfigured: Boolean((process.env.ADMIN_TELEGRAM_ID || '').trim()),
+        webKeyConfigured: Boolean((process.env.ADMIN_WEB_KEY || '').trim()),
+        via: auth.via,
+      });
+    }
+
+    if (action === 'user') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const targetId = String(req.query.targetId || '').trim();
+      if (!targetId) return res.status(400).json({ ok: false, error: 'Missing targetId' });
+
+      const [events, purchases, ban, adminHistory] = await Promise.all([
+        sql`
+          SELECT event, page, platform, created_at
+          FROM app_events
+          WHERE user_id = ${targetId} AND source IN ('telegram', 'web')
           ORDER BY created_at DESC
           LIMIT 25
         `,
         sql`
-          SELECT product_id
-          FROM user_purchases
-          WHERE user_id::text = ${targetId}
+          SELECT product_id FROM user_purchases WHERE user_id::text = ${targetId}
+        `,
+        sql`
+          SELECT reason, created_at FROM banned_users WHERE user_id = ${targetId} LIMIT 1
         `,
         sql`
           SELECT event, meta, created_at
           FROM app_events
-          WHERE source = 'admin' AND meta->>'targetUserId' = ${targetId}
+          WHERE source = 'admin' AND page = ${targetId}
           ORDER BY created_at DESC
           LIMIT 10
         `,
       ]);
+
       return res.status(200).json({
-        userId: targetId,
-        events,
-        products: purchases.map((r: any) => String(r.product_id)),
-        adminHistory,
+        ok: true,
+        targetId,
+        products: purchases.map((p) => String(p.product_id)),
+        isBanned: ban.length > 0,
+        banReason: ban.length > 0 ? String(ban[0].reason || '') : '',
+        events: events.map((e) => ({
+          event: String(e.event),
+          page: String(e.page || 'welcome'),
+          platform: String(e.platform || 'unknown'),
+          created_at: String(e.created_at),
+        })),
+        adminHistory: adminHistory.map((h) => ({
+          event: String(h.event),
+          meta: String(h.meta || ''),
+          created_at: String(h.created_at),
+        })),
       });
-    } catch (err) {
-      console.error('[user] DB error:', err);
-      return res.status(500).json({ error: 'Failed to load user profile' });
-    }
-  }
-
-  // === 6. GRANT / REVOKE PRO (with real Audit Log) ===
-  if (rawAction === 'grant' && req.method === 'POST') {
-    const adminUser = getVerifiedAdmin(rawInitData, botToken, adminId);
-    if (!adminUser) return res.status(403).json({ error: 'Forbidden' });
-
-    let body: Record<string, any> = {};
-    try {
-      body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
-    } catch {
-      return res.status(400).json({ error: 'Invalid JSON' });
     }
 
-    const targetUserId = String(body.targetUserId || '').trim();
-    const productId = String(body.productId || '').trim();
-    const revoke = Boolean(body.revoke);
+    if (action === 'grant' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
-    if (!/^\d{3,20}$/.test(targetUserId)) {
-      return res.status(400).json({ error: 'Некорректный Telegram ID (нужны только цифры)' });
-    }
+      const body = (req.body || {}) as Record<string, unknown>;
+      const targetId = String(body.targetId || '').trim();
+      const productId = String(body.productId || '').trim();
+      const mode = body.mode === 'revoke' ? 'revoke' : 'grant';
 
-    const productsToApply: string[] =
-      productId === 'all'
-        ? [...ALL_PRO_PRODUCTS]
-        : PRODUCT_ID_REGEX.test(productId)
-        ? [productId]
-        : [];
+      if (!targetId || !productId) {
+        return res.status(400).json({ ok: false, error: 'Укажите ID пользователя и модуль' });
+      }
 
-    if (productsToApply.length === 0) {
-      return res.status(400).json({ error: 'Некорректный productId' });
-    }
+      const targets = productId === 'all' ? ALL_CORE_PRO_IDS : [productId];
 
-    try {
-      const sql = neon(connectionString);
-      for (let i = 0; i < productsToApply.length; i++) {
-        const pid = productsToApply[i];
-        if (revoke) {
-          await sql`
-            DELETE FROM user_purchases
-            WHERE user_id::text = ${targetUserId} AND product_id = ${pid}
-          `;
-        } else {
+      if (mode === 'grant') {
+        for (const pid of targets) {
           const exists = await sql`
-            SELECT 1 FROM user_purchases
-            WHERE user_id::text = ${targetUserId} AND product_id = ${pid}
-            LIMIT 1
+            SELECT 1 FROM user_purchases WHERE user_id::text = ${targetId} AND product_id = ${pid} LIMIT 1
           `;
           if (exists.length === 0) {
             await sql`
-              INSERT INTO user_purchases (user_id, product_id)
-              VALUES (${targetUserId}, ${pid})
+              INSERT INTO user_purchases (user_id, product_id) VALUES (${targetId}, ${pid})
             `;
           }
         }
-      }
-      await logAdminAudit(sql, adminUser, revoke ? 'admin_revoke_pro' : 'admin_grant_pro', {
-        targetUserId,
-        productId,
-        result: 'ok',
-      });
-      return res.status(200).json({ ok: true, targetUserId, products: productsToApply, revoke });
-    } catch (err) {
-      console.error('[grant] DB error:', err);
-      return res.status(500).json({ error: 'Ошибка обновления доступа в Neon' });
-    }
-  }
-
-  // === 7. BAN / UNBAN (with real Audit Log) ===
-  if (rawAction === 'ban' && req.method === 'POST') {
-    const adminUser = getVerifiedAdmin(rawInitData, botToken, adminId);
-    if (!adminUser) return res.status(403).json({ error: 'Forbidden' });
-
-    let body: Record<string, any> = {};
-    try {
-      body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
-    } catch {
-      return res.status(400).json({ error: 'Invalid JSON' });
-    }
-
-    const targetUserId = String(body.targetUserId || '').trim();
-    const unban = Boolean(body.unban);
-    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 160) : '';
-
-    if (!targetUserId || targetUserId.length < 3 || targetUserId.length > 64) {
-      return res.status(400).json({ error: 'Некорректный ID пользователя' });
-    }
-    if (!unban && targetUserId === adminId) {
-      return res.status(400).json({ error: 'Нельзя заблокировать самого себя' });
-    }
-
-    try {
-      const sql = neon(connectionString);
-      if (unban) {
-        await sql`DELETE FROM banned_users WHERE user_id = ${targetUserId}`;
       } else {
+        for (const pid of targets) {
+          await sql`
+            DELETE FROM user_purchases WHERE user_id::text = ${targetId} AND product_id = ${pid}
+          `;
+        }
+      }
+
+      const auditEvent = mode === 'grant' ? 'admin_grant_pro' : 'admin_revoke_pro';
+      await sql`
+        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+        VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', ${auditEvent}, ${targetId}, ${productId})
+      `;
+
+      return res.status(200).json({ ok: true, mode, targetId, productId });
+    }
+
+    if (action === 'ban' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const targetId = String(body.targetId || '').trim();
+      const mode = body.mode === 'unban' ? 'unban' : 'ban';
+      const reason = String(body.reason || 'Ограничено администратором').slice(0, 200);
+
+      if (!targetId) {
+        return res.status(400).json({ ok: false, error: 'Укажите ID пользователя' });
+      }
+      if (mode === 'ban' && auth.adminId && targetId === auth.adminId) {
+        return res.status(400).json({ ok: false, error: 'Нельзя заблокировать самого себя' });
+      }
+
+      if (mode === 'ban') {
         await sql`
           INSERT INTO banned_users (user_id, reason)
-          VALUES (${targetUserId}, ${reason || 'Доступ ограничен администратором'})
+          VALUES (${targetId}, ${reason})
           ON CONFLICT (user_id) DO UPDATE SET reason = EXCLUDED.reason, created_at = NOW()
         `;
+      } else {
+        await sql`DELETE FROM banned_users WHERE user_id = ${targetId}`;
       }
-      await logAdminAudit(sql, adminUser, unban ? 'admin_unban' : 'admin_ban', {
-        targetUserId,
-        reason: reason || null,
-        result: 'ok',
+
+      const auditEvent = mode === 'ban' ? 'admin_ban' : 'admin_unban';
+      await sql`
+        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+        VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', ${auditEvent}, ${targetId}, ${reason})
+      `;
+
+      return res.status(200).json({ ok: true, mode, targetId });
+    }
+
+    // Standard purchase check
+    const userId = String(req.query.userId || '').trim();
+    const productId = String(req.query.productId || '').trim();
+
+    if (!userId) {
+      return res.status(200).json({ purchased: false, banned: false });
+    }
+
+    const banCheck = await sql`
+      SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
+    `;
+    if (banCheck.length > 0) {
+      return res.status(200).json({
+        purchased: false,
+        banned: true,
+        reason: String(banCheck[0].reason || 'Доступ ограничен администратором'),
       });
-      return res.status(200).json({ ok: true, targetUserId, unban });
-    } catch (err) {
-      console.error('[ban] DB error:', err);
-      return res.status(500).json({ error: 'Ошибка обновления бана' });
-    }
-  }
-
-  // === 8. STANDARD PURCHASE CHECK ===
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET, POST');
-    return res.status(405).json({ error: 'Метод не разрешен' });
-  }
-
-  const rawUserId = Array.isArray(req.query?.userId)
-    ? req.query.userId[0]
-    : req.query?.userId;
-  const rawProductId = Array.isArray(req.query?.productId)
-    ? req.query.productId[0]
-    : req.query?.productId;
-
-  if (!rawProductId || typeof rawProductId !== 'string' || !PRODUCT_ID_REGEX.test(rawProductId)) {
-    return res.status(400).json({ error: 'Некорректный или отсутствующий productId' });
-  }
-
-  if (!rawInitData) {
-    return res.status(401).json({ error: 'Требуется X-Telegram-Init-Data' });
-  }
-  if (!botToken) {
-    return res.status(500).json({ error: 'Токен бота не настроен на сервере' });
-  }
-  const verification = verifyTelegramInitData(rawInitData, botToken);
-  if (!verification.valid) return res.status(401).json({ error: verification.reason });
-  if (rawUserId && String(verification.user.id) !== String(rawUserId).trim()) {
-    return res.status(403).json({ error: 'Несовпадение userId с initData' });
-  }
-  const verifiedUserId = String(verification.user.id);
-
-  try {
-    const sql = neon(connectionString);
-    if (verifiedUserId !== adminId) {
-      try {
-        const banRows = await sql`
-          SELECT 1 FROM banned_users WHERE user_id = ${verifiedUserId} LIMIT 1
-        `;
-        if (banRows.length > 0) {
-          return res.status(200).json({
-            purchased: false,
-            banned: true,
-            userId: Number(verifiedUserId),
-            productId: rawProductId,
-          });
-        }
-      } catch {
-        // ignore
-      }
     }
 
-    const result = await sql`
-      SELECT 1
-      FROM user_purchases
-      WHERE user_id::text = ${verifiedUserId}
-        AND product_id = ${rawProductId}
+    if (!productId) {
+      return res.status(200).json({ purchased: false, banned: false });
+    }
+
+    const rows = await sql`
+      SELECT 1 FROM user_purchases
+      WHERE user_id::text = ${userId} AND product_id = ${productId}
       LIMIT 1
     `;
 
-    return res.status(200).json({
-      purchased: result.length > 0,
-      userId: Number(verifiedUserId),
-      productId: rawProductId,
-    });
-  } catch (error: unknown) {
-    console.error('[check-purchase] DB error:', error);
-    return res.status(500).json({ error: 'Внутренняя ошибка при проверке покупки' });
+    return res.status(200).json({ purchased: rows.length > 0, banned: false });
+  } catch (err) {
+    console.error('check-purchase error:', err);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 }
