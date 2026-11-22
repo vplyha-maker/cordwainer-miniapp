@@ -1,218 +1,202 @@
-export type AdminTab = 'overview' | 'pages' | 'crm' | 'users' | 'audit' | 'health'
-export type PeriodDays = 1 | 7 | 30 | 3650
-export type ChartSourceFilter = 'all' | 'tg' | 'web'
-export type ChartKind = 'line' | 'area' | 'bar'
+import type { CSSProperties } from 'react';
 
-export interface DailyRow {
-  day_iso: string
-  day_label: string
-  tg_users: number
-  web_users: number
-  events: number
-}
+export type AdminTab = 'overview' | 'analytics' | 'crm' | 'users' | 'audit' | 'system';
 
-export interface PageStat {
-  page: string
-  tg_users: number
-  web_users: number
-  opens: number
-}
+export type DailyPoint = {
+  day_iso: string;
+  label: string;
+  tg: number;
+  web: number;
+  events: number;
+};
 
-export interface CountRow {
-  lang?: string
-  platform?: string
-  users: number
-}
+export type PageStat = {
+  page: string;
+  tg: number;
+  web: number;
+  events: number;
+};
 
-export interface EventRow {
-  event: string
-  unique_users: number
-  total: number
-}
+export type EventStat = {
+  event: string;
+  users: number;
+  count: number;
+};
 
-export interface ProRow {
-  product_id: string
-  count: number
-  stars: number
-  net_usd: number
-}
+export type NameValue = {
+  name: string;
+  value: number;
+};
 
-export interface BannedRow {
-  user_id: string
-  reason: string | null
-  created_at: string
-}
+export type ProBreakdownItem = {
+  product_id: string;
+  count: number;
+  stars: number;
+};
 
-export interface UserRow {
-  user_id: string
-  username: string | null
-  first_name: string | null
-  source: string
-  platform: string | null
-  lang: string | null
-  events_count: number
-  active_days: number
-  first_seen: string
-  last_seen: string
-  last_page: string | null
-  pro_count: number
-}
+export type UserItem = {
+  user_id: string;
+  username: string;
+  first_name: string;
+  source: string;
+  platform: string;
+  lang: string;
+  last_page: string;
+  events: number;
+  last_seen: string;
+  pro_count: number;
+  is_banned: boolean;
+};
 
-export interface AuditRow {
-  id: number
-  user_id: string
-  username: string | null
-  first_name: string | null
-  event: string
-  meta: Record<string, unknown> | null
-  created_at: string
-}
+export type BannedItem = {
+  user_id: string;
+  reason: string;
+  created_at: string;
+};
 
-export interface UserDetailPayload {
-  userId: string
-  products: string[]
-  events: {
-    event: string
-    page: string | null
-    platform: string | null
-    lang: string | null
-    created_at: string
-  }[]
-  adminHistory: {
-    event: string
-    meta: Record<string, unknown> | null
-    created_at: string
-  }[]
-}
+export type AuditEntry = {
+  id: number;
+  actor_id: string;
+  event: string;
+  target: string;
+  via: string;
+  meta: string;
+  created_at: string;
+};
 
-export interface DayDetailPayload {
-  date: string
-  pages: { page: string; opens: number }[]
-  users: {
-    user_id: string
-    username: string | null
-    first_name: string | null
-    source: string
-    events_count: number
-  }[]
-}
-
-export interface HealthPayload {
-  checkedAt: string
-  apiStatus: 'ok' | 'error'
-  dbStatus: 'ok' | 'warn' | 'error'
-  dbLatencyMs: number
-  botTokenConfigured: boolean
-  adminIdConfigured: boolean
-  tables: {
-    app_events: number | null
-    user_purchases: number | null
-    banned_users: number | null
-  }
-  lastEventAt: string | null
-  error?: string
-}
-
-export interface StatsPayload {
-  days: number
-  hideAdmin: boolean
-  syncedAt: string
+export type AdminStats = {
+  ok: boolean;
+  via?: 'telegram' | 'web';
+  days: number;
+  hideAdmin: boolean;
   summary: {
-    tg_users: number
-    web_users: number
-    total_users: number
-    total_events: number
-    avg_events_per_user: number
-    new_users: number
-    returning_users: number
-    retention_pct: number
-    total_pro: number
-    total_stars: number
-    total_net_usd: number
-  }
-  previous: {
-    tg_users: number
-    web_users: number
-    total_users: number
-    total_events: number
-  }
-  daily: DailyRow[]
-  topPages: PageStat[]
-  langs: CountRow[]
-  platforms: CountRow[]
-  events: EventRow[]
-  proBreakdown: ProRow[]
-  users: UserRow[]
-  bannedUsers: BannedRow[]
-  auditLog: AuditRow[]
-}
+    tgUnique: number;
+    webUnique: number;
+    totalEvents: number;
+    prevTgUnique: number;
+    prevWebUnique: number;
+    prevTotalEvents: number;
+    newUsers: number;
+    returningUsers: number;
+    retention30d: number;
+    avgEventsPerUser: number;
+    proTotal: number;
+    proStars: number;
+    proUsdEst: number;
+  };
+  daily: DailyPoint[];
+  pages: PageStat[];
+  events: EventStat[];
+  languages: NameValue[];
+  platforms: NameValue[];
+  proBreakdown: ProBreakdownItem[];
+  users: UserItem[];
+  banned: BannedItem[];
+  auditLog: AuditEntry[];
+};
 
-export interface SavedFilterPreset {
-  id: string
-  name: string
-  days: PeriodDays
-  hideAdmin: boolean
-}
+export type DayDetail = {
+  date: string;
+  tg: number;
+  web: number;
+  events: number;
+  topPages: Array<{ page: string; count: number }>;
+  users: Array<{
+    user_id: string;
+    username: string;
+    first_name: string;
+    source: string;
+    events: number;
+  }>;
+};
 
-export const PRODUCT_OPTIONS = [
-  { id: 'pro_pigments', label: 'Пигменты', price: '1000 ⭐' },
-  { id: 'pro_videos', label: 'Видео-лукбук', price: '350 ⭐' },
-  { id: 'pro_colors', label: '3D Цвета', price: '250 ⭐' },
-  { id: 'pro_heel', label: 'Каблук', price: '250 ⭐' },
-  { id: 'pro_last', label: 'Колодка', price: '250 ⭐' },
-  { id: 'pro_sizes', label: 'Размеры', price: '150 ⭐' },
+export type HealthData = {
+  ok: boolean;
+  latencyMs: number;
+  eventsCount: number;
+  purchasesCount: number;
+  bannedCount: number;
+  lastEventAt: string | null;
+  adminIdConfigured: boolean;
+  webKeyConfigured?: boolean;
+  via?: string;
+};
+
+export type UserProfile = {
+  targetId: string;
+  products: string[];
+  isBanned: boolean;
+  banReason: string;
+  events: Array<{
+    event: string;
+    page: string;
+    platform: string;
+    created_at: string;
+  }>;
+  adminHistory: Array<{
+    event: string;
+    meta: string;
+    created_at: string;
+  }>;
+};
+
+export type FilterPreset = {
+  id: string;
+  label: string;
+  days: number;
+  hideAdmin: boolean;
+};
+
+export type ProCatalogItem = {
+  id: string;
+  label: string;
+  price: string;
+};
+
+export const PRO_CATALOG: ProCatalogItem[] = [
+  { id: 'pro_pigments', label: 'Пигменты', price: '1000 ★' },
+  { id: 'pro_videos', label: 'Видео-лукбук', price: '350 ★' },
+  { id: 'pro_colors', label: '3D Цвета', price: '250 ★' },
+  { id: 'pro_heel', label: 'Каблук', price: '250 ★' },
+  { id: 'pro_last', label: 'Колодка', price: '250 ★' },
+  { id: 'pro_sizes', label: 'Размеры', price: '150 ★' },
   { id: 'all', label: 'Все 6 модулей', price: 'ALL' },
-]
+];
 
-export const CHART_PALETTE = [
-  '#C9A86A',
-  '#60A5FA',
-  '#34D399',
-  '#A78BFA',
-  '#F59E0B',
-  '#E05A6D',
-]
+export const PALETTE = {
+  gold: '#C9A86A',
+  blue: '#5B9BFF',
+  emerald: '#3FD08F',
+  violet: '#A87BFF',
+  coral: '#F06A7E',
+  amber: '#F5B041',
+  muted: '#8D867C',
+  border: 'rgba(255,255,255,0.09)',
+  surface: '#141412',
+};
 
-export const DARK_INPUT_STYLE = {
+export const DARK_INPUT_STYLE: CSSProperties = {
   color: '#F5F1EB',
   WebkitTextFillColor: '#F5F1EB',
   caretColor: '#C9A86A',
-} as const
+  backgroundColor: '#0E0E0D',
+};
 
-export function formatTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  try {
-    return new Date(iso).toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return '—'
-  }
+export function formatShortDate(iso: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}.${mm}, ${hh}:${min}`;
 }
 
-export function formatDateShort(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  try {
-    return new Date(iso).toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-    })
-  } catch {
-    return '—'
-  }
+export function formatDelta(cur: number, prev: number): { text: string; positive: boolean; neutral: boolean } {
+  if (prev === 0 && cur === 0) return { text: '0%', positive: false, neutral: true };
+  if (prev === 0) return { text: '+100%', positive: true, neutral: false };
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return { text: '0%', positive: false, neutral: true };
+  return { text: `${pct > 0 ? '+' : ''}${pct}%`, positive: pct > 0, neutral: false };
 }
-
-export function formatNum(n: number): string {
-  return n.toLocaleString('ru-RU')
-}
-
-export function calcDeltaPct(current: number, previous: number): string | null {
-  if (previous <= 0) return current > 0 ? '+100%' : null
-  const pct = Math.round(((current - previous) / previous) * 100)
-  return pct >= 0 ? `+${pct}%` : `${pct}%`
-}
-
