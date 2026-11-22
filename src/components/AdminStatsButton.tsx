@@ -8,9 +8,9 @@ import {
   Copy,
   Database,
   Download,
+  ExternalLink,
   FileSpreadsheet,
   FileText,
-  KeyRound,
   LogOut,
   RefreshCw,
   ScrollText,
@@ -61,6 +61,7 @@ type TgWindow = {
   Telegram?: {
     WebApp?: {
       initData?: string;
+      openLink?: (url: string) => void;
     };
   };
 };
@@ -79,7 +80,7 @@ type PreviewModalData = {
   hint: string;
 };
 
-const WEB_KEY_STORAGE = 'cordwaine_admin_web_key';
+const WEB_TOKEN_STORAGE = 'cordwaine_admin_web_token';
 const PRESETS_STORAGE = 'cordwaine_admin_presets_v1';
 
 const TABS: Array<{ id: AdminTab; label: string }> = [
@@ -96,11 +97,10 @@ function getTgInitData(): string {
   return (window as unknown as TgWindow).Telegram?.WebApp?.initData || '';
 }
 
-function hasAdminUrlFlag(): boolean {
-  if (typeof window === 'undefined') return false;
-  const h = window.location.hash.toLowerCase();
-  const s = new URLSearchParams(window.location.search);
-  return h === '#admin' || h.startsWith('#admin') || s.get('admin') === '1';
+function extractUrlAdminToken(): string {
+  if (typeof window === 'undefined') return '';
+  const m = window.location.hash.match(/admin_token=([0-9a-f.]+)/i);
+  return m ? m[1] : '';
 }
 
 function loadPresets(): PresetList {
@@ -118,11 +118,8 @@ function loadPresets(): PresetList {
 
 export const AdminStatsButton: React.FC = () => {
   const [authMode, setAuthMode] = useState<AuthMode>('none');
-  const [webKey, setWebKey] = useState<string>('');
-  const [showWebLogin, setShowWebLogin] = useState<boolean>(false);
-  const [webKeyInput, setWebKeyInput] = useState<string>('');
-  const [webLoginError, setWebLoginError] = useState<string>('');
-  const [webLoginLoading, setWebLoginLoading] = useState<boolean>(false);
+  const [webToken, setWebToken] = useState<string>('');
+  const [mintingLink, setMintingLink] = useState<boolean>(false);
 
   const [open, setOpen] = useState<boolean>(false);
   const [tab, setTab] = useState<AdminTab>('overview');
@@ -138,14 +135,12 @@ export const AdminStatsButton: React.FC = () => {
   const [presets, setPresets] = useState<PresetList>(loadPresets);
   const [toast, setToast] = useState<string>('');
 
-  // Chart controls & day drill-down
   const [chartChannel, setChartChannel] = useState<'all' | 'tg' | 'web'>('all');
   const [chartKind, setChartKind] = useState<'area' | 'line' | 'bar'>('area');
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [dayLoading, setDayLoading] = useState<boolean>(false);
   const activityChartRef = useRef<echarts.ECharts | null>(null);
 
-  // CRM controls
   const [crmUserId, setCrmUserId] = useState<string>('');
   const [crmProduct, setCrmProduct] = useState<string>('pro_pigments');
   const [crmDropdownOpen, setCrmDropdownOpen] = useState<boolean>(false);
@@ -153,7 +148,6 @@ export const AdminStatsButton: React.FC = () => {
   const [crmBusy, setCrmBusy] = useState<boolean>(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  // Users tab controls
   const [userSearch, setUserSearch] = useState<string>('');
   const [userSourceFilter, setUserSourceFilter] = useState<'all' | 'telegram' | 'web'>('all');
   const [userSort, setUserSort] = useState<'recent' | 'events' | 'pro'>('recent');
@@ -161,41 +155,38 @@ export const AdminStatsButton: React.FC = () => {
   const [userProfiles, setUserProfiles] = useState<UserProfileMap>({});
   const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
-  // Health tab
   const [health, setHealth] = useState<HealthData | null>(null);
   const [healthLoading, setHealthLoading] = useState<boolean>(false);
-
-  // Preview modal for Telegram WebView exports
   const [previewModal, setPreviewModal] = useState<PreviewModalData | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => {
       setToast((prev) => (prev === msg ? '' : prev));
-    }, 2600);
+    }, 2800);
   }, []);
 
   const buildAuthHeaders = useCallback(
-    (overrideWebKey?: string): Record<string, string> => {
+    (overrideToken?: string): Record<string, string> => {
       const headers: Record<string, string> = {};
       const initData = getTgInitData();
       if (initData) {
         headers['X-Telegram-Init-Data'] = initData;
       }
-      const key = overrideWebKey !== undefined ? overrideWebKey : webKey;
-      if (key) {
-        headers['X-Admin-Key'] = key;
+      const tok = overrideToken !== undefined ? overrideToken : webToken;
+      if (tok) {
+        headers['X-Admin-Token'] = tok;
       }
       return headers;
     },
-    [webKey],
+    [webToken],
   );
 
-  // Initial auth detection (Telegram OR Chrome Web #admin / saved key)
+  // Silent auth check: Telegram cryptographic initData OR Telegram-issued 12h HMAC Web token
   useEffect(() => {
     let active = true;
 
-    const checkAuth = async () => {
+    const verifyAuth = async () => {
       const initData = getTgInitData();
       if (initData) {
         try {
@@ -211,81 +202,86 @@ export const AdminStatsButton: React.FC = () => {
         }
       }
 
-      const savedKey = localStorage.getItem(WEB_KEY_STORAGE) || '';
-      if (savedKey) {
+      const urlToken = extractUrlAdminToken();
+      if (urlToken) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
         try {
           const r = await fetch('/api/check-purchase?action=stats&check=1', {
-            headers: { 'X-Admin-Key': savedKey },
+            headers: { 'X-Admin-Token': urlToken },
           });
           if (r.ok && active) {
-            setWebKey(savedKey);
+            localStorage.setItem(WEB_TOKEN_STORAGE, urlToken);
+            setWebToken(urlToken);
             setAuthMode('web');
-            if (hasAdminUrlFlag()) setOpen(true);
+            setOpen(true);
             return;
           }
-          localStorage.removeItem(WEB_KEY_STORAGE);
         } catch {
           // ignore
         }
       }
 
-      if (hasAdminUrlFlag() && active) {
-        setShowWebLogin(true);
-      }
-    };
-
-    checkAuth();
-
-    const onHashChange = () => {
-      if (hasAdminUrlFlag()) {
-        if (authMode === 'none') {
-          setShowWebLogin(true);
-        } else {
-          setOpen(true);
+      const savedToken = localStorage.getItem(WEB_TOKEN_STORAGE) || '';
+      if (savedToken) {
+        try {
+          const r = await fetch('/api/check-purchase?action=stats&check=1', {
+            headers: { 'X-Admin-Token': savedToken },
+          });
+          if (r.ok && active) {
+            setWebToken(savedToken);
+            setAuthMode('web');
+            return;
+          }
+          localStorage.removeItem(WEB_TOKEN_STORAGE);
+        } catch {
+          // ignore
         }
       }
     };
-    window.addEventListener('hashchange', onHashChange);
+
+    verifyAuth();
     return () => {
       active = false;
-      window.removeEventListener('hashchange', onHashChange);
     };
-  }, [authMode]);
-
-  const handleWebLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = webKeyInput.trim();
-    if (!trimmed) return;
-    setWebLoginLoading(true);
-    setWebLoginError('');
-    try {
-      const r = await fetch('/api/check-purchase?action=stats&check=1', {
-        headers: { 'X-Admin-Key': trimmed },
-      });
-      if (!r.ok) {
-        setWebLoginError('Неверный ключ (проверьте ADMIN_WEB_KEY в Vercel)');
-        return;
-      }
-      localStorage.setItem(WEB_KEY_STORAGE, trimmed);
-      setWebKey(trimmed);
-      setAuthMode('web');
-      setShowWebLogin(false);
-      setWebKeyInput('');
-      setOpen(true);
-    } catch {
-      setWebLoginError('Ошибка сети при проверке ключа');
-    } finally {
-      setWebLoginLoading(false);
-    }
-  };
+  }, []);
 
   const handleWebLogout = () => {
-    localStorage.removeItem(WEB_KEY_STORAGE);
-    setWebKey('');
+    localStorage.removeItem(WEB_TOKEN_STORAGE);
+    setWebToken('');
     setAuthMode('none');
     setOpen(false);
-    if (window.location.hash.toLowerCase().startsWith('#admin')) {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  };
+
+  const handleMintChromeLink = async (mode: 'open' | 'copy') => {
+    if (authMode !== 'telegram') return;
+    setMintingLink(true);
+    try {
+      const r = await fetch('/api/check-purchase?action=web-token', {
+        method: 'POST',
+        headers: buildAuthHeaders(),
+      });
+      const data = (await r.json()) as { ok?: boolean; token?: string; error?: string };
+      if (!r.ok || !data.ok || !data.token) {
+        showToast(data.error || 'Не удалось создать ссылку');
+        return;
+      }
+      const magicUrl = `${window.location.origin}/#admin_token=${data.token}`;
+      if (mode === 'copy') {
+        const copied = await copyTextToClipboard(magicUrl);
+        showToast(copied ? 'Ссылка (12 ч) скопирована — вставьте в Chrome' : 'Не удалось скопировать');
+        return;
+      }
+      const tgWebApp = (window as unknown as TgWindow).Telegram?.WebApp;
+      if (tgWebApp && typeof tgWebApp.openLink === 'function') {
+        tgWebApp.openLink(magicUrl);
+        showToast('Открываю панель в Chrome...');
+      } else {
+        window.open(magicUrl, '_blank');
+      }
+    } catch {
+      showToast('Ошибка сети при выпуске ссылки');
+    } finally {
+      setMintingLink(false);
     }
   };
 
@@ -297,6 +293,12 @@ export const AdminStatsButton: React.FC = () => {
       const url = `/api/check-purchase?action=stats&days=${days}&hideAdmin=${hideAdmin ? '1' : '0'}`;
       const r = await fetch(url, { headers: buildAuthHeaders() });
       const data = (await r.json()) as AdminStats & { error?: string };
+      if (r.status === 403 && authMode === 'web') {
+        localStorage.removeItem(WEB_TOKEN_STORAGE);
+        setAuthMode('none');
+        setOpen(false);
+        return;
+      }
       if (!r.ok || !data.ok) {
         setError(data.error || 'Ошибка загрузки статистики из Neon');
       } else {
@@ -468,7 +470,7 @@ export const AdminStatsButton: React.FC = () => {
         setPreviewModal({
           title: 'Отчёт CORDWAINE (для Telegram)',
           content: buildReportSummaryText(stats, days),
-          hint: 'Telegram WebView блокирует системную печать. Скопируйте отчёт в 1 тап или откройте панель в Chrome (/#admin) для сохранения PDF.',
+          hint: 'Telegram WebView блокирует печать. Скопируйте отчёт ниже или откройте панель в Chrome (вкладка «Система» → «Открыть в Chrome»).',
         });
       }
       return;
@@ -482,7 +484,7 @@ export const AdminStatsButton: React.FC = () => {
         setPreviewModal({
           title: 'CSV · Пользователи',
           content: buildUsersCsv(stats),
-          hint: 'Скопируйте CSV ниже или откройте панель в Chrome (/#admin) для прямого скачивания файла.',
+          hint: 'Скопируйте CSV ниже или откройте панель в Chrome через вкладку «Система».',
         });
       }
       return;
@@ -496,7 +498,7 @@ export const AdminStatsButton: React.FC = () => {
         setPreviewModal({
           title: 'CSV · Разделы',
           content: buildPagesCsv(stats),
-          hint: 'Скопируйте CSV ниже или откройте панель в Chrome (/#admin) для прямого скачивания файла.',
+          hint: 'Скопируйте CSV ниже или откройте панель в Chrome через вкладку «Система».',
         });
       }
       return;
@@ -509,7 +511,7 @@ export const AdminStatsButton: React.FC = () => {
       setPreviewModal({
         title: 'Excel XML (резервный просмотр)',
         content: buildExcelXml(stats, days),
-        hint: 'Telegram WebView заблокировал скачивание .xls. Для прямого файла Excel откройте панель в Chrome через /#admin.',
+        hint: 'Для прямого скачивания .xls откройте панель в Chrome через вкладку «Система».',
       });
     }
   };
@@ -534,7 +536,7 @@ export const AdminStatsButton: React.FC = () => {
       a.click();
       showToast('PNG графика сохранён');
     } catch {
-      showToast('Экспорт PNG доступен в Chrome (/#admin)');
+      showToast('Экспорт PNG доступен в Chrome (вкладка «Система»)');
     }
   };
 
@@ -577,61 +579,10 @@ export const AdminStatsButton: React.FC = () => {
   const selectedProductObj =
     PRO_CATALOG.find((p) => p.id === crmProduct) || PRO_CATALOG[0];
 
-  // Web Login Modal (only shown when visiting /#admin in Chrome without saved key)
-  if (authMode === 'none') {
-    if (!showWebLogin) return null;
-    return (
-      <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <form
-          onSubmit={handleWebLogin}
-          className="w-full max-w-sm rounded-2xl border border-[#C9A86A]/30 bg-[#141412] p-5 shadow-2xl"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-[#C9A86A]">
-              <KeyRound className="w-4 h-4" />
-              <span className="text-[11px] font-semibold tracking-[0.14em] uppercase">
-                CORDWAINE · WEB ADMIN
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowWebLogin(false)}
-              className="p-1.5 rounded-lg text-[#9A9389] hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <h3 className="text-[17px] font-semibold text-[#F5F1EB] mb-1">Вход владельца</h3>
-          <p className="text-[12px] text-[#8D867C] mb-4">
-            Введите ключ из переменной <span className="font-mono text-[#D6CFC4]">ADMIN_WEB_KEY</span> в Vercel.
-          </p>
-          <input
-            type="password"
-            value={webKeyInput}
-            onChange={(e) => setWebKeyInput(e.target.value)}
-            placeholder="Секретный ключ администратора"
-            style={DARK_INPUT_STYLE}
-            className="w-full rounded-xl border border-white/15 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-[#C9A86A]"
-            autoFocus
-          />
-          {webLoginError && (
-            <div className="mt-2.5 text-[12px] text-[#F06A7E]">{webLoginError}</div>
-          )}
-          <button
-            type="submit"
-            disabled={webLoginLoading || !webKeyInput.trim()}
-            className="mt-4 w-full rounded-xl bg-[#C9A86A] py-2.5 text-[14px] font-semibold text-[#141412] disabled:opacity-50"
-          >
-            {webLoginLoading ? 'Проверка...' : 'Открыть Command Center'}
-          </button>
-        </form>
-      </div>
-    );
-  }
+  if (authMode === 'none') return null;
 
   return (
     <>
-      {/* Floating Owner Trigger Button */}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -642,7 +593,6 @@ export const AdminStatsButton: React.FC = () => {
         <span className="text-[12px] font-semibold tracking-wide hidden sm:inline">Admin</span>
       </button>
 
-      {/* Main Command Center Modal */}
       {open && (
         <div className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4">
           <div className="w-full h-[95dvh] md:h-[90dvh] md:max-w-4xl lg:max-w-[1260px] rounded-t-[26px] md:rounded-[26px] border border-white/[0.1] bg-[#0D0D0C] text-[#F5F1EB] flex flex-col lg:flex-row overflow-hidden shadow-2xl">
@@ -683,7 +633,7 @@ export const AdminStatsButton: React.FC = () => {
 
               <div className="pt-3 border-t border-white/[0.08] space-y-2">
                 <div className="text-[11px] text-[#8D867C]">
-                  Сессия: <span className="text-[#DED7CC]">{authMode === 'web' ? 'Chrome Web' : 'Telegram'}</span>
+                  Сессия: <span className="text-[#DED7CC]">{authMode === 'web' ? 'Chrome (12ч)' : 'Telegram'}</span>
                 </div>
                 {authMode === 'web' && (
                   <button
@@ -691,7 +641,7 @@ export const AdminStatsButton: React.FC = () => {
                     onClick={handleWebLogout}
                     className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 py-2 text-[12px] text-[#F06A7E] hover:bg-[#F06A7E]/10"
                   >
-                    <LogOut className="w-3.5 h-3.5" /> Выйти из Web
+                    <LogOut className="w-3.5 h-3.5" /> Завершить Web-сессию
                   </button>
                 )}
               </div>
@@ -775,7 +725,7 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Mobile & Tablet 3x2 Tab Grid — ALL 6 TABS VISIBLE AT ONCE */}
+                {/* Mobile & Tablet 3x2 Tab Grid — ALL 6 TABS VISIBLE */}
                 <div className="lg:hidden grid grid-cols-3 gap-1.5 mt-2.5">
                   {TABS.map((t) => {
                     const active = tab === t.id;
@@ -796,7 +746,6 @@ export const AdminStatsButton: React.FC = () => {
                   })}
                 </div>
 
-                {/* Collapsible Smart Search Drawer */}
                 {showSearchBar && (
                   <div className="mt-2.5">
                     <input
@@ -850,7 +799,6 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 )}
 
-                {/* Collapsible Export Drawer */}
                 {showExportBar && (
                   <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                     <button
@@ -887,7 +835,6 @@ export const AdminStatsButton: React.FC = () => {
 
               {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto px-3.5 py-3.5 space-y-3.5">
-                {/* Inline Period & Filter Strip (scrolls cleanly with content!) */}
                 {(tab === 'overview' || tab === 'analytics' || tab === 'users') && (
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="inline-flex rounded-xl border border-white/[0.08] bg-[#141412] p-0.5">
@@ -1030,7 +977,6 @@ export const AdminStatsButton: React.FC = () => {
                       })()}
                     </div>
 
-                    {/* Interactive ECharts Activity Studio */}
                     <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                         <div>
@@ -1089,7 +1035,6 @@ export const AdminStatsButton: React.FC = () => {
                         chartRefOut={activityChartRef}
                       />
 
-                      {/* Day Drill-Down Card */}
                       {(dayLoading || dayDetail) && (
                         <div className="mt-3 rounded-xl border border-[#C9A86A]/30 bg-[#0F0F0E] p-3">
                           <div className="flex items-center justify-between mb-2">
@@ -1129,7 +1074,6 @@ export const AdminStatsButton: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Donuts */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <DonutCard
                         title="Каналы трафика"
@@ -1546,14 +1490,14 @@ export const AdminStatsButton: React.FC = () => {
                       <div>
                         <div className="text-[14px] font-semibold">Журнал действий администратора</div>
                         <div className="text-[11px] text-[#8D867C]">
-                          Реальные записи выдачи PRO и блокировок из Neon
+                          Выдача PRO, блокировки и входы в Chrome из Neon
                         </div>
                       </div>
                     </div>
 
                     {stats.auditLog.length === 0 ? (
                       <div className="text-[12px] text-[#8D867C] py-6 text-center">
-                        Пока нет записей. Любая операция в «PRO · CRM» появится здесь.
+                        Пока нет записей. Любая операция в «PRO · CRM» или вход в Chrome появится здесь.
                       </div>
                     ) : (
                       <div className="divide-y divide-white/[0.06]">
@@ -1588,9 +1532,45 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 )}
 
-                {/* TAB 6: SYSTEM HEALTH */}
+                {/* TAB 6: SYSTEM HEALTH + PASSWORDLESS CHROME LAUNCH */}
                 {tab === 'system' && (
                   <div className="space-y-3">
+                    {authMode === 'telegram' && (
+                      <div className="rounded-2xl border border-[#C9A86A]/35 bg-[#15130E] p-4 space-y-3">
+                        <div className="flex items-start gap-2.5">
+                          <ExternalLink className="w-4 h-4 text-[#C9A86A] shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-[14px] font-semibold text-[#F5F1EB]">
+                              Открыть в Chrome (без пароля)
+                            </div>
+                            <div className="text-[12px] text-[#A8A095] mt-0.5">
+                              Создаёт крипто-ссылку (HMAC-SHA256, 12 часов). В браузере нет формы логина — подобрать доступ невозможно.
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            disabled={mintingLink}
+                            onClick={() => handleMintChromeLink('open')}
+                            className="flex items-center justify-center gap-2 rounded-xl bg-[#C9A86A] py-2.5 px-3 text-[13px] font-semibold text-[#121210] disabled:opacity-50"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            {mintingLink ? 'Создание...' : 'Открыть в Chrome'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={mintingLink}
+                            onClick={() => handleMintChromeLink('copy')}
+                            className="flex items-center justify-center gap-2 rounded-xl border border-[#C9A86A]/40 bg-white/[0.04] py-2.5 px-3 text-[13px] font-semibold text-[#F5F1EB] disabled:opacity-50"
+                          >
+                            <Copy className="w-4 h-4 text-[#C9A86A]" />
+                            Скопировать ссылку для ПК
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -1652,38 +1632,35 @@ export const AdminStatsButton: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span>ADMIN_WEB_KEY (Chrome):</span>
-                            <span className={health.webKeyConfigured ? 'text-[#3FD08F]' : 'text-[#F5B041]'}>
-                              {health.webKeyConfigured ? 'Настроен (/#admin)' : 'Не задан в Vercel'}
+                            <span>Защита Chrome (HMAC-256):</span>
+                            <span className={health.webKeyConfigured ? 'text-[#3FD08F]' : 'text-[#F06A7E]'}>
+                              {health.webKeyConfigured ? 'Активна (без пароля)' : 'Нет BOT_TOKEN'}
                             </span>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4 text-[12px] text-[#A8A095] flex items-start gap-2.5">
-                      <Activity className="w-4 h-4 text-[#C9A86A] shrink-0 mt-0.5" />
-                      <div>
-                        <div className="font-semibold text-[#F5F1EB] mb-0.5">
-                          Доступ с ПК / Chrome
+                    {authMode === 'web' && (
+                      <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4 text-[12px] text-[#A8A095] flex items-start gap-2.5">
+                        <Activity className="w-4 h-4 text-[#3FD08F] shrink-0 mt-0.5" />
+                        <div>
+                          Вы вошли в Chrome по временной крипто-ссылке из Telegram (действует 12 часов). В Chrome работают прямое скачивание CSV/Excel, печать PDF и широкая панель.
                         </div>
-                        Откройте ваш домен с хвостом <span className="font-mono text-[#C9A86A]">/#admin</span> и введите ключ <span className="font-mono text-[#DED7CC]">ADMIN_WEB_KEY</span>. В Chrome сразу доступны широкая десктоп-версия, прямое скачивание CSV/Excel и печать PDF.
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Toast */}
           {toast && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[140] rounded-xl border border-[#C9A86A]/40 bg-[#171614] px-4 py-2.5 text-[13px] text-[#F5F1EB] shadow-2xl">
               {toast}
             </div>
           )}
 
-          {/* Confirmation Modal */}
           {confirmAction && (
             <div className="fixed inset-0 z-[130] bg-black/75 flex items-center justify-center p-4">
               <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#151513] p-5 space-y-4">
@@ -1719,7 +1696,6 @@ export const AdminStatsButton: React.FC = () => {
             </div>
           )}
 
-          {/* In-App Export / Report Preview Modal (Telegram WebView fallback) */}
           {previewModal && (
             <div className="fixed inset-0 z-[135] bg-black/80 flex items-center justify-center p-4">
               <div className="w-full max-w-lg max-h-[82dvh] rounded-2xl border border-white/15 bg-[#141412] flex flex-col overflow-hidden">
