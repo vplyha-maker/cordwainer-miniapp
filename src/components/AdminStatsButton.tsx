@@ -182,7 +182,6 @@ export const AdminStatsButton: React.FC = () => {
     [webToken],
   );
 
-  // Silent auth check: Telegram cryptographic initData OR Telegram-issued 12h HMAC Web token
   useEffect(() => {
     let active = true;
 
@@ -725,7 +724,7 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Mobile & Tablet 3x2 Tab Grid — ALL 6 TABS VISIBLE */}
+                {/* Mobile & Tablet 3x2 Tab Grid */}
                 <div className="lg:hidden grid grid-cols-3 gap-1.5 mt-2.5">
                   {TABS.map((t) => {
                     const active = tab === t.id;
@@ -964,12 +963,12 @@ export const AdminStatsButton: React.FC = () => {
                             </div>
 
                             <div className="rounded-2xl border border-[#3FD08F]/25 bg-[#0F1B15] p-3.5">
-                              <div className="text-[11px] text-[#3FD08F]">PRO (оценка в ★)</div>
-                              <div className="mt-1.5 text-[22px] font-bold font-mono text-[#3FD08F] leading-tight">
-                                {stats.summary.proTotal} · {stats.summary.proStars.toLocaleString('ru-RU')}★
+                              <div className="text-[11px] text-[#3FD08F]">PRO в Neon</div>
+                              <div className="mt-1.5 text-[19px] font-bold font-mono text-[#3FD08F] leading-tight">
+                                {stats.summary.proUsers ?? 0} чел. · {stats.summary.proTotal} мод.
                               </div>
                               <div className="mt-1 text-[11px] text-[#8D867C]">
-                                Усл. экв. ~${stats.summary.proUsdEst}
+                                {stats.summary.proStars.toLocaleString('ru-RU')} ★ · усл. ~${stats.summary.proUsdEst}
                               </div>
                             </div>
                           </>
@@ -1300,7 +1299,7 @@ export const AdminStatsButton: React.FC = () => {
 
                     <DonutCard
                       title="Распределение PRO-модулей (★)"
-                      subtitle={`Всего ${stats.summary.proTotal} активаций · усл. экв. ~$${stats.summary.proUsdEst}`}
+                      subtitle={`${stats.summary.proUsers ?? 0} чел. · ${stats.summary.proTotal} мод. · усл. экв. ~$${stats.summary.proUsdEst}`}
                       items={stats.proBreakdown.map((p) => ({
                         name: `${p.product_id} (${p.count})`,
                         value: p.stars,
