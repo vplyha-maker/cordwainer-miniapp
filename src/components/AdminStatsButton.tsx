@@ -11,6 +11,7 @@ import {
   ExternalLink,
   FileSpreadsheet,
   FileText,
+  KeyRound,
   LogOut,
   RefreshCw,
   ScrollText,
@@ -103,6 +104,13 @@ function extractUrlAdminToken(): string {
   return m ? m[1] : '';
 }
 
+function hasAdminHash(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hash.toLowerCase();
+  const q = new URLSearchParams(window.location.search);
+  return h === '#admin' || q.get('admin') === '1';
+}
+
 function loadPresets(): PresetList {
   try {
     const raw = localStorage.getItem(PRESETS_STORAGE);
@@ -120,6 +128,14 @@ export const AdminStatsButton: React.FC = () => {
   const [authMode, setAuthMode] = useState<AuthMode>('none');
   const [webToken, setWebToken] = useState<string>('');
   const [mintingLink, setMintingLink] = useState<boolean>(false);
+
+  // One-time Telegram OTP login modal (shown ONLY on /#admin in browser)
+  const [showOtpModal, setShowOtpModal] = useState<boolean>(false);
+  const [otpChallengeId, setOtpChallengeId] = useState<string>('');
+  const [otpCode, setOtpCode] = useState<string>('');
+  const [otpBusy, setOtpBusy] = useState<boolean>(false);
+  const [otpError, setOtpError] = useState<string>('');
+  const [otpInfo, setOtpInfo] = useState<string>('');
 
   const [open, setOpen] = useState<boolean>(false);
   const [tab, setTab] = useState<AdminTab>('overview');
@@ -229,6 +245,10 @@ export const AdminStatsButton: React.FC = () => {
           if (r.ok && active) {
             setWebToken(savedToken);
             setAuthMode('web');
+            if (hasAdminHash()) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              setOpen(true);
+            }
             return;
           }
           localStorage.removeItem(WEB_TOKEN_STORAGE);
@@ -236,13 +256,85 @@ export const AdminStatsButton: React.FC = () => {
           // ignore
         }
       }
+
+      if (hasAdminHash() && active) {
+        setShowOtpModal(true);
+      }
     };
 
     verifyAuth();
+
+    const onHashChange = () => {
+      if (hasAdminHash()) {
+        if (authMode === 'none') {
+          setShowOtpModal(true);
+        } else {
+          setOpen(true);
+        }
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
     return () => {
       active = false;
+      window.removeEventListener('hashchange', onHashChange);
     };
-  }, []);
+  }, [authMode]);
+
+  const handleRequestOtp = async () => {
+    setOtpBusy(true);
+    setOtpError('');
+    setOtpInfo('');
+    try {
+      const r = await fetch('/api/check-purchase?action=otp-request', { method: 'POST' });
+      const data = (await r.json()) as { ok?: boolean; challengeId?: string; error?: string };
+      if (!r.ok || !data.ok || !data.challengeId) {
+        setOtpError(data.error || 'Не удалось отправить код');
+      } else {
+        setOtpChallengeId(data.challengeId);
+        setOtpCode('');
+        setOtpInfo('Код отправлен в ваш Telegram. Действует 2 минуты.');
+      }
+    } catch {
+      setOtpError('Ошибка сети');
+    } finally {
+      setOtpBusy(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = otpCode.replace(/\D/g, '');
+    if (clean.length !== 6 || !otpChallengeId) {
+      setOtpError('Введите 6 цифр из Telegram');
+      return;
+    }
+    setOtpBusy(true);
+    setOtpError('');
+    try {
+      const r = await fetch('/api/check-purchase?action=otp-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId: otpChallengeId, code: clean }),
+      });
+      const data = (await r.json()) as { ok?: boolean; token?: string; error?: string };
+      if (!r.ok || !data.ok || !data.token) {
+        setOtpError(data.error || 'Неверный код');
+        return;
+      }
+      localStorage.setItem(WEB_TOKEN_STORAGE, data.token);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      setWebToken(data.token);
+      setAuthMode('web');
+      setShowOtpModal(false);
+      setOtpChallengeId('');
+      setOtpCode('');
+      setOpen(true);
+    } catch {
+      setOtpError('Ошибка сети при проверке кода');
+    } finally {
+      setOtpBusy(false);
+    }
+  };
 
   const handleWebLogout = () => {
     localStorage.removeItem(WEB_TOKEN_STORAGE);
@@ -483,7 +575,7 @@ export const AdminStatsButton: React.FC = () => {
         setPreviewModal({
           title: 'CSV · Пользователи',
           content: buildUsersCsv(stats),
-          hint: 'Скопируйте CSV ниже или откройте панель в Chrome через вкладку «Система».',
+          hint: 'Скопируйте CSV ниже или откройте панель в Chrome.',
         });
       }
       return;
@@ -497,7 +589,7 @@ export const AdminStatsButton: React.FC = () => {
         setPreviewModal({
           title: 'CSV · Разделы',
           content: buildPagesCsv(stats),
-          hint: 'Скопируйте CSV ниже или откройте панель в Chrome через вкладку «Система».',
+          hint: 'Скопируйте CSV ниже или откройте панель в Chrome.',
         });
       }
       return;
@@ -510,7 +602,7 @@ export const AdminStatsButton: React.FC = () => {
       setPreviewModal({
         title: 'Excel XML (резервный просмотр)',
         content: buildExcelXml(stats, days),
-        hint: 'Для прямого скачивания .xls откройте панель в Chrome через вкладку «Система».',
+        hint: 'Для прямого скачивания .xls откройте панель в Chrome.',
       });
     }
   };
@@ -535,7 +627,7 @@ export const AdminStatsButton: React.FC = () => {
       a.click();
       showToast('PNG графика сохранён');
     } catch {
-      showToast('Экспорт PNG доступен в Chrome (вкладка «Система»)');
+      showToast('Экспорт PNG доступен в Chrome');
     }
   };
 
@@ -578,7 +670,84 @@ export const AdminStatsButton: React.FC = () => {
   const selectedProductObj =
     PRO_CATALOG.find((p) => p.id === crmProduct) || PRO_CATALOG[0];
 
-  if (authMode === 'none') return null;
+  // One-time Telegram OTP Modal on /#admin (zero static password!)
+  if (authMode === 'none') {
+    if (!showOtpModal) return null;
+    return (
+      <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-[#C9A86A]/35 bg-[#141412] p-5 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[#C9A86A]">
+              <KeyRound className="w-4 h-4" />
+              <span className="text-[11px] font-semibold tracking-[0.14em] uppercase">
+                CORDWAINE · TELEGRAM OTP
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowOtpModal(false);
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              }}
+              className="p-1.5 rounded-lg text-[#9A9389] hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div>
+            <h3 className="text-[17px] font-semibold text-[#F5F1EB]">Вход по коду в Telegram</h3>
+            <p className="text-[12px] text-[#8D867C] mt-1">
+              Одноразовый 6-значный код придёт в личный чат с ботом (действует 2 минуты, до 3 попыток).
+            </p>
+          </div>
+
+          {!otpChallengeId ? (
+            <button
+              type="button"
+              disabled={otpBusy}
+              onClick={handleRequestOtp}
+              className="w-full rounded-xl bg-[#C9A86A] py-2.5 text-[14px] font-semibold text-[#121210] disabled:opacity-50"
+            >
+              {otpBusy ? 'Отправка в Telegram...' : 'Прислать код в Telegram'}
+            </button>
+          ) : (
+            <form onSubmit={handleVerifyOtp} className="space-y-3">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                style={DARK_INPUT_STYLE}
+                className="w-full rounded-xl border border-white/15 px-4 py-3 text-center text-[22px] tracking-[0.35em] font-mono focus:outline-none focus:border-[#C9A86A]"
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={otpBusy || otpCode.length !== 6}
+                className="w-full rounded-xl bg-[#C9A86A] py-2.5 text-[14px] font-semibold text-[#121210] disabled:opacity-45"
+              >
+                {otpBusy ? 'Проверка...' : 'Войти в Command Center'}
+              </button>
+              <button
+                type="button"
+                disabled={otpBusy}
+                onClick={handleRequestOtp}
+                className="w-full rounded-xl border border-white/10 py-2 text-[12px] text-[#BDB6AC]"
+              >
+                Отправить новый код
+              </button>
+            </form>
+          )}
+
+          {otpInfo && <div className="text-[12px] text-[#3FD08F]">{otpInfo}</div>}
+          {otpError && <div className="text-[12px] text-[#F06A7E]">{otpError}</div>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -595,7 +764,6 @@ export const AdminStatsButton: React.FC = () => {
       {open && (
         <div className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4">
           <div className="w-full h-[95dvh] md:h-[90dvh] md:max-w-4xl lg:max-w-[1260px] rounded-t-[26px] md:rounded-[26px] border border-white/[0.1] bg-[#0D0D0C] text-[#F5F1EB] flex flex-col lg:flex-row overflow-hidden shadow-2xl">
-            {/* Desktop Left Sidebar */}
             <aside className="hidden lg:flex w-[240px] shrink-0 flex-col border-r border-white/[0.08] bg-[#111110] p-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2 h-2 rounded-full bg-[#3FD08F]" />
@@ -646,9 +814,7 @@ export const AdminStatsButton: React.FC = () => {
               </div>
             </aside>
 
-            {/* Right / Main Workspace */}
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
-              {/* Compact Sticky Header */}
               <header className="shrink-0 border-b border-white/[0.08] bg-[#111110]/95 px-3.5 pt-3 pb-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -724,7 +890,6 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Mobile & Tablet 3x2 Tab Grid */}
                 <div className="lg:hidden grid grid-cols-3 gap-1.5 mt-2.5">
                   {TABS.map((t) => {
                     const active = tab === t.id;
@@ -832,7 +997,6 @@ export const AdminStatsButton: React.FC = () => {
                 )}
               </header>
 
-              {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto px-3.5 py-3.5 space-y-3.5">
                 {(tab === 'overview' || tab === 'analytics' || tab === 'users') && (
                   <div className="flex flex-wrap items-center gap-2">
@@ -1531,7 +1695,7 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 )}
 
-                {/* TAB 6: SYSTEM HEALTH + PASSWORDLESS CHROME LAUNCH */}
+                {/* TAB 6: SYSTEM HEALTH + CHROME LAUNCH */}
                 {tab === 'system' && (
                   <div className="space-y-3">
                     {authMode === 'telegram' && (
@@ -1540,10 +1704,10 @@ export const AdminStatsButton: React.FC = () => {
                           <ExternalLink className="w-4 h-4 text-[#C9A86A] shrink-0 mt-0.5" />
                           <div>
                             <div className="text-[14px] font-semibold text-[#F5F1EB]">
-                              Открыть в Chrome (без пароля)
+                              Вход с ПК / Chrome (без пароля)
                             </div>
                             <div className="text-[12px] text-[#A8A095] mt-0.5">
-                              Создаёт крипто-ссылку (HMAC-SHA256, 12 часов). В браузере нет формы логина — подобрать доступ невозможно.
+                              На ПК откройте <span className="font-mono text-[#C9A86A]">cordwaine.app/#admin</span> — бот пришлёт одноразовый 6-значный код прямо сюда (2 мин, макс. 3 попытки). Или откройте Chrome прямо с телефона:
                             </div>
                           </div>
                         </div>
@@ -1564,7 +1728,7 @@ export const AdminStatsButton: React.FC = () => {
                             className="flex items-center justify-center gap-2 rounded-xl border border-[#C9A86A]/40 bg-white/[0.04] py-2.5 px-3 text-[13px] font-semibold text-[#F5F1EB] disabled:opacity-50"
                           >
                             <Copy className="w-4 h-4 text-[#C9A86A]" />
-                            Скопировать ссылку для ПК
+                            Скопировать ссылку (12 ч)
                           </button>
                         </div>
                       </div>
@@ -1631,9 +1795,9 @@ export const AdminStatsButton: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Защита Chrome (HMAC-256):</span>
+                            <span>Вход с ПК (Telegram OTP):</span>
                             <span className={health.webKeyConfigured ? 'text-[#3FD08F]' : 'text-[#F06A7E]'}>
-                              {health.webKeyConfigured ? 'Активна (без пароля)' : 'Нет BOT_TOKEN'}
+                              {health.webKeyConfigured ? 'Активен (/#admin)' : 'Нет BOT_TOKEN'}
                             </span>
                           </div>
                         </div>
@@ -1644,7 +1808,7 @@ export const AdminStatsButton: React.FC = () => {
                       <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4 text-[12px] text-[#A8A095] flex items-start gap-2.5">
                         <Activity className="w-4 h-4 text-[#3FD08F] shrink-0 mt-0.5" />
                         <div>
-                          Вы вошли в Chrome по временной крипто-ссылке из Telegram (действует 12 часов). В Chrome работают прямое скачивание CSV/Excel, печать PDF и широкая панель.
+                          Вы вошли в Chrome по крипто-сессии (действует 12 часов). В Chrome работают прямое скачивание CSV/Excel, печать PDF и широкая десктоп-панель.
                         </div>
                       </div>
                     )}
