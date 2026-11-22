@@ -2,6 +2,8 @@ import { AnimatePresence } from 'framer-motion'
 import { useEffect, useLayoutEffect, useState } from 'react'
 import SmoothScroll from './components/SmoothScroll'
 import CustomCursor from './components/CustomCursor'
+import { AdminStatsButton } from './components/AdminStatsButton'
+import { trackEvent } from './utils/analytics'
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
 import { BlogPage } from './pages/BlogPage'
@@ -220,6 +222,15 @@ export default function App() {
   const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
   const [selectedGlossaryTermId, setSelectedGlossaryTermId] = useState<string | null>(null)
+
+  // Аналитика визитов в Neon (раздельно Telegram и Web)
+  useEffect(() => {
+    trackEvent('app_open', getInitialScreen())
+  }, [])
+
+  useEffect(() => {
+    trackEvent('page_view', screen, { lang })
+  }, [screen, lang])
 
   const handleSetLang = (next: Lang) => {
     setLang(next)
@@ -464,6 +475,7 @@ export default function App() {
     <>
       {!isMobileWebView && <CustomCursor />}
       {isMobileWebView || isWideStudioScreen ? appContent : <SmoothScroll>{appContent}</SmoothScroll>}
+      <AdminStatsButton />
     </>
   )
 }
