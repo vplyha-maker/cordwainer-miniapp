@@ -129,7 +129,7 @@ export default async function handler(req: any, res: any) {
     (typeof queryInitData === 'string' && queryInitData.trim()) ||
     '';
 
-  // === 1. ЗАПИСЬ СОБЫТИЙ АНАЛИТИКИ ===
+  // === 1. ЗАПИСЬ СОБЫТИЙ АНАЛИТИКИ + ПРОВЕРКА БАНА ===
   if (rawAction === 'track' && req.method === 'POST') {
     let body: Record<string, any> = {};
     try {
@@ -175,7 +175,24 @@ export default async function handler(req: any, res: any) {
         INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
         VALUES (${userId}, ${username}, ${firstName}, ${source}, ${platform}, ${finalLang}, ${event}, ${page}, ${metaJson}::jsonb)
       `;
-      return res.status(200).json({ ok: true });
+
+      let banned = false;
+      let reason = '';
+      if (userId !== adminId) {
+        try {
+          const banRows = await sql`
+            SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
+          `;
+          if (banRows.length > 0) {
+            banned = true;
+            reason = String(banRows[0]?.reason || '');
+          }
+        } catch {
+          // таблица banned_users может быть ещё не создана
+        }
+      }
+
+      return res.status(200).json({ ok: true, banned, reason });
     } catch (err) {
       console.error('[api/check-purchase:track] DB error:', err);
       return res.status(500).json({ error: 'Failed to record event' });
@@ -210,7 +227,6 @@ export default async function handler(req: any, res: any) {
         eventsRows,
         proByProductRows,
         usersRows,
-        recentPurchasesRows,
       ] = await Promise.all([
         sql`
           SELECT
@@ -324,12 +340,19 @@ export default async function handler(req: any, res: any) {
           ORDER BY MAX(e.created_at) DESC
           LIMIT 40
         `,
-        sql`
-          SELECT user_id, product_id
-          FROM user_purchases
-          LIMIT 40
-        `,
       ]);
+
+      let bannedUsers: any[] = [];
+      try {
+        bannedUsers = await sql`
+          SELECT user_id, reason, created_at
+          FROM banned_users
+          ORDER BY created_at DESC
+          LIMIT 50
+        `;
+      } catch {
+        bannedUsers = [];
+      }
 
       const proBreakdown = proByProductRows.map((row: any) => {
         const pid = String(row.product_id);
@@ -372,7 +395,7 @@ export default async function handler(req: any, res: any) {
         events: eventsRows,
         proBreakdown,
         users: usersRows,
-        recentPurchases: recentPurchasesRows,
+        bannedUsers,
       });
     } catch (err) {
       console.error('[api/check-purchase:stats] DB error:', err);
@@ -416,7 +439,7 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // === 4. ADMIN CRM: ВЫДАТЬ / ЗАБРАТЬ PRO ПО TELEGRAM ID ===
+  // === 4. ADMIN CRM: ВЫДАТЬ / ЗАБРАТЬ PRO ===
   if (rawAction === 'grant' && req.method === 'POST') {
     if (!isAuthorizedAdmin(rawInitData, botToken, adminId)) {
       return res.status(403).json({ error: 'Forbidden' });
@@ -471,19 +494,56 @@ export default async function handler(req: any, res: any) {
           }
         }
       }
-      return res.status(200).json({
-        ok: true,
-        targetUserId,
-        products: productsToApply,
-        revoke,
-      });
+      return res.status(200).json({ ok: true, targetUserId, products: productsToApply, revoke });
     } catch (err) {
       console.error('[api/check-purchase:grant] DB error:', err);
       return res.status(500).json({ error: 'Ошибка обновления доступа в Neon' });
     }
   }
 
-  // === 5. СТАНДАРТНАЯ ПРОВЕРКА ПОКУПКИ ===
+  // === 5. ADMIN CRM: БАН / РАЗБАН ПОЛЬЗОВАТЕЛЯ ===
+  if (rawAction === 'ban' && req.method === 'POST') {
+    if (!isAuthorizedAdmin(rawInitData, botToken, adminId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    let body: Record<string, any> = {};
+    try {
+      body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+    } catch {
+      return res.status(400).json({ error: 'Invalid JSON' });
+    }
+
+    const targetUserId = String(body.targetUserId || '').trim();
+    const unban = Boolean(body.unban);
+    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 160) : '';
+
+    if (!targetUserId || targetUserId.length < 3 || targetUserId.length > 64) {
+      return res.status(400).json({ error: 'Некорректный ID пользователя' });
+    }
+    if (!unban && targetUserId === adminId) {
+      return res.status(400).json({ error: 'Нельзя заблокировать самого себя' });
+    }
+
+    try {
+      const sql = neon(connectionString);
+      if (unban) {
+        await sql`DELETE FROM banned_users WHERE user_id = ${targetUserId}`;
+      } else {
+        await sql`
+          INSERT INTO banned_users (user_id, reason)
+          VALUES (${targetUserId}, ${reason || 'Доступ ограничен администратором'})
+          ON CONFLICT (user_id) DO UPDATE SET reason = EXCLUDED.reason, created_at = NOW()
+        `;
+      }
+      return res.status(200).json({ ok: true, targetUserId, unban });
+    } catch (err) {
+      console.error('[api/check-purchase:ban] DB error:', err);
+      return res.status(500).json({ error: 'Ошибка обновления бана (создана ли таблица banned_users?)' });
+    }
+  }
+
+  // === 6. СТАНДАРТНАЯ ПРОВЕРКА ПОКУПКИ ===
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Метод не разрешен' });
@@ -522,6 +582,25 @@ export default async function handler(req: any, res: any) {
 
   try {
     const sql = neon(connectionString);
+
+    if (verifiedUserId !== adminId) {
+      try {
+        const banRows = await sql`
+          SELECT 1 FROM banned_users WHERE user_id = ${verifiedUserId} LIMIT 1
+        `;
+        if (banRows.length > 0) {
+          return res.status(200).json({
+            purchased: false,
+            banned: true,
+            userId: Number(verifiedUserId),
+            productId: rawProductId,
+          });
+        }
+      } catch {
+        // ignore if table not created
+      }
+    }
+
     const result = await sql`
       SELECT 1
       FROM user_purchases
