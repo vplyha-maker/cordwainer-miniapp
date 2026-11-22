@@ -31,6 +31,19 @@ type AuthResult = {
   via: 'telegram' | 'web' | 'none';
 };
 
+function formatAuditMeta(meta: unknown): string {
+  if (!meta) return '';
+  if (typeof meta === 'string') return meta;
+  if (typeof meta === 'object') {
+    const obj = meta as Record<string, unknown>;
+    if (obj.productId) return String(obj.productId);
+    if (obj.reason) return String(obj.reason);
+    if (obj.ttl) return String(obj.ttl);
+    return JSON.stringify(obj);
+  }
+  return String(meta);
+}
+
 function verifyTelegramInitData(initData: string, botToken: string): string | null {
   try {
     if (!initData || !botToken) return null;
@@ -156,10 +169,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
       const { token, expMs } = createWebSessionToken(tgAuth.adminId, botToken);
 
-      await sql`
-        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
-        VALUES (${tgAuth.adminId}, '', 'Admin', 'admin', 'telegram', 'ru', 'admin_web_token', 'chrome_session', '12h')
-      `;
+      try {
+        const auditMeta = JSON.stringify({ ttl: '12h' });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${tgAuth.adminId}, '', 'Admin', 'admin', 'telegram', 'ru', 'admin_web_token', 'chrome_session', ${auditMeta})
+        `;
+      } catch (logErr) {
+        console.error('audit web-token log error:', logErr);
+      }
 
       return res.status(200).json({
         ok: true,
@@ -527,7 +545,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           event: String(r.event || ''),
           target: String(r.page || ''),
           via: String(r.platform || 'telegram'),
-          meta: String(r.meta || ''),
+          meta: formatAuditMeta(r.meta),
           created_at: String(r.created_at || ''),
         })),
       });
@@ -680,7 +698,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })),
         adminHistory: adminHistory.map((h) => ({
           event: String(h.event),
-          meta: String(h.meta || ''),
+          meta: formatAuditMeta(h.meta),
           created_at: String(h.created_at),
         })),
       });
@@ -720,11 +738,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      const auditEvent = mode === 'grant' ? 'admin_grant_pro' : 'admin_revoke_pro';
-      await sql`
-        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
-        VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', ${auditEvent}, ${targetId}, ${productId})
-      `;
+      try {
+        const auditEvent = mode === 'grant' ? 'admin_grant_pro' : 'admin_revoke_pro';
+        const auditMeta = JSON.stringify({ productId });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', ${auditEvent}, ${targetId}, ${auditMeta})
+        `;
+      } catch (logErr) {
+        console.error('audit grant log error:', logErr);
+      }
 
       return res.status(200).json({ ok: true, mode, targetId, productId });
     }
@@ -755,11 +778,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await sql`DELETE FROM banned_users WHERE user_id = ${targetId}`;
       }
 
-      const auditEvent = mode === 'ban' ? 'admin_ban' : 'admin_unban';
-      await sql`
-        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
-        VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', ${auditEvent}, ${targetId}, ${reason})
-      `;
+      try {
+        const auditEvent = mode === 'ban' ? 'admin_ban' : 'admin_unban';
+        const auditMeta = JSON.stringify({ reason });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', ${auditEvent}, ${targetId}, ${auditMeta})
+        `;
+      } catch (logErr) {
+        console.error('audit ban log error:', logErr);
+      }
 
       return res.status(200).json({ ok: true, mode, targetId });
     }
