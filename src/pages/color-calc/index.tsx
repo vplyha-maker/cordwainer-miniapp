@@ -333,7 +333,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const handleAddFromArchive = useCallback(
     (pigmentId: string) => {
-      if (paints.length >= 2 && !requireProAccess()) return
+      if (paints.some((row) => row.pigmentId === pigmentId)) return
+      const hasEmptySlot = paints.some(
+        (row) => !row.amount || parseFloat(row.amount) <= 0
+      )
+      if (!hasEmptySlot && paints.length >= 2 && !requireProAccess()) return
       hapticConfirm()
       setPaints((prev) => {
         if (prev.some((row) => row.pigmentId === pigmentId)) return prev
@@ -353,7 +357,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         ]
       })
     },
-    [paints.length, requireProAccess, setPaints]
+    [paints, requireProAccess, setPaints]
   )
 
   const copyRecipe = async () => {
