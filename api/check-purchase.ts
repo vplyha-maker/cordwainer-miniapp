@@ -24,6 +24,7 @@ const ALL_CORE_PRO_IDS = [
 ];
 
 const WEB_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+const OTP_TTL_MS = 2 * 60 * 1000;
 
 type AuthResult = {
   ok: boolean;
@@ -31,9 +32,29 @@ type AuthResult = {
   via: 'telegram' | 'web' | 'none';
 };
 
+function parseMetaObj(meta: unknown): Record<string, unknown> {
+  if (!meta) return {};
+  if (typeof meta === 'object') return meta as Record<string, unknown>;
+  if (typeof meta === 'string') {
+    try {
+      const parsed = JSON.parse(meta) as unknown;
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
 function formatAuditMeta(meta: unknown): string {
   if (!meta) return '';
-  if (typeof meta === 'string') return meta;
+  if (typeof meta === 'string') {
+    const obj = parseMetaObj(meta);
+    if (obj.productId) return String(obj.productId);
+    if (obj.reason) return String(obj.reason);
+    if (obj.ttl) return String(obj.ttl);
+    return meta;
+  }
   if (typeof meta === 'object') {
     const obj = meta as Record<string, unknown>;
     if (obj.productId) return String(obj.productId);
@@ -77,6 +98,13 @@ function verifyTelegramInitData(initData: string, botToken: string): string | nu
 
 function getWebSigningKey(botToken: string): Buffer {
   return crypto.createHmac('sha256', 'CordwaineAdminWebSession').update(botToken).digest();
+}
+
+function computeOtpSig(botToken: string, challengeId: string, expMs: number, code: string): string {
+  return crypto
+    .createHmac('sha256', getWebSigningKey(botToken))
+    .update(`otp:${challengeId}:${expMs}:${code}`)
+    .digest('hex');
 }
 
 function createWebSessionToken(adminId: string, botToken: string): { token: string; expMs: number } {
@@ -160,6 +188,174 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const sql = getSql();
+
+    // 1) Request one-time 6-digit Telegram OTP for PC/Chrome login
+    if (action === 'otp-request' && req.method === 'POST') {
+      const adminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
+      const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+      if (!adminId || !botToken) {
+        return res.status(500).json({ ok: false, error: 'Бот или ADMIN_TELEGRAM_ID не настроены' });
+      }
+
+      const cooldownIso = new Date(Date.now() - 60 * 1000).toISOString();
+      const recentSent = await sql`
+        SELECT 1 FROM app_events
+        WHERE source = 'admin_otp' AND event = 'otp_sent' AND created_at >= ${cooldownIso}::timestamptz
+        LIMIT 1
+      `;
+      if (recentSent.length > 0) {
+        return res.status(429).json({
+          ok: false,
+          error: 'Код уже отправлен. Подождите 1 минуту перед повторным запросом.',
+        });
+      }
+
+      const code = String(crypto.randomInt(100000, 1000000));
+      const challengeId = crypto.randomBytes(12).toString('hex');
+      const expMs = Date.now() + OTP_TTL_MS;
+      const sig = computeOtpSig(botToken, challengeId, expMs, code);
+      const metaJson = JSON.stringify({ expMs, sig });
+
+      const tgText = [
+        '🔐 CORDWAINE Command Center',
+        '',
+        `Код входа в браузер: ${code}`,
+        '',
+        'Действует 2 минуты (макс. 3 попытки).',
+        'Если это не вы — просто проигнорируйте.',
+      ].join('\n');
+
+      const tgResp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: adminId,
+          text: tgText,
+        }),
+      });
+
+      if (!tgResp.ok) {
+        return res.status(502).json({
+          ok: false,
+          error: 'Не удалось отправить код в Telegram. Убедитесь, что диалог с ботом открыт.',
+        });
+      }
+
+      await sql`
+        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+        VALUES (${adminId}, '', 'Admin', 'admin_otp', 'web', 'ru', 'otp_sent', ${challengeId}, ${metaJson})
+      `;
+
+      return res.status(200).json({ ok: true, challengeId, ttlSec: 120 });
+    }
+
+    // 2) Verify one-time 6-digit Telegram OTP (strict 3 tries/code, 5 fails/10min, single-use)
+    if (action === 'otp-verify' && req.method === 'POST') {
+      const adminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
+      const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+      if (!adminId || !botToken) {
+        return res.status(500).json({ ok: false, error: 'Сервер не настроен' });
+      }
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const challengeId = String(body.challengeId || '').trim();
+      const code = String(body.code || '').replace(/\s+/g, '');
+
+      if (!/^[0-9a-f]{24}$/i.test(challengeId) || !/^\d{6}$/.test(code)) {
+        return res.status(400).json({ ok: false, error: 'Введите 6 цифр из Telegram' });
+      }
+
+      const tenMinAgoIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const globalFails = await sql`
+        SELECT COUNT(*)::int AS cnt FROM app_events
+        WHERE source = 'admin_otp' AND event = 'otp_fail' AND created_at >= ${tenMinAgoIso}::timestamptz
+      `;
+      if (Number(globalFails[0]?.cnt || 0) >= 5) {
+        return res.status(429).json({
+          ok: false,
+          error: 'Слишком много неверных попыток. Повторите через 10 минут.',
+        });
+      }
+
+      const [usedRows, failRows, sentRows] = await Promise.all([
+        sql`
+          SELECT 1 FROM app_events
+          WHERE source = 'admin_otp' AND event = 'otp_used' AND page = ${challengeId}
+          LIMIT 1
+        `,
+        sql`
+          SELECT COUNT(*)::int AS cnt FROM app_events
+          WHERE source = 'admin_otp' AND event = 'otp_fail' AND page = ${challengeId}
+        `,
+        sql`
+          SELECT meta FROM app_events
+          WHERE source = 'admin_otp' AND event = 'otp_sent' AND page = ${challengeId}
+          ORDER BY created_at DESC LIMIT 1
+        `,
+      ]);
+
+      if (usedRows.length > 0 || Number(failRows[0]?.cnt || 0) >= 3 || sentRows.length === 0) {
+        return res.status(403).json({
+          ok: false,
+          error: 'Код больше не действителен. Запросите новый.',
+        });
+      }
+
+      const metaObj = parseMetaObj(sentRows[0].meta);
+      const expMs = Number(metaObj.expMs || 0);
+      const savedSig = String(metaObj.sig || '');
+
+      if (!Number.isFinite(expMs) || Date.now() > expMs || !/^[0-9a-f]{64}$/i.test(savedSig)) {
+        return res.status(403).json({
+          ok: false,
+          error: 'Срок действия кода (2 мин) истёк. Запросите новый.',
+        });
+      }
+
+      const candidateSig = computeOtpSig(botToken, challengeId, expMs, code);
+      const a = Buffer.from(candidateSig, 'hex');
+      const b = Buffer.from(savedSig, 'hex');
+      const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+
+      if (!valid) {
+        const failMeta = JSON.stringify({ attempt: Number(failRows[0]?.cnt || 0) + 1 });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${adminId}, '', 'Admin', 'admin_otp', 'web', 'ru', 'otp_fail', ${challengeId}, ${failMeta})
+        `;
+        const left = Math.max(0, 2 - Number(failRows[0]?.cnt || 0));
+        return res.status(403).json({
+          ok: false,
+          error: left > 0 ? `Неверный код (осталось попыток: ${left})` : 'Код заблокирован. Запросите новый.',
+        });
+      }
+
+      // Burn OTP permanently & mint 12h HMAC session token
+      const usedMeta = JSON.stringify({ used: true });
+      await sql`
+        INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+        VALUES (${adminId}, '', 'Admin', 'admin_otp', 'web', 'ru', 'otp_used', ${challengeId}, ${usedMeta})
+      `;
+
+      const { token, expMs: sessionExp } = createWebSessionToken(adminId, botToken);
+
+      try {
+        const auditMeta = JSON.stringify({ ttl: '12h' });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${adminId}, '', 'Admin', 'admin', 'web', 'ru', 'admin_otp_login', 'chrome_otp', ${auditMeta})
+        `;
+      } catch (logErr) {
+        console.error('audit otp login log error:', logErr);
+      }
+
+      return res.status(200).json({
+        ok: true,
+        token,
+        expiresAt: new Date(sessionExp).toISOString(),
+        ttlHours: 12,
+      });
+    }
 
     if (action === 'web-token' && req.method === 'POST') {
       const tgAuth = authorizeTelegramOnly(req);
@@ -631,7 +827,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const t0 = Date.now();
       const counts = await sql`
         SELECT
-          (SELECT COUNT(*)::int FROM app_events) AS events_count,
+          (SELECT COUNT(*)::int FROM app_events WHERE source IN ('telegram', 'web')) AS events_count,
           (SELECT COUNT(*)::int FROM user_purchases) AS purchases_count,
           (SELECT COUNT(*)::int FROM banned_users) AS banned_count,
           (SELECT MAX(created_at) FROM app_events WHERE source IN ('telegram', 'web')) AS last_event_at
