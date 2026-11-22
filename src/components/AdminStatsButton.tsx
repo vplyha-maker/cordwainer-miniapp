@@ -1,1536 +1,1768 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { BANNED_EVENT_NAME } from '../utils/analytics'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type * as echarts from 'echarts';
+import {
+  Activity,
+  BarChart3,
+  Check,
+  ChevronDown,
+  Copy,
+  Database,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  KeyRound,
+  LogOut,
+  RefreshCw,
+  ScrollText,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  Users,
+  X,
+} from 'lucide-react';
 import {
   ActivityStudioChart,
   ConversionFunnelChart,
   DonutCard,
   PagesBarChart,
-} from './admin/AdminCharts'
+} from './admin/AdminCharts';
 import {
-  exportEditorialPdfReport,
+  buildExcelXml,
+  buildPagesCsv,
+  buildReportSummaryText,
+  buildUsersCsv,
+  copyTextToClipboard,
+  exportExcelWorkbook,
   exportPagesCsv,
   exportUsersCsv,
-  exportWorkbookExcel,
-} from './admin/exportUtils'
+  printEditorialReport,
+} from './admin/exportUtils';
+import type {
+  AdminStats,
+  AdminTab,
+  DayDetail,
+  FilterPreset,
+  HealthData,
+  UserProfile,
+} from './admin/types';
 import {
-  CHART_PALETTE,
   DARK_INPUT_STYLE,
-  PRODUCT_OPTIONS,
-  calcDeltaPct,
-  formatDateShort,
-  formatNum,
-  formatTime,
-  type AdminTab,
-  type DayDetailPayload,
-  type HealthPayload,
-  type PeriodDays,
-  type SavedFilterPreset,
-  type StatsPayload,
-  type UserDetailPayload,
-} from './admin/types'
+  PALETTE,
+  PRO_CATALOG,
+  formatDelta,
+  formatShortDate,
+} from './admin/types';
+
+type UserProfileMap = Record<string, UserProfile>;
+type PresetList = FilterPreset[];
+type AuthMode = 'none' | 'telegram' | 'web';
 
 type TgWindow = {
   Telegram?: {
     WebApp?: {
-      initData?: string
-    }
-  }
+      initData?: string;
+    };
+  };
+};
+
+type ConfirmAction = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  danger: boolean;
+  onConfirm: () => Promise<void>;
+};
+
+type PreviewModalData = {
+  title: string;
+  content: string;
+  hint: string;
+};
+
+const WEB_KEY_STORAGE = 'cordwaine_admin_web_key';
+const PRESETS_STORAGE = 'cordwaine_admin_presets_v1';
+
+const TABS: Array<{ id: AdminTab; label: string }> = [
+  { id: 'overview', label: 'Обзор' },
+  { id: 'analytics', label: 'Аналитика' },
+  { id: 'crm', label: 'PRO · CRM' },
+  { id: 'users', label: 'Люди' },
+  { id: 'audit', label: 'Журнал' },
+  { id: 'system', label: 'Система' },
+];
+
+function getTgInitData(): string {
+  if (typeof window === 'undefined') return '';
+  return (window as unknown as TgWindow).Telegram?.WebApp?.initData || '';
 }
 
-const PRESETS_STORAGE_KEY = 'cordwaine_admin_filter_presets_v1'
-
-function getInitData(): string {
-  if (typeof window === 'undefined') return ''
-  return (window as unknown as TgWindow).Telegram?.WebApp?.initData || ''
+function hasAdminUrlFlag(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hash.toLowerCase();
+  const s = new URLSearchParams(window.location.search);
+  return h === '#admin' || h.startsWith('#admin') || s.get('admin') === '1';
 }
 
-function loadSavedPresets(): SavedFilterPreset[] {
+function loadPresets(): PresetList {
   try {
-    const raw = localStorage.getItem(PRESETS_STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as SavedFilterPreset[]) : []
+    const raw = localStorage.getItem(PRESETS_STORAGE);
+    if (!raw) return [{ id: 'p_7_no', label: '7д · Без меня', days: 7, hideAdmin: true }];
+    const parsed = JSON.parse(raw) as PresetList;
+    return Array.isArray(parsed) && parsed.length > 0
+      ? parsed
+      : [{ id: 'p_7_no', label: '7д · Без меня', days: 7, hideAdmin: true }];
   } catch {
-    return []
+    return [{ id: 'p_7_no', label: '7д · Без меня', days: 7, hideAdmin: true }];
   }
 }
 
-export function AdminStatsButton() {
-  const [bannedReason, setBannedReason] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<AdminTab>('overview')
-  const [days, setDays] = useState<PeriodDays>(7)
-  const [hideAdmin, setHideAdmin] = useState(true)
+export const AdminStatsButton: React.FC = () => {
+  const [authMode, setAuthMode] = useState<AuthMode>('none');
+  const [webKey, setWebKey] = useState<string>('');
+  const [showWebLogin, setShowWebLogin] = useState<boolean>(false);
+  const [webKeyInput, setWebKeyInput] = useState<string>('');
+  const [webLoginError, setWebLoginError] = useState<string>('');
+  const [webLoginLoading, setWebLoginLoading] = useState<boolean>(false);
 
-  const [loading, setLoading] = useState(false)
-  const [stats, setStats] = useState<StatsPayload | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState<boolean>(false);
+  const [tab, setTab] = useState<AdminTab>('overview');
+  const [days, setDays] = useState<number>(7);
+  const [hideAdmin, setHideAdmin] = useState<boolean>(true);
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
-  // Smart Search & Saved Presets
-  const [globalQuery, setGlobalQuery] = useState('')
-  const [presets, setPresets] = useState<SavedFilterPreset[]>(() => loadSavedPresets())
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [showSearchBar, setShowSearchBar] = useState<boolean>(false);
+  const [showExportBar, setShowExportBar] = useState<boolean>(false);
+  const [smartQuery, setSmartQuery] = useState<string>('');
+  const [presets, setPresets] = useState<PresetList>(loadPresets);
+  const [toast, setToast] = useState<string>('');
 
-  // Day Drill-Down
-  const [dayDetail, setDayDetail] = useState<DayDetailPayload | null>(null)
-  const [dayLoading, setDayLoading] = useState(false)
+  // Chart controls & day drill-down
+  const [chartChannel, setChartChannel] = useState<'all' | 'tg' | 'web'>('all');
+  const [chartKind, setChartKind] = useState<'area' | 'line' | 'bar'>('area');
+  const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
+  const [dayLoading, setDayLoading] = useState<boolean>(false);
+  const activityChartRef = useRef<echarts.ECharts | null>(null);
 
-  // System Health
-  const [health, setHealth] = useState<HealthPayload | null>(null)
-  const [healthLoading, setHealthLoading] = useState(false)
+  // CRM controls
+  const [crmUserId, setCrmUserId] = useState<string>('');
+  const [crmProduct, setCrmProduct] = useState<string>('pro_pigments');
+  const [crmDropdownOpen, setCrmDropdownOpen] = useState<boolean>(false);
+  const [banReason, setBanReason] = useState<string>('');
+  const [crmBusy, setCrmBusy] = useState<boolean>(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  // CRM & Confirmations
-  const [crmUserId, setCrmUserId] = useState('')
-  const [crmProductId, setCrmProductId] = useState('pro_pigments')
-  const [productMenuOpen, setProductMenuOpen] = useState(false)
-  const [banReasonInput, setBanReasonInput] = useState('')
-  const [crmBusy, setCrmBusy] = useState(false)
-  const [pendingConfirm, setPendingConfirm] = useState<{
-    title: string
-    onConfirm: () => void
-  } | null>(null)
+  // Users tab controls
+  const [userSearch, setUserSearch] = useState<string>('');
+  const [userSourceFilter, setUserSourceFilter] = useState<'all' | 'telegram' | 'web'>('all');
+  const [userSort, setUserSort] = useState<'recent' | 'events' | 'pro'>('recent');
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [userProfiles, setUserProfiles] = useState<UserProfileMap>({});
+  const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
-  // Users filtering & sorting
-  const [userSearch, setUserSearch] = useState('')
-  const [userSourceFilter, setUserSourceFilter] = useState<'all' | 'telegram' | 'web'>('all')
-  const [userSort, setUserSort] = useState<'recent' | 'events' | 'pro'>('recent')
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-  const [userDetail, setUserDetail] = useState<UserDetailPayload | null>(null)
-  const [userDetailLoading, setUserDetailLoading] = useState(false)
+  // Health tab
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [healthLoading, setHealthLoading] = useState<boolean>(false);
 
-  // Audit Log filter
-  const [auditFilter, setAuditFilter] = useState('')
+  // Preview modal for Telegram WebView exports
+  const [previewModal, setPreviewModal] = useState<PreviewModalData | null>(null);
 
-  const flashToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2800)
-  }
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => {
+      setToast((prev) => (prev === msg ? '' : prev));
+    }, 2600);
+  }, []);
 
+  const buildAuthHeaders = useCallback(
+    (overrideWebKey?: string): Record<string, string> => {
+      const headers: Record<string, string> = {};
+      const initData = getTgInitData();
+      if (initData) {
+        headers['X-Telegram-Init-Data'] = initData;
+      }
+      const key = overrideWebKey !== undefined ? overrideWebKey : webKey;
+      if (key) {
+        headers['X-Admin-Key'] = key;
+      }
+      return headers;
+    },
+    [webKey],
+  );
+
+  // Initial auth detection (Telegram OR Chrome Web #admin / saved key)
   useEffect(() => {
-    const onBanned = (e: Event) => {
-      const ce = e as CustomEvent<string>
-      setBannedReason(ce.detail || 'Доступ ограничен администратором')
-    }
-    window.addEventListener(BANNED_EVENT_NAME, onBanned)
-    return () => window.removeEventListener(BANNED_EVENT_NAME, onBanned)
-  }, [])
+    let active = true;
 
-  useEffect(() => {
-    const initData = getInitData()
-    if (!initData) return
-    let active = true
-    fetch('/api/check-purchase?action=stats&check=1', {
-      headers: { 'X-Telegram-Init-Data': initData },
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { isAdmin?: boolean } | null) => {
-        if (active && data?.isAdmin) setIsAdmin(true)
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const loadStats = useCallback(
-    async (nextDays: PeriodDays = days, nextHide: boolean = hideAdmin) => {
-      const initData = getInitData()
-      if (!initData) return
-      setLoading(true)
-      setError(null)
-      try {
-        const qs = new URLSearchParams({
-          action: 'stats',
-          days: String(nextDays),
-          hideAdmin: nextHide ? '1' : '0',
-        })
-        const res = await fetch(`/api/check-purchase?${qs.toString()}`, {
-          headers: { 'X-Telegram-Init-Data': initData },
-        })
-        if (!res.ok) {
-          setError('Не удалось загрузить статистику из Neon')
-          setLoading(false)
-          return
+    const checkAuth = async () => {
+      const initData = getTgInitData();
+      if (initData) {
+        try {
+          const r = await fetch('/api/check-purchase?action=stats&check=1', {
+            headers: { 'X-Telegram-Init-Data': initData },
+          });
+          if (r.ok && active) {
+            setAuthMode('telegram');
+            return;
+          }
+        } catch {
+          // ignore
         }
-        const data = (await res.json()) as StatsPayload
-        setStats(data)
+      }
+
+      const savedKey = localStorage.getItem(WEB_KEY_STORAGE) || '';
+      if (savedKey) {
+        try {
+          const r = await fetch('/api/check-purchase?action=stats&check=1', {
+            headers: { 'X-Admin-Key': savedKey },
+          });
+          if (r.ok && active) {
+            setWebKey(savedKey);
+            setAuthMode('web');
+            if (hasAdminUrlFlag()) setOpen(true);
+            return;
+          }
+          localStorage.removeItem(WEB_KEY_STORAGE);
+        } catch {
+          // ignore
+        }
+      }
+
+      if (hasAdminUrlFlag() && active) {
+        setShowWebLogin(true);
+      }
+    };
+
+    checkAuth();
+
+    const onHashChange = () => {
+      if (hasAdminUrlFlag()) {
+        if (authMode === 'none') {
+          setShowWebLogin(true);
+        } else {
+          setOpen(true);
+        }
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => {
+      active = false;
+      window.removeEventListener('hashchange', onHashChange);
+    };
+  }, [authMode]);
+
+  const handleWebLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = webKeyInput.trim();
+    if (!trimmed) return;
+    setWebLoginLoading(true);
+    setWebLoginError('');
+    try {
+      const r = await fetch('/api/check-purchase?action=stats&check=1', {
+        headers: { 'X-Admin-Key': trimmed },
+      });
+      if (!r.ok) {
+        setWebLoginError('Неверный ключ (проверьте ADMIN_WEB_KEY в Vercel)');
+        return;
+      }
+      localStorage.setItem(WEB_KEY_STORAGE, trimmed);
+      setWebKey(trimmed);
+      setAuthMode('web');
+      setShowWebLogin(false);
+      setWebKeyInput('');
+      setOpen(true);
+    } catch {
+      setWebLoginError('Ошибка сети при проверке ключа');
+    } finally {
+      setWebLoginLoading(false);
+    }
+  };
+
+  const handleWebLogout = () => {
+    localStorage.removeItem(WEB_KEY_STORAGE);
+    setWebKey('');
+    setAuthMode('none');
+    setOpen(false);
+    if (window.location.hash.toLowerCase().startsWith('#admin')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
+  const fetchStats = useCallback(async () => {
+    if (authMode === 'none') return;
+    setLoading(true);
+    setError('');
+    try {
+      const url = `/api/check-purchase?action=stats&days=${days}&hideAdmin=${hideAdmin ? '1' : '0'}`;
+      const r = await fetch(url, { headers: buildAuthHeaders() });
+      const data = (await r.json()) as AdminStats & { error?: string };
+      if (!r.ok || !data.ok) {
+        setError(data.error || 'Ошибка загрузки статистики из Neon');
+      } else {
+        setStats(data);
+      }
+    } catch {
+      setError('Не удалось подключиться к серверу');
+    } finally {
+      setLoading(false);
+    }
+  }, [authMode, days, hideAdmin, buildAuthHeaders]);
+
+  const fetchHealth = useCallback(async () => {
+    if (authMode === 'none') return;
+    setHealthLoading(true);
+    try {
+      const r = await fetch('/api/check-purchase?action=health', {
+        headers: buildAuthHeaders(),
+      });
+      const data = (await r.json()) as HealthData;
+      if (r.ok && data.ok) setHealth(data);
+    } catch {
+      // ignore
+    } finally {
+      setHealthLoading(false);
+    }
+  }, [authMode, buildAuthHeaders]);
+
+  useEffect(() => {
+    if (open && authMode !== 'none') {
+      fetchStats();
+    }
+  }, [open, authMode, fetchStats]);
+
+  useEffect(() => {
+    if (open && tab === 'system' && authMode !== 'none') {
+      fetchHealth();
+    }
+  }, [open, tab, authMode, fetchHealth]);
+
+  const handleSelectDay = useCallback(
+    async (dayIso: string) => {
+      setDayLoading(true);
+      try {
+        const url = `/api/check-purchase?action=day&date=${encodeURIComponent(dayIso)}&hideAdmin=${hideAdmin ? '1' : '0'}`;
+        const r = await fetch(url, { headers: buildAuthHeaders() });
+        const data = (await r.json()) as DayDetail & { ok?: boolean };
+        if (r.ok && data.ok) {
+          setDayDetail(data);
+        }
       } catch {
-        setError('Ошибка сети')
+        showToast('Не удалось загрузить детализацию дня');
       } finally {
-        setLoading(false)
+        setDayLoading(false);
       }
     },
-    [days, hideAdmin]
-  )
+    [hideAdmin, buildAuthHeaders, showToast],
+  );
 
-  const loadHealth = useCallback(async () => {
-    const initData = getInitData()
-    if (!initData) return
-    setHealthLoading(true)
-    try {
-      const res = await fetch('/api/check-purchase?action=health', {
-        headers: { 'X-Telegram-Init-Data': initData },
-      })
-      if (res.ok) {
-        const data = (await res.json()) as HealthPayload
-        setHealth(data)
-      }
-    } catch {
-      // ignore
-    } finally {
-      setHealthLoading(false)
+  const handleToggleUser = async (uid: string) => {
+    if (expandedUserId === uid) {
+      setExpandedUserId(null);
+      return;
     }
-  }, [])
-
-  const loadDayDetail = async (dayIso: string) => {
-    const initData = getInitData()
-    if (!initData) return
-    setDayLoading(true)
+    setExpandedUserId(uid);
+    if (userProfiles[uid]) return;
+    setProfileLoadingId(uid);
     try {
-      const qs = new URLSearchParams({
-        action: 'day',
-        date: dayIso,
-        hideAdmin: hideAdmin ? '1' : '0',
-      })
-      const res = await fetch(`/api/check-purchase?${qs.toString()}`, {
-        headers: { 'X-Telegram-Init-Data': initData },
-      })
-      if (res.ok) {
-        const data = (await res.json()) as DayDetailPayload
-        setDayDetail(data)
-      }
-    } catch {
-      // ignore
-    } finally {
-      setDayLoading(false)
-    }
-  }
-
-  const loadUserDetail = async (uid: string) => {
-    const initData = getInitData()
-    if (!initData) return
-    if (selectedUserId === uid) {
-      setSelectedUserId(null)
-      return
-    }
-    setSelectedUserId(uid)
-    setUserDetail(null)
-    setUserDetailLoading(true)
-    try {
-      const res = await fetch(
+      const r = await fetch(
         `/api/check-purchase?action=user&targetId=${encodeURIComponent(uid)}`,
-        { headers: { 'X-Telegram-Init-Data': initData } }
-      )
-      if (res.ok) {
-        const data = (await res.json()) as UserDetailPayload
-        setUserDetail(data)
+        { headers: buildAuthHeaders() },
+      );
+      const data = (await r.json()) as UserProfile & { ok?: boolean };
+      if (r.ok && data.ok) {
+        setUserProfiles((prev) => ({ ...prev, [uid]: data }));
       }
     } catch {
       // ignore
     } finally {
-      setUserDetailLoading(false)
+      setProfileLoadingId(null);
     }
-  }
+  };
 
-  const executeCrmAction = async (revoke: boolean) => {
-    const initData = getInitData()
-    if (!initData || !crmUserId.trim()) return
-    setCrmBusy(true)
+  const executeCrmGrant = async (mode: 'grant' | 'revoke') => {
+    const uid = crmUserId.trim();
+    if (!uid) {
+      showToast('Введите ID пользователя');
+      return;
+    }
+    setCrmBusy(true);
     try {
-      const res = await fetch('/api/check-purchase?action=grant', {
+      const r = await fetch('/api/check-purchase?action=grant', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData,
-        },
-        body: JSON.stringify({
-          targetUserId: crmUserId.trim(),
-          productId: crmProductId,
-          revoke,
-        }),
-      })
-      const data = (await res.json()) as { ok?: boolean; error?: string }
-      if (!res.ok || !data.ok) {
-        flashToast(`Ошибка: ${data.error || 'операция не выполнена'}`)
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+        body: JSON.stringify({ targetId: uid, productId: crmProduct, mode }),
+      });
+      const data = (await r.json()) as { ok?: boolean; error?: string };
+      if (!r.ok || !data.ok) {
+        showToast(data.error || 'Ошибка операции');
       } else {
-        flashToast(
-          revoke
-            ? `Отозван ${crmProductId} для #${crmUserId.trim()}`
-            : `Выдан ${crmProductId} для #${crmUserId.trim()} ✓`
-        )
-        void loadStats(days, hideAdmin)
+        showToast(mode === 'grant' ? 'PRO-доступ выдан' : 'PRO-доступ снят');
+        setUserProfiles((prev) => {
+          const copy = { ...prev };
+          delete copy[uid];
+          return copy;
+        });
+        fetchStats();
       }
     } catch {
-      flashToast('Ошибка сети')
+      showToast('Ошибка сети');
     } finally {
-      setCrmBusy(false)
+      setCrmBusy(false);
     }
-  }
+  };
 
-  const executeBanAction = async (targetId: string, unban: boolean) => {
-    const initData = getInitData()
-    if (!initData || !targetId.trim()) return
-    setCrmBusy(true)
+  const executeCrmBan = async (mode: 'ban' | 'unban', targetOverride?: string) => {
+    const uid = (targetOverride || crmUserId).trim();
+    if (!uid) {
+      showToast('Введите ID пользователя');
+      return;
+    }
+    setCrmBusy(true);
     try {
-      const res = await fetch('/api/check-purchase?action=ban', {
+      const r = await fetch('/api/check-purchase?action=ban', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData,
-        },
-        body: JSON.stringify({
-          targetUserId: targetId.trim(),
-          unban,
-          reason: banReasonInput.trim(),
-        }),
-      })
-      const data = (await res.json()) as { ok?: boolean; error?: string }
-      if (!res.ok || !data.ok) {
-        flashToast(`Ошибка: ${data.error || 'не удалось выполнить'}`)
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+        body: JSON.stringify({ targetId: uid, mode, reason: banReason.trim() }),
+      });
+      const data = (await r.json()) as { ok?: boolean; error?: string };
+      if (!r.ok || !data.ok) {
+        showToast(data.error || 'Ошибка операции');
       } else {
-        flashToast(
-          unban
-            ? `#${targetId.trim()} разблокирован ✓`
-            : `#${targetId.trim()} заблокирован`
-        )
-        if (!unban) setBanReasonInput('')
-        void loadStats(days, hideAdmin)
+        showToast(mode === 'ban' ? `Пользователь ${uid} заблокирован` : `Блокировка снята`);
+        setBanReason('');
+        fetchStats();
       }
     } catch {
-      flashToast('Ошибка сети')
+      showToast('Ошибка сети');
     } finally {
-      setCrmBusy(false)
+      setCrmBusy(false);
     }
-  }
+  };
 
-  const saveCurrentFilterPreset = () => {
-    const label = `${days >= 3650 ? 'Всё' : `${days}д`} · ${hideAdmin ? 'Без меня' : 'Все'}`
+  const handleSavePreset = () => {
+    const label = `${days >= 3650 ? 'Всё' : `${days}д`} · ${hideAdmin ? 'Без меня' : 'Все'}`;
     if (presets.some((p) => p.days === days && p.hideAdmin === hideAdmin)) {
-      flashToast('Такой пресет уже сохранён')
-      return
+      showToast('Такой пресет уже сохранён');
+      return;
     }
-    const next = [...presets, { id: String(Date.now()), name: label, days, hideAdmin }].slice(-4)
-    setPresets(next)
+    const next: PresetList = [{ id: `p_${Date.now()}`, label, days, hideAdmin }, ...presets].slice(0, 4);
+    setPresets(next);
     try {
-      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next))
+      localStorage.setItem(PRESETS_STORAGE, JSON.stringify(next));
     } catch {
       // ignore
     }
-    flashToast(`Пресет «${label}» сохранён`)
-  }
+    showToast(`Пресет «${label}» сохранён`);
+  };
+
+  const handleExportAction = async (kind: 'users_csv' | 'pages_csv' | 'excel' | 'pdf') => {
+    if (!stats) return;
+    setShowExportBar(false);
+
+    if (kind === 'pdf') {
+      const printed = printEditorialReport(stats, days);
+      if (printed) {
+        showToast('Окно печати PDF открыто');
+      } else {
+        setPreviewModal({
+          title: 'Отчёт CORDWAINE (для Telegram)',
+          content: buildReportSummaryText(stats, days),
+          hint: 'Telegram WebView блокирует системную печать. Скопируйте отчёт в 1 тап или откройте панель в Chrome (/#admin) для сохранения PDF.',
+        });
+      }
+      return;
+    }
+
+    if (kind === 'users_csv') {
+      const res = await exportUsersCsv(stats);
+      if (res === 'shared') showToast('Открыто меню отправки CSV');
+      else if (res === 'downloaded') showToast('CSV пользователей скачан');
+      else {
+        setPreviewModal({
+          title: 'CSV · Пользователи',
+          content: buildUsersCsv(stats),
+          hint: 'Скопируйте CSV ниже или откройте панель в Chrome (/#admin) для прямого скачивания файла.',
+        });
+      }
+      return;
+    }
+
+    if (kind === 'pages_csv') {
+      const res = await exportPagesCsv(stats);
+      if (res === 'shared') showToast('Открыто меню отправки CSV');
+      else if (res === 'downloaded') showToast('CSV разделов скачан');
+      else {
+        setPreviewModal({
+          title: 'CSV · Разделы',
+          content: buildPagesCsv(stats),
+          hint: 'Скопируйте CSV ниже или откройте панель в Chrome (/#admin) для прямого скачивания файла.',
+        });
+      }
+      return;
+    }
+
+    const res = await exportExcelWorkbook(stats, days);
+    if (res === 'shared') showToast('Открыто меню отправки Excel (.xls)');
+    else if (res === 'downloaded') showToast('Excel (.xls) скачан');
+    else {
+      setPreviewModal({
+        title: 'Excel XML (резервный просмотр)',
+        content: buildExcelXml(stats, days),
+        hint: 'Telegram WebView заблокировал скачивание .xls. Для прямого файла Excel откройте панель в Chrome через /#admin.',
+      });
+    }
+  };
+
+  const handleExportChartPng = async () => {
+    const chart = activityChartRef.current;
+    if (!chart) return;
+    try {
+      const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#141412' });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], 'cordwaine-activity.png', { type: 'image/png' });
+      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+      if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [file] }))) {
+        await nav.share({ files: [file], title: 'CORDWAINE Activity' });
+        showToast('График отправлен');
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'cordwaine-activity.png';
+      a.click();
+      showToast('PNG графика сохранён');
+    } catch {
+      showToast('Экспорт PNG доступен в Chrome (/#admin)');
+    }
+  };
 
   const filteredUsers = useMemo(() => {
-    if (!stats) return []
-    const q = userSearch.trim().toLowerCase()
-    const list = stats.users.filter((u) => {
-      if (userSourceFilter !== 'all' && u.source !== userSourceFilter) return false
-      if (!q) return true
-      return (
-        u.user_id.toLowerCase().includes(q) ||
-        (u.username || '').toLowerCase().includes(q) ||
-        (u.first_name || '').toLowerCase().includes(q) ||
-        (u.last_page || '').toLowerCase().includes(q)
-      )
-    })
-    return [...list].sort((a, b) => {
-      if (userSort === 'events') return b.events_count - a.events_count
-      if (userSort === 'pro') return b.pro_count - a.pro_count
-      return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
-    })
-  }, [stats, userSearch, userSourceFilter, userSort])
+    if (!stats) return [];
+    const q = (userSearch || smartQuery).trim().toLowerCase();
+    return stats.users
+      .filter((u) => {
+        if (userSourceFilter !== 'all' && u.source !== userSourceFilter) return false;
+        if (!q) return true;
+        return (
+          u.user_id.toLowerCase().includes(q) ||
+          u.username.toLowerCase().includes(q) ||
+          u.first_name.toLowerCase().includes(q) ||
+          u.last_page.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (userSort === 'events') return b.events - a.events;
+        if (userSort === 'pro') return b.pro_count - a.pro_count || b.events - a.events;
+        return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime();
+      });
+  }, [stats, userSearch, smartQuery, userSourceFilter, userSort]);
 
-  const filteredAudit = useMemo(() => {
-    if (!stats) return []
-    const q = auditFilter.trim().toLowerCase()
-    if (!q) return stats.auditLog
-    return stats.auditLog.filter((row) => {
-      const hay = `${row.event} ${row.user_id} ${JSON.stringify(row.meta || {})}`.toLowerCase()
-      return hay.includes(q)
-    })
-  }, [stats, auditFilter])
-
-  const smartSearchHits = useMemo(() => {
-    const q = globalQuery.trim().toLowerCase()
-    if (!q || !stats) return null
+  const smartMatches = useMemo(() => {
+    const q = smartQuery.trim().toLowerCase();
+    if (!q || !stats) return null;
     const users = stats.users
       .filter(
         (u) =>
           u.user_id.toLowerCase().includes(q) ||
-          (u.username || '').toLowerCase().includes(q) ||
-          (u.first_name || '').toLowerCase().includes(q)
+          u.username.toLowerCase().includes(q) ||
+          u.first_name.toLowerCase().includes(q),
       )
-      .slice(0, 4)
-    const pages = stats.topPages.filter((p) => p.page.toLowerCase().includes(q)).slice(0, 4)
-    const events = stats.events.filter((e) => e.event.toLowerCase().includes(q)).slice(0, 3)
-    return { users, pages, events }
-  }, [globalQuery, stats])
+      .slice(0, 4);
+    const pages = stats.pages.filter((p) => p.page.toLowerCase().includes(q)).slice(0, 4);
+    return { users, pages };
+  }, [smartQuery, stats]);
 
-  if (bannedReason !== null && !isAdmin) {
+  const selectedProductObj =
+    PRO_CATALOG.find((p) => p.id === crmProduct) || PRO_CATALOG[0];
+
+  // Web Login Modal (only shown when visiting /#admin in Chrome without saved key)
+  if (authMode === 'none') {
+    if (!showWebLogin) return null;
     return (
-      <div className="fixed inset-0 z-[999] bg-[#0B0B0C] text-[#F5F1EB] flex items-center justify-center p-6">
-        <div className="max-w-sm w-full rounded-2xl border border-[#E05A6D]/35 bg-[#141413] p-6 text-center space-y-3 shadow-2xl">
-          <div className="text-[11px] font-mono uppercase tracking-[0.2em] text-[#E05A6D]">
-            CORDWAINE · ACCESS DENIED
+      <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <form
+          onSubmit={handleWebLogin}
+          className="w-full max-w-sm rounded-2xl border border-[#C9A86A]/30 bg-[#141412] p-5 shadow-2xl"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-[#C9A86A]">
+              <KeyRound className="w-4 h-4" />
+              <span className="text-[11px] font-semibold tracking-[0.14em] uppercase">
+                CORDWAINE · WEB ADMIN
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowWebLogin(false)}
+              className="p-1.5 rounded-lg text-[#9A9389] hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <h2 className="text-[22px] font-serif">Доступ ограничен</h2>
-          <p className="text-[13.5px] text-[#B5AFA4] leading-relaxed">{bannedReason}</p>
-        </div>
+          <h3 className="text-[17px] font-semibold text-[#F5F1EB] mb-1">Вход владельца</h3>
+          <p className="text-[12px] text-[#8D867C] mb-4">
+            Введите ключ из переменной <span className="font-mono text-[#D6CFC4]">ADMIN_WEB_KEY</span> в Vercel.
+          </p>
+          <input
+            type="password"
+            value={webKeyInput}
+            onChange={(e) => setWebKeyInput(e.target.value)}
+            placeholder="Секретный ключ администратора"
+            style={DARK_INPUT_STYLE}
+            className="w-full rounded-xl border border-white/15 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-[#C9A86A]"
+            autoFocus
+          />
+          {webLoginError && (
+            <div className="mt-2.5 text-[12px] text-[#F06A7E]">{webLoginError}</div>
+          )}
+          <button
+            type="submit"
+            disabled={webLoginLoading || !webKeyInput.trim()}
+            className="mt-4 w-full rounded-xl bg-[#C9A86A] py-2.5 text-[14px] font-semibold text-[#141412] disabled:opacity-50"
+          >
+            {webLoginLoading ? 'Проверка...' : 'Открыть Command Center'}
+          </button>
+        </form>
       </div>
-    )
+    );
   }
-
-  if (!isAdmin) return null
-
-  const activeProductOption =
-    PRODUCT_OPTIONS.find((p) => p.id === crmProductId) || PRODUCT_OPTIONS[0]
-
-  const navItems: { id: AdminTab; label: string; count?: number }[] = [
-    { id: 'overview', label: 'Обзор' },
-    { id: 'pages', label: 'Аналитика', count: stats?.topPages.length },
-    { id: 'crm', label: 'PRO · CRM', count: stats?.summary.total_pro },
-    { id: 'users', label: 'Люди', count: stats?.users.length },
-    { id: 'audit', label: 'Журнал', count: stats?.auditLog.length },
-    { id: 'health', label: 'Система' },
-  ]
-
-  const periodItems: { d: PeriodDays; label: string }[] = [
-    { d: 1, label: '24ч' },
-    { d: 7, label: '7д' },
-    { d: 30, label: '30д' },
-    { d: 3650, label: 'Всё' },
-  ]
-
-  const tgDelta = stats ? calcDeltaPct(stats.summary.tg_users, stats.previous.tg_users) : null
-  const webDelta = stats ? calcDeltaPct(stats.summary.web_users, stats.previous.web_users) : null
 
   return (
     <>
+      {/* Floating Owner Trigger Button */}
       <button
         type="button"
-        onClick={() => {
-          setOpen(true)
-          void loadStats(days, hideAdmin)
-          void loadHealth()
-        }}
-        title="Cordwaine Command Center"
-        className="fixed bottom-4 left-4 z-50 w-10 h-10 rounded-full bg-[#141413]/92 text-[#C9A86A] border border-[#C9A86A]/45 flex items-center justify-center shadow-lg cursor-pointer hover:bg-[#1E1D1A] transition-colors"
+        onClick={() => setOpen(true)}
+        aria-label="CORDWAINE Command Center"
+        className="fixed bottom-5 left-4 z-[90] flex items-center gap-2 rounded-full border border-[#C9A86A]/45 bg-[#141412]/95 px-3.5 py-2.5 text-[#C9A86A] shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md active:scale-95 transition"
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 20V10M12 20V4M6 20v-6" />
-        </svg>
+        <BarChart3 className="w-4 h-4" />
+        <span className="text-[12px] font-semibold tracking-wide hidden sm:inline">Admin</span>
       </button>
 
+      {/* Main Command Center Modal */}
       {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/82 flex items-end md:items-center justify-center p-0 md:p-4 lg:p-6"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full md:max-w-4xl lg:max-w-[1280px] h-[95dvh] md:h-[90vh] flex flex-col lg:flex-row rounded-t-3xl md:rounded-2xl bg-[#0B0B0C] text-[#F5F1EB] border border-[#F4F0E8]/[0.1] overflow-hidden shadow-2xl relative"
-          >
-            {/* === ДЕСКТОПНЫЙ САЙДБАР === */}
-            <aside className="hidden lg:flex lg:w-[252px] shrink-0 flex-col justify-between bg-[#10100F] border-r border-[#F4F0E8]/[0.08] p-5">
-              <div className="space-y-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#34D399]" />
-                    <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-[#C9A86A]">
-                      CORDWAINE · ADMIN
-                    </span>
-                  </div>
-                  <h2 className="text-[18px] font-semibold text-[#F5F1EB] mt-1">
-                    Command Center
-                  </h2>
-                  <p className="text-[12px] text-[#8C867C] mt-0.5 font-mono">
-                    {stats?.syncedAt ? `Обновлено ${formatTime(stats.syncedAt)}` : 'Neon Live'}
-                  </p>
-                </div>
-
-                <nav className="space-y-1">
-                  {navItems.map((item) => {
-                    const active = tab === item.id
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setTab(item.id)
-                          if (item.id === 'health') void loadHealth()
-                        }}
-                        className={`w-full px-3.5 py-2.5 rounded-xl flex items-center justify-between text-[13.5px] font-medium cursor-pointer transition-colors ${
-                          active
-                            ? 'bg-[#C9A86A]/15 text-[#F5F1EB] border border-[#C9A86A]/35'
-                            : 'text-[#9A948A] hover:bg-white/[0.04] hover:text-[#F5F1EB] border border-transparent'
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {item.count !== undefined && (
-                          <span
-                            className={`font-mono text-[11px] px-2 py-0.5 rounded-md ${
-                              active
-                                ? 'bg-[#C9A86A] text-[#0B0B0C] font-semibold'
-                                : 'bg-white/[0.06] text-[#9A948A]'
-                            }`}
-                          >
-                            {item.count}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </nav>
+        <div className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4">
+          <div className="w-full h-[95dvh] md:h-[90dvh] md:max-w-4xl lg:max-w-[1260px] rounded-t-[26px] md:rounded-[26px] border border-white/[0.1] bg-[#0D0D0C] text-[#F5F1EB] flex flex-col lg:flex-row overflow-hidden shadow-2xl">
+            {/* Desktop Left Sidebar */}
+            <aside className="hidden lg:flex w-[240px] shrink-0 flex-col border-r border-white/[0.08] bg-[#111110] p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2 h-2 rounded-full bg-[#3FD08F]" />
+                <span className="text-[11px] font-semibold tracking-[0.16em] text-[#C9A86A] uppercase">
+                  CORDWAINE
+                </span>
               </div>
+              <div className="text-[18px] font-bold tracking-tight mb-5">Command Center</div>
 
-              <div className="space-y-2.5 pt-4 border-t border-[#F4F0E8]/[0.08]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !hideAdmin
-                    setHideAdmin(next)
-                    void loadStats(days, next)
-                  }}
-                  className={`w-full px-3 py-2 rounded-xl text-[12px] font-medium border cursor-pointer text-left ${
-                    hideAdmin
-                      ? 'border-[#C9A86A]/45 bg-[#C9A86A]/12 text-[#E5C992]'
-                      : 'border-[#F4F0E8]/[0.1] bg-[#141413] text-[#9A948A]'
-                  }`}
-                >
-                  {hideAdmin ? '✓ Без моих визитов' : 'С моими визитами'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="w-full py-2 rounded-xl border border-[#F4F0E8]/[0.1] text-[12.5px] text-[#9A948A] hover:text-[#F5F1EB] cursor-pointer"
-                >
-                  Закрыть
-                </button>
+              <nav className="space-y-1 flex-1">
+                {TABS.map((t) => {
+                  const active = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTab(t.id)}
+                      className={`w-full flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[13px] font-medium transition ${
+                        active
+                          ? 'bg-[#C9A86A] text-[#121210] font-semibold'
+                          : 'text-[#BDB6AC] hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <span>{t.label}</span>
+                      {t.id === 'audit' && stats && stats.auditLog.length > 0 && (
+                        <span className={`text-[11px] font-mono ${active ? 'text-[#121210]/70' : 'text-[#8D867C]'}`}>
+                          {stats.auditLog.length}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div className="pt-3 border-t border-white/[0.08] space-y-2">
+                <div className="text-[11px] text-[#8D867C]">
+                  Сессия: <span className="text-[#DED7CC]">{authMode === 'web' ? 'Chrome Web' : 'Telegram'}</span>
+                </div>
+                {authMode === 'web' && (
+                  <button
+                    type="button"
+                    onClick={handleWebLogout}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 py-2 text-[12px] text-[#F06A7E] hover:bg-[#F06A7E]/10"
+                  >
+                    <LogOut className="w-3.5 h-3.5" /> Выйти из Web
+                  </button>
+                )}
               </div>
             </aside>
 
-            {/* === ОСНОВНАЯ ОБЛАСТЬ === */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-              <header className="px-4 sm:px-6 pt-3.5 pb-3 bg-[#10100F] border-b border-[#F4F0E8]/[0.08] shrink-0 space-y-2.5">
+            {/* Right / Main Workspace */}
+            <div className="flex-1 flex flex-col min-w-0 min-h-0">
+              {/* Compact Sticky Header */}
+              <header className="shrink-0 border-b border-white/[0.08] bg-[#111110]/95 px-3.5 pt-3 pb-2.5">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 lg:hidden">
-                      <span className="w-2 h-2 rounded-full bg-[#34D399] shrink-0" />
-                      <span className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#C9A86A] whitespace-nowrap">
-                        CORDWAINE · ADMIN
-                      </span>
-                    </div>
-                    <h2 className="text-[17px] sm:text-[19px] font-semibold text-[#F5F1EB] leading-snug">
-                      {navItems.find((n) => n.id === tab)?.label}
-                    </h2>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-[#3FD08F] shrink-0" />
+                    <span className="text-[15px] font-bold tracking-tight truncate">
+                      {TABS.find((t) => t.id === tab)?.label || 'Обзор'}
+                    </span>
+                    <span className="hidden sm:inline text-[11px] text-[#8D867C] font-mono">
+                      · {authMode === 'web' ? 'WEB' : 'TG'}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      disabled={!stats}
-                      onClick={() => setShowExportMenu((v) => !v)}
-                      className="h-9 px-2.5 rounded-xl text-[12px] font-medium border border-[#F4F0E8]/[0.14] bg-[#141413] text-[#E5DFD5] cursor-pointer disabled:opacity-40"
+                      onClick={() => {
+                        setShowSearchBar((v) => !v);
+                        setShowExportBar(false);
+                      }}
+                      title="Поиск"
+                      className={`p-2 rounded-xl border transition ${
+                        showSearchBar
+                          ? 'border-[#C9A86A] bg-[#C9A86A]/15 text-[#C9A86A]'
+                          : 'border-white/10 bg-white/[0.03] text-[#D6CFC4]'
+                      }`}
                     >
-                      Экспорт
+                      <Search className="w-4 h-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        void loadStats(days, hideAdmin)
-                        if (tab === 'health') void loadHealth()
+                        setShowExportBar((v) => !v);
+                        setShowSearchBar(false);
                       }}
-                      disabled={loading}
-                      className="h-9 px-3 rounded-xl text-[12px] font-medium border border-[#C9A86A]/35 bg-[#C9A86A]/10 text-[#E5C992] cursor-pointer disabled:opacity-50"
+                      title="Экспорт"
+                      className={`p-2 rounded-xl border transition ${
+                        showExportBar
+                          ? 'border-[#C9A86A] bg-[#C9A86A]/15 text-[#C9A86A]'
+                          : 'border-white/10 bg-white/[0.03] text-[#D6CFC4]'
+                      }`}
                     >
-                      {loading ? '…' : 'Обновить'}
+                      <Download className="w-4 h-4" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetchStats();
+                        if (tab === 'system') fetchHealth();
+                      }}
+                      title="Обновить"
+                      className="p-2 rounded-xl border border-[#C9A86A]/35 bg-[#C9A86A]/10 text-[#C9A86A]"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    {authMode === 'web' && (
+                      <button
+                        type="button"
+                        onClick={handleWebLogout}
+                        title="Выйти"
+                        className="lg:hidden p-2 rounded-xl border border-white/10 bg-white/[0.03] text-[#F06A7E]"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setOpen(false)}
-                      className="lg:hidden w-9 h-9 rounded-xl border border-[#F4F0E8]/[0.12] bg-[#141413] text-[#B5AFA4] flex items-center justify-center cursor-pointer"
+                      title="Закрыть"
+                      className="p-2 rounded-xl border border-white/10 bg-white/[0.03] text-[#BDB6AC]"
                     >
-                      ✕
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Меню экспорта */}
-                {showExportMenu && stats && (
-                  <div className="p-2.5 rounded-xl bg-[#0B0B0C] border border-[#C9A86A]/35 flex flex-wrap items-center gap-2">
-                    <span className="text-[11.5px] text-[#9A948A] mr-auto">
-                      Экспорт данных:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        exportUsersCsv(stats)
-                        setShowExportMenu(false)
-                        flashToast('CSV пользователей скачан')
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1C1B19] border border-[#F4F0E8]/[0.12] text-[12px] text-[#F5F1EB] cursor-pointer"
-                    >
-                      CSV (Люди)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        exportPagesCsv(stats)
-                        setShowExportMenu(false)
-                        flashToast('CSV разделов скачан')
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1C1B19] border border-[#F4F0E8]/[0.12] text-[12px] text-[#F5F1EB] cursor-pointer"
-                    >
-                      CSV (Разделы)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        exportWorkbookExcel(stats)
-                        setShowExportMenu(false)
-                        flashToast('Excel (.xls) сформирован')
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#C9A86A]/20 border border-[#C9A86A]/40 text-[12px] text-[#E5C992] font-semibold cursor-pointer"
-                    >
-                      Excel (.xls)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        exportEditorialPdfReport(stats)
-                        setShowExportMenu(false)
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#34D399]/15 border border-[#34D399]/35 text-[12px] text-[#8CE6C0] font-semibold cursor-pointer"
-                    >
-                      PDF Отчёт
-                    </button>
-                  </div>
-                )}
-
-                {/* Smart Search */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={globalQuery}
-                    onChange={(e) => setGlobalQuery(e.target.value)}
-                    placeholder="Smart Search: Telegram ID, @username, раздел, событие…"
-                    style={DARK_INPUT_STYLE}
-                    className="w-full h-9 px-3 rounded-xl bg-[#0B0B0C] border border-[#F4F0E8]/[0.12] text-[12.5px] placeholder:text-[#7D776E] focus:outline-none focus:border-[#C9A86A]"
-                  />
-                  {smartSearchHits && (
-                    <div className="absolute left-0 right-0 top-10 z-30 rounded-xl bg-[#141413] border border-[#C9A86A]/35 p-3 shadow-2xl space-y-2.5 max-h-64 overflow-y-auto">
-                      {smartSearchHits.users.length === 0 &&
-                      smartSearchHits.pages.length === 0 &&
-                      smartSearchHits.events.length === 0 ? (
-                        <div className="text-[12px] text-[#8C867C]">Ничего не найдено</div>
-                      ) : (
-                        <>
-                          {smartSearchHits.users.map((u) => (
-                            <button
-                              key={u.user_id}
-                              type="button"
-                              onClick={() => {
-                                setUserSearch(u.user_id)
-                                setTab('users')
-                                setGlobalQuery('')
-                              }}
-                              className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] flex justify-between text-[12px] cursor-pointer"
-                            >
-                              <span className="text-[#F5F1EB]">
-                                👤 {u.first_name || 'Guest'} #{u.user_id}
-                              </span>
-                              <span className="text-[#C9A86A] font-mono">Люди →</span>
-                            </button>
-                          ))}
-                          {smartSearchHits.pages.map((p) => (
-                            <button
-                              key={p.page}
-                              type="button"
-                              onClick={() => {
-                                setTab('pages')
-                                setGlobalQuery('')
-                              }}
-                              className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] flex justify-between text-[12px] cursor-pointer"
-                            >
-                              <span className="text-[#F5F1EB] font-mono">📄 {p.page}</span>
-                              <span className="text-[#60A5FA] font-mono">{p.opens} откр.</span>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Мобильная / планшетная навигация (6 вкладок горизонтально) */}
-                <div className="lg:hidden flex gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-                  {navItems.map((item) => {
-                    const active = tab === item.id
+                {/* Mobile & Tablet 3x2 Tab Grid — ALL 6 TABS VISIBLE AT ONCE */}
+                <div className="lg:hidden grid grid-cols-3 gap-1.5 mt-2.5">
+                  {TABS.map((t) => {
+                    const active = tab === t.id;
                     return (
                       <button
-                        key={item.id}
+                        key={t.id}
                         type="button"
-                        onClick={() => {
-                          setTab(item.id)
-                          if (item.id === 'health') void loadHealth()
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap shrink-0 cursor-pointer border ${
+                        onClick={() => setTab(t.id)}
+                        className={`rounded-xl py-1.5 px-2 text-[12px] font-semibold text-center transition ${
                           active
-                            ? 'bg-[#C9A86A] text-[#0B0B0C] border-[#C9A86A]'
-                            : 'bg-[#0B0B0C] text-[#9A948A] border-[#F4F0E8]/[0.08]'
+                            ? 'bg-[#C9A86A] text-[#121210]'
+                            : 'bg-white/[0.04] text-[#BDB6AC] border border-white/[0.06]'
                         }`}
                       >
-                        {item.label}
+                        {t.label}
                       </button>
-                    )
+                    );
                   })}
                 </div>
 
-                {/* Фильтры периода + Сохранённые пресеты */}
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="inline-flex rounded-xl bg-[#0B0B0C] border border-[#F4F0E8]/[0.08] p-0.5">
-                    {periodItems.map((p) => (
-                      <button
-                        key={p.d}
-                        type="button"
-                        onClick={() => {
-                          setDays(p.d)
-                          void loadStats(p.d, hideAdmin)
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-[11.5px] font-mono cursor-pointer ${
-                          days === p.d
-                            ? 'bg-[#22211F] text-[#F5F1EB] font-semibold'
-                            : 'text-[#8C867C]'
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
+                {/* Collapsible Smart Search Drawer */}
+                {showSearchBar && (
+                  <div className="mt-2.5">
+                    <input
+                      type="text"
+                      value={smartQuery}
+                      onChange={(e) => setSmartQuery(e.target.value)}
+                      placeholder="Поиск: Telegram ID, @username, раздел..."
+                      style={DARK_INPUT_STYLE}
+                      className="w-full rounded-xl border border-white/15 px-3 py-2 text-[13px] focus:outline-none focus:border-[#C9A86A]"
+                      autoFocus
+                    />
+                    {smartMatches && (
+                      <div className="mt-2 rounded-xl border border-white/10 bg-[#161614] p-2.5 space-y-2 text-[12px]">
+                        {smartMatches.users.length === 0 && smartMatches.pages.length === 0 && (
+                          <div className="text-[#8D867C]">Ничего не найдено</div>
+                        )}
+                        {smartMatches.users.map((u) => (
+                          <button
+                            key={u.user_id}
+                            type="button"
+                            onClick={() => {
+                              setTab('users');
+                              setUserSearch(u.user_id);
+                              setShowSearchBar(false);
+                            }}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-white/[0.06] text-left"
+                          >
+                            <span className="truncate">
+                              {u.username ? `@${u.username}` : u.first_name || 'Guest'}{' '}
+                              <span className="font-mono text-[#8D867C]">#{u.user_id}</span>
+                            </span>
+                            <span className="text-[#C9A86A] shrink-0">Люди →</span>
+                          </button>
+                        ))}
+                        {smartMatches.pages.map((p) => (
+                          <button
+                            key={p.page}
+                            type="button"
+                            onClick={() => {
+                              setTab('analytics');
+                              setShowSearchBar(false);
+                            }}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-white/[0.06] text-left"
+                          >
+                            <span>Раздел: {p.page}</span>
+                            <span className="font-mono text-[#5B9BFF]">{p.events} соб.</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  <div className="flex items-center gap-1.5">
+                {/* Collapsible Export Drawer */}
+                {showExportBar && (
+                  <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                     <button
                       type="button"
-                      onClick={saveCurrentFilterPreset}
-                      title="Сохранить фильтр"
-                      className="px-2 py-1 rounded-lg border border-[#F4F0E8]/[0.1] bg-[#141413] text-[11.5px] text-[#9A948A] cursor-pointer"
+                      onClick={() => handleExportAction('users_csv')}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] py-2 px-2.5 text-[12px] text-[#F5F1EB]"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-[#C9A86A]" /> CSV Люди
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExportAction('pages_csv')}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] py-2 px-2.5 text-[12px] text-[#F5F1EB]"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-[#5B9BFF]" /> CSV Разделы
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExportAction('excel')}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-[#C9A86A]/35 bg-[#C9A86A]/10 py-2 px-2.5 text-[12px] text-[#C9A86A]"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" /> Excel (.xls)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExportAction('pdf')}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3FD08F]/35 bg-[#3FD08F]/10 py-2 px-2.5 text-[12px] text-[#3FD08F]"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Отчёт / PDF
+                    </button>
+                  </div>
+                )}
+              </header>
+
+              {/* Scrollable Content Area */}
+              <div className="flex-1 overflow-y-auto px-3.5 py-3.5 space-y-3.5">
+                {/* Inline Period & Filter Strip (scrolls cleanly with content!) */}
+                {(tab === 'overview' || tab === 'analytics' || tab === 'users') && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex rounded-xl border border-white/[0.08] bg-[#141412] p-0.5">
+                      {[
+                        { label: '24ч', v: 1 },
+                        { label: '7д', v: 7 },
+                        { label: '30д', v: 30 },
+                        { label: 'Всё', v: 3650 },
+                      ].map((p) => (
+                        <button
+                          key={p.v}
+                          type="button"
+                          onClick={() => setDays(p.v)}
+                          className={`rounded-lg px-2.5 py-1 text-[12px] font-medium transition ${
+                            days === p.v ? 'bg-white/[0.12] text-[#F5F1EB]' : 'text-[#8D867C]'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setHideAdmin((v) => !v)}
+                      className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-[12px] font-medium transition ${
+                        hideAdmin
+                          ? 'border-[#C9A86A]/45 bg-[#C9A86A]/12 text-[#C9A86A]'
+                          : 'border-white/10 bg-[#141412] text-[#9A9389]'
+                      }`}
+                    >
+                      {hideAdmin && <Check className="w-3.5 h-3.5" />}
+                      Без меня
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSavePreset}
+                      className="rounded-xl border border-white/10 bg-[#141412] px-2.5 py-1.5 text-[11px] text-[#BDB6AC]"
                     >
                       + Пресет
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = !hideAdmin
-                        setHideAdmin(next)
-                        void loadStats(days, next)
-                      }}
-                      className={`lg:hidden px-2.5 py-1 rounded-lg text-[11.5px] font-medium border cursor-pointer whitespace-nowrap ${
-                        hideAdmin
-                          ? 'border-[#C9A86A]/45 bg-[#C9A86A]/12 text-[#E5C992]'
-                          : 'border-[#F4F0E8]/[0.1] bg-[#141413] text-[#9A948A]'
-                      }`}
-                    >
-                      {hideAdmin ? '✓ Без меня' : 'Все'}
-                    </button>
-                  </div>
-                </div>
 
-                {presets.length > 0 && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
                     {presets.map((pr) => (
                       <button
                         key={pr.id}
                         type="button"
                         onClick={() => {
-                          setDays(pr.days)
-                          setHideAdmin(pr.hideAdmin)
-                          void loadStats(pr.days, pr.hideAdmin)
+                          setDays(pr.days);
+                          setHideAdmin(pr.hideAdmin);
                         }}
-                        className="px-2.5 py-0.5 rounded-full bg-white/[0.05] border border-white/10 text-[11px] font-mono text-[#CFC9BE] whitespace-nowrap cursor-pointer"
+                        className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-2.5 py-1 text-[11px] text-[#A8A095]"
                       >
-                        ★ {pr.name}
+                        ★ {pr.label}
                       </button>
                     ))}
                   </div>
                 )}
-              </header>
 
-              {/* Тело */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
                 {error && (
-                  <div className="p-4 rounded-2xl border border-[#E05A6D]/40 bg-[#E05A6D]/10 text-[#F4A3AE] text-[13px]">
+                  <div className="rounded-2xl border border-[#F06A7E]/40 bg-[#F06A7E]/10 px-4 py-3 text-[13px] text-[#F06A7E]">
                     {error}
                   </div>
                 )}
 
-                {loading && !stats && (
-                  <div className="py-16 text-center text-[13.5px] text-[#8C867C]">
-                    Загрузка аналитики из Neon…
+                {!stats && loading && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="h-24 rounded-2xl bg-white/[0.04] animate-pulse" />
+                    ))}
                   </div>
                 )}
 
-                {/* === 1. ОБЗОР === */}
+                {/* TAB 1: OVERVIEW */}
                 {stats && tab === 'overview' && (
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4">
-                        <div className="flex items-center justify-between text-[12px] text-[#9A948A]">
-                          <span>Telegram уник.</span>
-                          {tgDelta && (
-                            <span className="font-mono text-[11px] text-[#34D399]">{tgDelta}</span>
-                          )}
-                        </div>
-                        <div className="mt-2 font-mono text-[26px] leading-none font-bold text-[#C9A86A] tabular-nums">
-                          {formatNum(stats.summary.tg_users)}
-                        </div>
-                        <div className="mt-2 text-[11.5px] text-[#7D776E] font-mono">
-                          Событий: {formatNum(stats.summary.total_events)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4">
-                        <div className="flex items-center justify-between text-[12px] text-[#9A948A]">
-                          <span>Браузер (Web)</span>
-                          {webDelta && (
-                            <span className="font-mono text-[11px] text-[#60A5FA]">{webDelta}</span>
-                          )}
-                        </div>
-                        <div className="mt-2 font-mono text-[26px] leading-none font-bold text-[#60A5FA] tabular-nums">
-                          {formatNum(stats.summary.web_users)}
-                        </div>
-                        <div className="mt-2 text-[11.5px] text-[#7D776E] font-mono">
-                          Сред. соб./чел: {stats.summary.avg_events_per_user}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4">
-                        <div className="text-[12px] text-[#9A948A]">Новые / Возвраты</div>
-                        <div className="mt-2 font-mono text-[24px] leading-none font-bold text-[#F5F1EB] tabular-nums">
-                          {stats.summary.new_users} / {stats.summary.returning_users}
-                        </div>
-                        <div className="mt-2 text-[11.5px] text-[#7D776E] font-mono">
-                          Retention 30д: {stats.summary.retention_pct}%
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-[#141413] border border-[#34D399]/25 p-4">
-                        <div className="text-[12px] text-[#8CE6C0]">PRO (оценка в ⭐)</div>
-                        <div className="mt-2 font-mono text-[24px] leading-none font-bold text-[#34D399] tabular-nums">
-                          {formatNum(stats.summary.total_pro)} · {formatNum(stats.summary.total_stars)}⭐
-                        </div>
-                        <div className="mt-2 text-[11.5px] text-[#8C867C] font-mono">
-                          Расч. экв. ~${stats.summary.total_net_usd}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                      <div className="lg:col-span-8 space-y-3">
-                        <ActivityStudioChart
-                          daily={stats.daily}
-                          onSelectDayIso={(iso) => void loadDayDetail(iso)}
-                        />
-
-                        {/* Drill-Down по выбранному дню */}
-                        {(dayLoading || dayDetail) && (
-                          <div className="rounded-2xl bg-[#141413] border border-[#C9A86A]/35 p-4 space-y-2.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[13px] font-semibold text-[#E5C992]">
-                                Детали за {dayDetail?.date || '…'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setDayDetail(null)}
-                                className="text-[12px] text-[#8C867C] cursor-pointer"
-                              >
-                                Закрыть ✕
-                              </button>
-                            </div>
-                            {dayLoading ? (
-                              <div className="text-[12px] text-[#8C867C]">Загрузка дня…</div>
-                            ) : dayDetail ? (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
-                                <div>
-                                  <div className="text-[#8C867C] mb-1">Топ разделов:</div>
-                                  {dayDetail.pages.length === 0 ? (
-                                    <div className="text-[#6E6860]">Нет открытий</div>
-                                  ) : (
-                                    dayDetail.pages.map((p) => (
-                                      <div key={p.page} className="flex justify-between font-mono py-0.5">
-                                        <span>{p.page}</span>
-                                        <span className="text-[#C9A86A]">{p.opens}</span>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="text-[#8C867C] mb-1">Активные пользователи:</div>
-                                  {dayDetail.users.length === 0 ? (
-                                    <div className="text-[#6E6860]">Нет визитов</div>
-                                  ) : (
-                                    dayDetail.users.slice(0, 6).map((u) => (
-                                      <div key={u.user_id} className="flex justify-between font-mono py-0.5">
-                                        <span className="truncate">
-                                          {u.username ? `@${u.username}` : `#${u.user_id}`}
-                                        </span>
-                                        <span className="text-[#60A5FA]">{u.events_count}</span>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                      {(() => {
+                        const tgDelta = formatDelta(stats.summary.tgUnique, stats.summary.prevTgUnique);
+                        const webDelta = formatDelta(stats.summary.webUnique, stats.summary.prevWebUnique);
+                        return (
+                          <>
+                            <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5">
+                              <div className="flex items-center justify-between text-[11px] text-[#8D867C]">
+                                <span>Telegram уник.</span>
+                                {!tgDelta.neutral && (
+                                  <span className={tgDelta.positive ? 'text-[#3FD08F]' : 'text-[#F06A7E]'}>
+                                    {tgDelta.text}
+                                  </span>
+                                )}
                               </div>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
+                              <div className="mt-1.5 text-[24px] font-bold font-mono text-[#C9A86A]">
+                                {stats.summary.tgUnique}
+                              </div>
+                              <div className="mt-1 text-[11px] text-[#8D867C]">
+                                Событий: {stats.summary.totalEvents}
+                              </div>
+                            </div>
 
-                      <div className="lg:col-span-4">
-                        <DonutCard
-                          title="Каналы трафика"
-                          centerValue={formatNum(
-                            stats.summary.tg_users + stats.summary.web_users
-                          )}
-                          items={[
-                            { name: 'Telegram', value: stats.summary.tg_users, color: '#C9A86A' },
-                            { name: 'Web', value: stats.summary.web_users, color: '#60A5FA' },
-                          ]}
-                        />
-                      </div>
+                            <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5">
+                              <div className="flex items-center justify-between text-[11px] text-[#8D867C]">
+                                <span>Браузер (Web)</span>
+                                {!webDelta.neutral && (
+                                  <span className={webDelta.positive ? 'text-[#5B9BFF]' : 'text-[#F06A7E]'}>
+                                    {webDelta.text}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1.5 text-[24px] font-bold font-mono text-[#5B9BFF]">
+                                {stats.summary.webUnique}
+                              </div>
+                              <div className="mt-1 text-[11px] text-[#8D867C]">
+                                Сред. соб./чел: {stats.summary.avgEventsPerUser}
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5">
+                              <div className="text-[11px] text-[#8D867C]">Новые / Возвраты</div>
+                              <div className="mt-1.5 text-[24px] font-bold font-mono text-[#F5F1EB]">
+                                {stats.summary.newUsers}{' '}
+                                <span className="text-[#8D867C] font-normal">/</span>{' '}
+                                {stats.summary.returningUsers}
+                              </div>
+                              <div className="mt-1 text-[11px] text-[#8D867C]">
+                                Retention 30д: {stats.summary.retention30d}%
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-[#3FD08F]/25 bg-[#0F1B15] p-3.5">
+                              <div className="text-[11px] text-[#3FD08F]">PRO (оценка в ★)</div>
+                              <div className="mt-1.5 text-[22px] font-bold font-mono text-[#3FD08F] leading-tight">
+                                {stats.summary.proTotal} · {stats.summary.proStars.toLocaleString('ru-RU')}★
+                              </div>
+                              <div className="mt-1 text-[11px] text-[#8D867C]">
+                                Усл. экв. ~${stats.summary.proUsdEst}
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Interactive ECharts Activity Studio */}
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                        <div>
+                          <div className="text-[14px] font-semibold text-[#F5F1EB]">
+                            Динамика активности (14 дней)
+                          </div>
+                          <div className="text-[11px] text-[#8D867C]">
+                            Тап по колонке дня = детализация
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleExportChartPng}
+                          className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-[#D6CFC4]"
+                        >
+                          PNG
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <div className="inline-flex rounded-xl border border-white/[0.08] bg-[#0D0D0C] p-0.5 text-[11px]">
+                          {(['all', 'tg', 'web'] as const).map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setChartChannel(c)}
+                              className={`px-2.5 py-1 rounded-lg ${
+                                chartChannel === c ? 'bg-white/[0.12] text-[#F5F1EB]' : 'text-[#8D867C]'
+                              }`}
+                            >
+                              {c === 'all' ? 'Все' : c === 'tg' ? 'TG' : 'Web'}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="inline-flex rounded-xl border border-white/[0.08] bg-[#0D0D0C] p-0.5 text-[11px]">
+                          {(['area', 'line', 'bar'] as const).map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              onClick={() => setChartKind(k)}
+                              className={`px-2.5 py-1 rounded-lg capitalize ${
+                                chartKind === k ? 'bg-white/[0.12] text-[#F5F1EB]' : 'text-[#8D867C]'
+                              }`}
+                            >
+                              {k}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <ActivityStudioChart
+                        data={stats.daily}
+                        channel={chartChannel}
+                        chartKind={chartKind}
+                        onSelectDay={handleSelectDay}
+                        chartRefOut={activityChartRef}
+                      />
+
+                      {/* Day Drill-Down Card */}
+                      {(dayLoading || dayDetail) && (
+                        <div className="mt-3 rounded-xl border border-[#C9A86A]/30 bg-[#0F0F0E] p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[12px] font-semibold text-[#C9A86A]">
+                              {dayLoading ? 'Загрузка дня...' : `Детализация за ${dayDetail?.date}`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setDayDetail(null)}
+                              className="text-[11px] text-[#8D867C]"
+                            >
+                              Скрыть
+                            </button>
+                          </div>
+                          {dayDetail && !dayLoading && (
+                            <div className="space-y-2 text-[12px]">
+                              <div className="flex gap-4 font-mono">
+                                <span className="text-[#C9A86A]">TG: {dayDetail.tg}</span>
+                                <span className="text-[#5B9BFF]">Web: {dayDetail.web}</span>
+                                <span className="text-[#DED7CC]">Событий: {dayDetail.events}</span>
+                              </div>
+                              {dayDetail.topPages.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {dayDetail.topPages.map((p) => (
+                                    <span
+                                      key={p.page}
+                                      className="rounded-lg bg-white/[0.05] px-2 py-0.5 text-[11px] text-[#D6CFC4]"
+                                    >
+                                      {p.page}: {p.count}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Donuts */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <DonutCard
+                        title="Каналы трафика"
+                        items={[
+                          { name: 'Telegram', value: stats.summary.tgUnique },
+                          { name: 'Web', value: stats.summary.webUnique },
+                        ]}
+                        centerText={String(stats.summary.tgUnique + stats.summary.webUnique)}
+                        colors={[PALETTE.gold, PALETTE.blue]}
+                      />
                       <DonutCard
                         title="Языки аудитории"
-                        centerValue={formatNum(stats.langs.reduce((a, b) => a + b.users, 0))}
-                        items={stats.langs.map((l, idx) => ({
-                          name: (l.lang || 'other').toUpperCase(),
-                          value: l.users,
-                          color: CHART_PALETTE[idx % CHART_PALETTE.length],
-                        }))}
+                        items={stats.languages}
+                        centerText={String(stats.languages.reduce((a, b) => a + b.value, 0))}
                       />
                       <DonutCard
                         title="Платформы устройств"
-                        centerValue={formatNum(stats.platforms.reduce((a, b) => a + b.users, 0))}
-                        items={stats.platforms.map((p, idx) => ({
-                          name: p.platform || 'web',
-                          value: p.users,
-                          color: CHART_PALETTE[(idx + 1) % CHART_PALETTE.length],
-                        }))}
+                        items={stats.platforms}
+                        centerText={String(stats.platforms.reduce((a, b) => a + b.value, 0))}
+                        colors={[PALETTE.blue, PALETTE.gold, PALETTE.emerald, PALETTE.violet]}
                       />
                     </div>
                   </div>
                 )}
 
-                {/* === 2. АНАЛИТИКА И ВОРОНКА === */}
-                {stats && tab === 'pages' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                      <div className="lg:col-span-7">
-                        <PagesBarChart pages={stats.topPages} />
-                      </div>
-                      <div className="lg:col-span-5">
-                        <ConversionFunnelChart
-                          steps={[
-                            { name: 'Всего визитов', value: stats.summary.total_users },
-                            {
-                              name: 'Повторные',
-                              value: stats.summary.returning_users,
-                            },
-                            {
-                              name: 'Telegram',
-                              value: stats.summary.tg_users,
-                            },
-                            { name: 'PRO-доступы', value: stats.summary.total_pro },
-                          ]}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4 sm:p-5 space-y-3">
-                      <h3 className="text-[14px] font-semibold text-[#F5F1EB]">
-                        События системы
-                      </h3>
-                      <div className="divide-y divide-[#F4F0E8]/[0.06]">
+                {/* TAB 2: ANALYTICS */}
+                {stats && tab === 'analytics' && (
+                  <div className="space-y-3.5">
+                    <PagesBarChart pages={stats.pages} />
+                    <ConversionFunnelChart
+                      totalVisits={stats.summary.tgUnique + stats.summary.webUnique}
+                      tgUsers={stats.summary.tgUnique}
+                      returningUsers={stats.summary.returningUsers}
+                      proActivations={stats.summary.proTotal}
+                    />
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4">
+                      <div className="text-[14px] font-semibold mb-2.5">События системы</div>
+                      <div className="divide-y divide-white/[0.06]">
                         {stats.events.map((ev) => (
-                          <div key={ev.event} className="py-2.5 flex justify-between font-mono text-[12.5px]">
-                            <span className="text-[#F5F1EB]">{ev.event}</span>
-                            <span>
-                              <span className="text-[#C9A86A] font-semibold">
-                                {formatNum(ev.unique_users)} чел
-                              </span>
-                              <span className="text-[#7D776E]"> · {formatNum(ev.total)}×</span>
+                          <div key={ev.event} className="py-2 flex items-center justify-between text-[13px]">
+                            <span className="font-mono text-[#E7E1D7]">{ev.event}</span>
+                            <span className="font-mono text-[12px]">
+                              <span className="text-[#C9A86A]">{ev.users} чел</span>
+                              <span className="text-[#8D867C]"> · {ev.count}×</span>
                             </span>
                           </div>
                         ))}
+                        {stats.events.length === 0 && (
+                          <div className="text-[12px] text-[#8D867C] py-3">Событий за период нет</div>
+                        )}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* === 3. PRO · CRM === */}
+                {/* TAB 3: PRO · CRM */}
                 {stats && tab === 'crm' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <div className="lg:col-span-7 space-y-4">
-                      <div className="rounded-2xl bg-[#141413] border border-[#C9A86A]/30 p-4 sm:p-5 space-y-4">
-                        <div>
-                          <h3 className="text-[14px] font-semibold text-[#F5F1EB]">
-                            Управление PRO-доступом
-                          </h3>
-                          <p className="text-[12px] text-[#8C867C] mt-0.5">
-                            Все операции фиксируются в журнале администратора
-                          </p>
+                  <div className="space-y-3.5">
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4 space-y-3.5">
+                      <div>
+                        <div className="text-[15px] font-semibold flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[#C9A86A]" />
+                          Управление PRO-доступом
                         </div>
-
-                        <div className="space-y-3">
-                          <label className="block space-y-1.5">
-                            <span className="text-[12px] text-[#B5AFA4] font-medium">
-                              ID пользователя
-                            </span>
-                            <input
-                              type="text"
-                              value={crmUserId}
-                              onChange={(e) => setCrmUserId(e.target.value.trim())}
-                              placeholder="Telegram ID (или web_… для бана)"
-                              style={DARK_INPUT_STYLE}
-                              className="w-full h-11 px-3.5 rounded-xl bg-[#0B0B0C] border border-[#F4F0E8]/[0.18] font-mono text-[14px] placeholder:text-[#7D776E] focus:outline-none focus:border-[#C9A86A]"
-                            />
-                          </label>
-
-                          <div className="space-y-1.5">
-                            <span className="text-[12px] text-[#B5AFA4] font-medium">
-                              Модуль PRO
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setProductMenuOpen((v) => !v)}
-                              className="w-full h-11 px-3.5 rounded-xl bg-[#0B0B0C] border border-[#F4F0E8]/[0.18] flex items-center justify-between text-[13.5px] text-[#F5F1EB] cursor-pointer"
-                            >
-                              <span className="font-medium truncate">
-                                {activeProductOption.label}
-                              </span>
-                              <span className="flex items-center gap-2 shrink-0">
-                                <span className="font-mono text-[12px] text-[#C9A86A]">
-                                  {activeProductOption.price}
-                                </span>
-                                <span className="text-[#8C867C] text-[11px]">
-                                  {productMenuOpen ? '▲' : '▼'}
-                                </span>
-                              </span>
-                            </button>
-
-                            {productMenuOpen && (
-                              <div className="rounded-xl bg-[#0B0B0C] border border-[#F4F0E8]/[0.18] divide-y divide-[#F4F0E8]/[0.06] overflow-hidden">
-                                {PRODUCT_OPTIONS.map((opt) => (
-                                  <button
-                                    key={opt.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setCrmProductId(opt.id)
-                                      setProductMenuOpen(false)
-                                    }}
-                                    className={`w-full px-3.5 py-2.5 flex items-center justify-between text-[13px] cursor-pointer ${
-                                      opt.id === crmProductId
-                                        ? 'bg-[#C9A86A]/18 text-[#F5F1EB] font-semibold'
-                                        : 'text-[#CFC9BE]'
-                                    }`}
-                                  >
-                                    <span>{opt.label}</span>
-                                    <span className="font-mono text-[12px] text-[#C9A86A]">
-                                      {opt.price}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2.5 pt-1">
-                            <button
-                              type="button"
-                              disabled={crmBusy || !crmUserId}
-                              onClick={() => void executeCrmAction(false)}
-                              className="h-11 rounded-xl bg-[#C9A86A] text-[#0B0B0C] font-semibold text-[13.5px] cursor-pointer disabled:opacity-40"
-                            >
-                              {crmBusy ? '…' : 'Выдать PRO'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={crmBusy || !crmUserId}
-                              onClick={() =>
-                                setPendingConfirm({
-                                  title: `Отозвать ${crmProductId} у #${crmUserId}?`,
-                                  onConfirm: () => void executeCrmAction(true),
-                                })
-                              }
-                              className="h-11 rounded-xl border border-[#F4F0E8]/[0.18] bg-[#1C1B19] text-[#F5F1EB] font-semibold text-[13.5px] cursor-pointer disabled:opacity-40"
-                            >
-                              Забрать PRO
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="pt-4 border-t border-[#F4F0E8]/[0.08] space-y-3">
-                          <h4 className="text-[13.5px] font-semibold text-[#F4A3AE]">
-                            Блокировка пользователя
-                          </h4>
-                          <input
-                            type="text"
-                            value={banReasonInput}
-                            onChange={(e) => setBanReasonInput(e.target.value)}
-                            placeholder="Причина блокировки (необязательно)"
-                            style={DARK_INPUT_STYLE}
-                            className="w-full h-11 px-3.5 rounded-xl bg-[#0B0B0C] border border-[#F4F0E8]/[0.18] text-[13.5px] placeholder:text-[#7D776E] focus:outline-none focus:border-[#E05A6D]"
-                          />
-                          <div className="grid grid-cols-2 gap-2.5">
-                            <button
-                              type="button"
-                              disabled={crmBusy || !crmUserId}
-                              onClick={() =>
-                                setPendingConfirm({
-                                  title: `Заблокировать пользователя #${crmUserId}?`,
-                                  onConfirm: () => void executeBanAction(crmUserId, false),
-                                })
-                              }
-                              className="h-11 rounded-xl bg-[#C83E52] text-[#F5F1EB] font-semibold text-[13.5px] cursor-pointer disabled:opacity-40"
-                            >
-                              Заблокировать
-                            </button>
-                            <button
-                              type="button"
-                              disabled={crmBusy || !crmUserId}
-                              onClick={() => void executeBanAction(crmUserId, true)}
-                              className="h-11 rounded-xl border border-[#34D399]/40 bg-[#34D399]/10 text-[#8CE6C0] font-semibold text-[13.5px] cursor-pointer disabled:opacity-40"
-                            >
-                              Разблокировать
-                            </button>
-                          </div>
+                        <div className="text-[12px] text-[#8D867C] mt-0.5">
+                          Все операции записываются в «Журнал»
                         </div>
                       </div>
 
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4 sm:p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-[14px] font-semibold text-[#F5F1EB]">
-                            Заблокированные ({stats.bannedUsers.length})
-                          </h3>
-                        </div>
-                        {stats.bannedUsers.length === 0 ? (
-                          <div className="text-[13px] text-[#7D776E]">Список пуст</div>
-                        ) : (
-                          <div className="divide-y divide-[#F4F0E8]/[0.06]">
-                            {stats.bannedUsers.map((b) => (
-                              <div key={b.user_id} className="py-2.5 flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="font-mono text-[13px] font-semibold text-[#F4A3AE]">
-                                    #{b.user_id}
-                                  </div>
-                                  <div className="text-[12px] text-[#8C867C] truncate">
-                                    {b.reason || 'Без причины'} · {formatTime(b.created_at)}
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={crmBusy}
-                                  onClick={() => void executeBanAction(b.user_id, true)}
-                                  className="px-3 py-1.5 rounded-xl border border-[#34D399]/40 bg-[#34D399]/10 text-[#8CE6C0] text-[12px] cursor-pointer shrink-0"
-                                >
-                                  Разбанить
-                                </button>
-                              </div>
+                      <div>
+                        <label className="block text-[12px] text-[#A8A095] mb-1.5">ID пользователя</label>
+                        <input
+                          type="text"
+                          value={crmUserId}
+                          onChange={(e) => setCrmUserId(e.target.value)}
+                          placeholder="Telegram ID (или web_... для бана)"
+                          style={DARK_INPUT_STYLE}
+                          className="w-full rounded-xl border border-white/15 px-3.5 py-2.5 text-[14px] font-mono focus:outline-none focus:border-[#C9A86A]"
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <label className="block text-[12px] text-[#A8A095] mb-1.5">Модуль PRO</label>
+                        <button
+                          type="button"
+                          onClick={() => setCrmDropdownOpen((v) => !v)}
+                          className="w-full flex items-center justify-between rounded-xl border border-white/15 bg-[#0E0E0D] px-3.5 py-2.5 text-[14px] text-[#F5F1EB]"
+                        >
+                          <span>{selectedProductObj.label}</span>
+                          <span className="flex items-center gap-2 text-[#C9A86A] font-mono text-[13px]">
+                            {selectedProductObj.price}
+                            <ChevronDown className="w-4 h-4 text-[#8D867C]" />
+                          </span>
+                        </button>
+                        {crmDropdownOpen && (
+                          <div className="mt-1.5 rounded-xl border border-white/15 bg-[#121210] overflow-hidden divide-y divide-white/[0.06]">
+                            {PRO_CATALOG.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setCrmProduct(item.id);
+                                  setCrmDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-[13px] ${
+                                  crmProduct === item.id
+                                    ? 'bg-[#C9A86A]/15 text-[#C9A86A] font-semibold'
+                                    : 'text-[#E7E1D7]'
+                                }`}
+                              >
+                                <span>{item.label}</span>
+                                <span className="font-mono text-[#C9A86A]">{item.price}</span>
+                              </button>
                             ))}
                           </div>
                         )}
                       </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          disabled={crmBusy || !crmUserId.trim()}
+                          onClick={() =>
+                            setConfirmAction({
+                              title: 'Выдать PRO-доступ?',
+                              description: `Пользователь #${crmUserId.trim()} получит «${selectedProductObj.label}» в Neon.`,
+                              confirmLabel: 'Выдать PRO',
+                              danger: false,
+                              onConfirm: () => executeCrmGrant('grant'),
+                            })
+                          }
+                          className="rounded-xl bg-[#C9A86A] py-2.5 text-[13px] font-semibold text-[#121210] disabled:opacity-40"
+                        >
+                          Выдать PRO
+                        </button>
+                        <button
+                          type="button"
+                          disabled={crmBusy || !crmUserId.trim()}
+                          onClick={() =>
+                            setConfirmAction({
+                              title: 'Забрать PRO-доступ?',
+                              description: `Удалить «${selectedProductObj.label}» у пользователя #${crmUserId.trim()}?`,
+                              confirmLabel: 'Забрать PRO',
+                              danger: true,
+                              onConfirm: () => executeCrmGrant('revoke'),
+                            })
+                          }
+                          className="rounded-xl border border-white/15 bg-white/[0.04] py-2.5 text-[13px] font-semibold text-[#F5F1EB] disabled:opacity-40"
+                        >
+                          Забрать PRO
+                        </button>
+                      </div>
+
+                      <div className="pt-3 border-t border-white/[0.08] space-y-2.5">
+                        <div className="text-[14px] font-semibold text-[#F06A7E] flex items-center gap-1.5">
+                          <ShieldAlert className="w-4 h-4" /> Блокировка пользователя
+                        </div>
+                        <input
+                          type="text"
+                          value={banReason}
+                          onChange={(e) => setBanReason(e.target.value)}
+                          placeholder="Причина блокировки (необязательно)"
+                          style={DARK_INPUT_STYLE}
+                          className="w-full rounded-xl border border-white/15 px-3.5 py-2.5 text-[13px] focus:outline-none focus:border-[#F06A7E]"
+                        />
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <button
+                            type="button"
+                            disabled={crmBusy || !crmUserId.trim()}
+                            onClick={() =>
+                              setConfirmAction({
+                                title: 'Заблокировать пользователя?',
+                                description: `Доступ для #${crmUserId.trim()} будет мгновенно закрыт.`,
+                                confirmLabel: 'Заблокировать',
+                                danger: true,
+                                onConfirm: () => executeCrmBan('ban'),
+                              })
+                            }
+                            className="rounded-xl bg-[#D94A64] py-2.5 text-[13px] font-semibold text-white disabled:opacity-40"
+                          >
+                            Заблокировать
+                          </button>
+                          <button
+                            type="button"
+                            disabled={crmBusy || !crmUserId.trim()}
+                            onClick={() => executeCrmBan('unban')}
+                            className="rounded-xl border border-[#3FD08F]/40 bg-[#3FD08F]/10 py-2.5 text-[13px] font-semibold text-[#3FD08F] disabled:opacity-40"
+                          >
+                            Разблокировать
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="lg:col-span-5">
-                      <DonutCard
-                        title="Распределение PRO-модулей (⭐)"
-                        subtitle={`Всего ${formatNum(stats.summary.total_pro)} активаций · усл. экв. ~$${stats.summary.total_net_usd}`}
-                        centerValue={`${formatNum(stats.summary.total_stars)} ⭐`}
-                        items={stats.proBreakdown.map((r, idx) => ({
-                          name: `${r.product_id} (${r.count})`,
-                          value: r.stars,
-                          color: CHART_PALETTE[idx % CHART_PALETTE.length],
-                        }))}
-                      />
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4">
+                      <div className="text-[14px] font-semibold mb-2">
+                        Заблокированные ({stats.banned.length})
+                      </div>
+                      {stats.banned.length === 0 ? (
+                        <div className="text-[12px] text-[#8D867C]">Список пуст</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {stats.banned.map((b) => (
+                            <div
+                              key={b.user_id}
+                              className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0F0F0E] px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="font-mono text-[13px] text-[#F5F1EB]">#{b.user_id}</div>
+                                <div className="text-[11px] text-[#8D867C] truncate">{b.reason}</div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => executeCrmBan('unban', b.user_id)}
+                                className="shrink-0 rounded-lg border border-[#3FD08F]/35 px-2.5 py-1 text-[11px] text-[#3FD08F]"
+                              >
+                                Снять
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+
+                    <DonutCard
+                      title="Распределение PRO-модулей (★)"
+                      subtitle={`Всего ${stats.summary.proTotal} активаций · усл. экв. ~$${stats.summary.proUsdEst}`}
+                      items={stats.proBreakdown.map((p) => ({
+                        name: `${p.product_id} (${p.count})`,
+                        value: p.stars,
+                      }))}
+                      centerText={`${stats.summary.proStars.toLocaleString('ru-RU')} ★`}
+                    />
                   </div>
                 )}
 
-                {/* === 4. ЛЮДИ (User Intelligence) === */}
+                {/* TAB 4: USERS */}
                 {stats && tab === 'users' && (
-                  <div className="space-y-3.5">
-                    <div className="flex flex-col sm:flex-row gap-2.5">
+                  <div className="space-y-3">
+                    <div className="space-y-2">
                       <input
                         type="text"
                         value={userSearch}
                         onChange={(e) => setUserSearch(e.target.value)}
-                        placeholder="Поиск по ID, @username, имени или разделу…"
+                        placeholder="Поиск по ID, @username, имени или разделу..."
                         style={DARK_INPUT_STYLE}
-                        className="flex-1 h-10 px-3.5 rounded-xl bg-[#141413] border border-[#F4F0E8]/[0.14] text-[13px] placeholder:text-[#7D776E] focus:outline-none focus:border-[#C9A86A]"
+                        className="w-full rounded-xl border border-white/15 px-3.5 py-2 text-[13px] focus:outline-none focus:border-[#C9A86A]"
                       />
-
-                      <div className="flex items-center gap-2">
-                        <div className="inline-flex rounded-xl bg-[#141413] border border-[#F4F0E8]/[0.1] p-0.5">
-                          {(
-                            [
-                              ['all', 'Все'],
-                              ['telegram', 'TG'],
-                              ['web', 'Web'],
-                            ] as const
-                          ).map(([f, lbl]) => (
-                            <button
-                              key={f}
-                              type="button"
-                              onClick={() => setUserSourceFilter(f)}
-                              className={`px-2.5 py-1 rounded-lg text-[12px] cursor-pointer ${
-                                userSourceFilter === f
-                                  ? 'bg-[#C9A86A] text-[#0B0B0C] font-semibold'
-                                  : 'text-[#9A948A]'
-                              }`}
-                            >
-                              {lbl}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="inline-flex rounded-xl bg-[#141413] border border-[#F4F0E8]/[0.1] p-0.5">
-                          {(
-                            [
-                              ['recent', 'Новые'],
-                              ['events', 'Актив.'],
-                              ['pro', 'PRO'],
-                            ] as const
-                          ).map(([s, lbl]) => (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="inline-flex rounded-xl border border-white/[0.08] bg-[#141412] p-0.5 text-[11px]">
+                          {(['all', 'telegram', 'web'] as const).map((s) => (
                             <button
                               key={s}
                               type="button"
-                              onClick={() => setUserSort(s)}
-                              className={`px-2.5 py-1 rounded-lg text-[12px] cursor-pointer ${
-                                userSort === s
-                                  ? 'bg-[#22211F] text-[#F5F1EB] font-semibold'
-                                  : 'text-[#8C867C]'
+                              onClick={() => setUserSourceFilter(s)}
+                              className={`px-2.5 py-1 rounded-lg ${
+                                userSourceFilter === s
+                                  ? 'bg-[#C9A86A] text-[#121210] font-semibold'
+                                  : 'text-[#8D867C]'
                               }`}
                             >
-                              {lbl}
+                              {s === 'all' ? 'Все' : s === 'telegram' ? 'TG' : 'Web'}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="inline-flex rounded-xl border border-white/[0.08] bg-[#141412] p-0.5 text-[11px]">
+                          {(
+                            [
+                              { id: 'recent', label: 'Новые' },
+                              { id: 'events', label: 'Актив.' },
+                              { id: 'pro', label: 'PRO' },
+                            ] as const
+                          ).map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setUserSort(s.id)}
+                              className={`px-2.5 py-1 rounded-lg ${
+                                userSort === s.id
+                                  ? 'bg-white/[0.12] text-[#F5F1EB] font-semibold'
+                                  : 'text-[#8D867C]'
+                              }`}
+                            >
+                              {s.label}
                             </button>
                           ))}
                         </div>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] overflow-hidden">
-                      <div className="px-4 sm:px-5 py-3 border-b border-[#F4F0E8]/[0.08] flex justify-between items-center text-[12.5px] text-[#9A948A]">
-                        <span>Найдено пользователей: {filteredUsers.length}</span>
-                      </div>
+                    <div className="text-[12px] text-[#8D867C] flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Найдено пользователей: {filteredUsers.length}
+                    </div>
 
-                      {filteredUsers.length === 0 ? (
-                        <div className="py-10 text-center text-[13px] text-[#8C867C]">
-                          Пользователи не найдены
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-[#F4F0E8]/[0.06]">
-                          {filteredUsers.map((u) => {
-                            const isOpen = selectedUserId === u.user_id
-                            const isTg = u.source === 'telegram'
-                            return (
-                              <div key={u.user_id} className="px-4 sm:px-5 py-3.5">
-                                <button
-                                  type="button"
-                                  onClick={() => void loadUserDetail(u.user_id)}
-                                  className="w-full text-left flex items-center justify-between gap-3 bg-transparent border-0 p-0 text-inherit cursor-pointer"
+                    <div className="space-y-2">
+                      {filteredUsers.map((u) => {
+                        const isOpen = expandedUserId === u.user_id;
+                        const prof = userProfiles[u.user_id];
+                        return (
+                          <div
+                            key={u.user_id}
+                            className="rounded-2xl border border-white/[0.08] bg-[#141412] overflow-hidden"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUser(u.user_id)}
+                              className="w-full p-3 flex items-center justify-between gap-2 text-left"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                                    u.source === 'telegram'
+                                      ? 'bg-[#C9A86A]/15 text-[#C9A86A]'
+                                      : 'bg-[#5B9BFF]/15 text-[#5B9BFF]'
+                                  }`}
                                 >
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div
-                                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-mono text-[11px] font-bold shrink-0 border ${
-                                        isTg
-                                          ? 'bg-[#C9A86A]/15 text-[#E5C992] border-[#C9A86A]/35'
-                                          : 'bg-[#60A5FA]/15 text-[#93C5FD] border-[#60A5FA]/35'
-                                      }`}
-                                    >
-                                      {isTg ? 'TG' : 'WEB'}
-                                    </div>
+                                  {u.source === 'telegram' ? 'TG' : 'WEB'}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[13px] font-semibold text-[#F5F1EB] truncate">
+                                      {u.username
+                                        ? `@${u.username}`
+                                        : u.first_name || 'Guest'}
+                                    </span>
+                                    {u.pro_count > 0 && (
+                                      <span className="rounded-md bg-[#3FD08F]/15 px-1.5 py-0.5 text-[10px] font-mono text-[#3FD08F]">
+                                        PRO ×{u.pro_count}
+                                      </span>
+                                    )}
+                                    {u.is_banned && (
+                                      <span className="rounded-md bg-[#F06A7E]/15 px-1.5 py-0.5 text-[10px] text-[#F06A7E]">
+                                        BAN
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] font-mono text-[#8D867C] truncate">
+                                    #{u.user_id} · {u.last_page} · {u.events} соб.
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="text-[11px] font-mono text-[#A8A095]">
+                                  {formatShortDate(u.last_seen)}
+                                </div>
+                              </div>
+                            </button>
 
-                                    <div className="min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[13.5px] font-semibold text-[#F5F1EB] truncate">
-                                          {u.first_name || 'Guest'}
+                            {isOpen && (
+                              <div className="px-3 pb-3 pt-2 border-t border-white/[0.06] bg-[#10100F] space-y-2.5 text-[12px]">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="text-[#A8A095]">
+                                    PRO:{' '}
+                                    <span className="text-[#3FD08F] font-mono">
+                                      {prof
+                                        ? prof.products.length > 0
+                                          ? prof.products.join(', ')
+                                          : 'нет'
+                                        : '...'}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCrmUserId(u.user_id);
+                                      setTab('crm');
+                                    }}
+                                    className="rounded-lg border border-[#C9A86A]/40 bg-[#C9A86A]/10 px-2.5 py-1 text-[11px] font-semibold text-[#C9A86A]"
+                                  >
+                                    В CRM / Бан →
+                                  </button>
+                                </div>
+
+                                {profileLoadingId === u.user_id && (
+                                  <div className="text-[#8D867C]">Загрузка истории...</div>
+                                )}
+
+                                {prof && prof.events.length > 0 && (
+                                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                                    {prof.events.slice(0, 12).map((ev, idx) => (
+                                      <div
+                                        key={`${ev.created_at}-${idx}`}
+                                        className="flex items-center justify-between font-mono text-[11px] text-[#BDB6AC]"
+                                      >
+                                        <span>
+                                          {ev.event} · <span className="text-[#C9A86A]">{ev.page}</span>
                                         </span>
-                                        {u.username ? (
-                                          <span className="text-[12.5px] font-mono text-[#C9A86A]">
-                                            @{u.username}
-                                          </span>
-                                        ) : (
-                                          <span className="text-[12px] font-mono text-[#8C867C]">
-                                            #{u.user_id}
-                                          </span>
-                                        )}
-                                        {u.pro_count > 0 && (
-                                          <span className="px-2 py-0.5 rounded-md bg-[#34D399]/15 text-[#8CE6C0] font-mono text-[11px] font-semibold">
-                                            PRO ×{u.pro_count}
-                                          </span>
-                                        )}
-                                        {u.active_days >= 2 && (
-                                          <span className="px-2 py-0.5 rounded-md bg-white/[0.06] text-[#CFC9BE] font-mono text-[10.5px]">
-                                            {u.active_days}д
-                                          </span>
-                                        )}
+                                        <span className="text-[#7E786E]">
+                                          {formatShortDate(ev.created_at)}
+                                        </span>
                                       </div>
-                                      <div className="text-[12px] text-[#8C867C] mt-0.5 truncate">
-                                        {u.last_page || '—'} · {u.platform || 'web'} · {u.events_count} соб. · с {formatDateShort(u.first_seen)}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-right shrink-0">
-                                    <div className="font-mono text-[12px] text-[#B5AFA4] tabular-nums">
-                                      {formatTime(u.last_seen)}
-                                    </div>
-                                    <div className="text-[11px] text-[#7D776E] mt-0.5">
-                                      {isOpen ? '▲' : '▼'}
-                                    </div>
-                                  </div>
-                                </button>
-
-                                {isOpen && (
-                                  <div className="mt-3 p-3.5 rounded-xl bg-[#0B0B0C] border border-[#F4F0E8]/[0.08] space-y-3">
-                                    {userDetailLoading ? (
-                                      <div className="text-[12.5px] text-[#8C867C]">
-                                        Загрузка профиля…
-                                      </div>
-                                    ) : userDetail ? (
-                                      <>
-                                        <div className="flex items-center justify-between gap-2 flex-wrap pb-2.5 border-b border-[#F4F0E8]/[0.06]">
-                                          <div className="text-[12px] font-mono text-[#CFC9BE]">
-                                            <span className="text-[#8C867C]">PRO: </span>
-                                            {userDetail.products.length
-                                              ? userDetail.products.join(', ')
-                                              : 'нет'}
-                                          </div>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setCrmUserId(u.user_id)
-                                              setTab('crm')
-                                            }}
-                                            className="px-3 py-1.5 rounded-lg bg-[#C9A86A]/18 border border-[#C9A86A]/35 text-[#E5C992] text-[12px] font-semibold cursor-pointer"
-                                          >
-                                            В CRM / Бан →
-                                          </button>
-                                        </div>
-
-                                        {userDetail.adminHistory.length > 0 && (
-                                          <div className="text-[11.5px] font-mono text-[#E5C992] space-y-1">
-                                            <div className="text-[#8C867C]">История админ-действий:</div>
-                                            {userDetail.adminHistory.map((h, idx) => (
-                                              <div key={idx}>
-                                                {h.event} · {formatTime(h.created_at)}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-
-                                        <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
-                                          {userDetail.events.map((ev, i) => (
-                                            <div
-                                              key={`${ev.created_at}-${i}`}
-                                              className="flex justify-between font-mono text-[12px] text-[#B5AFA4]"
-                                            >
-                                              <span className="truncate">
-                                                <span className="text-[#F5F1EB]">{ev.event}</span>
-                                                <span className="text-[#7D776E]"> · {ev.page || '—'}</span>
-                                              </span>
-                                              <span className="text-[#7D776E] shrink-0">
-                                                {formatTime(ev.created_at)}
-                                              </span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </>
-                                    ) : null}
+                                    ))}
                                   </div>
                                 )}
                               </div>
-                            )
-                          })}
+                            )}
+                          </div>
+                        );
+                      })}
+                      {filteredUsers.length === 0 && (
+                        <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-6 text-center text-[13px] text-[#8D867C]">
+                          Пользователи не найдены
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* === 5. ЖУРНАЛ ДЕЙСТВИЙ АДМИНА === */}
+                {/* TAB 5: AUDIT LOG */}
                 {stats && tab === 'audit' && (
-                  <div className="space-y-3.5">
-                    <input
-                      type="text"
-                      value={auditFilter}
-                      onChange={(e) => setAuditFilter(e.target.value)}
-                      placeholder="Фильтр журнала (admin_grant, admin_ban, ID…)"
-                      style={DARK_INPUT_STYLE}
-                      className="w-full h-10 px-3.5 rounded-xl bg-[#141413] border border-[#F4F0E8]/[0.14] text-[13px] placeholder:text-[#7D776E] focus:outline-none focus:border-[#C9A86A]"
-                    />
-
-                    <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] overflow-hidden">
-                      {filteredAudit.length === 0 ? (
-                        <div className="py-12 text-center text-[13px] text-[#8C867C]">
-                          Операций администратора пока нет
+                  <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ScrollText className="w-4 h-4 text-[#C9A86A]" />
+                      <div>
+                        <div className="text-[14px] font-semibold">Журнал действий администратора</div>
+                        <div className="text-[11px] text-[#8D867C]">
+                          Реальные записи выдачи PRO и блокировок из Neon
                         </div>
-                      ) : (
-                        <div className="divide-y divide-[#F4F0E8]/[0.06]">
-                          {filteredAudit.map((row) => {
-                            const target = String(row.meta?.targetUserId || '—')
-                            const prod = row.meta?.productId
-                              ? ` · ${String(row.meta.productId)}`
-                              : ''
-                            return (
-                              <div
-                                key={row.id}
-                                className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3"
-                              >
-                                <div className="min-w-0">
-                                  <div className="font-mono text-[13px] font-semibold text-[#E5C992] truncate">
-                                    {row.event}
-                                  </div>
-                                  <div className="text-[12px] text-[#9A948A] font-mono truncate mt-0.5">
-                                    Объект: #{target}
-                                    {prod} · Админ: #{row.user_id}
-                                  </div>
-                                </div>
-                                <span className="font-mono text-[11.5px] text-[#7D776E] shrink-0">
-                                  {formatTime(row.created_at)}
-                                </span>
+                      </div>
+                    </div>
+
+                    {stats.auditLog.length === 0 ? (
+                      <div className="text-[12px] text-[#8D867C] py-6 text-center">
+                        Пока нет записей. Любая операция в «PRO · CRM» появится здесь.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-white/[0.06]">
+                        {stats.auditLog.map((entry) => (
+                          <div key={entry.id} className="py-2.5 flex items-start justify-between gap-2 text-[12px]">
+                            <div className="min-w-0">
+                              <div className="font-mono text-[#F5F1EB]">
+                                <span
+                                  className={
+                                    entry.event.includes('ban') && !entry.event.includes('unban')
+                                      ? 'text-[#F06A7E]'
+                                      : entry.event.includes('grant')
+                                        ? 'text-[#3FD08F]'
+                                        : 'text-[#C9A86A]'
+                                  }
+                                >
+                                  {entry.event}
+                                </span>{' '}
+                                → #{entry.target}
                               </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* === 6. СОСТОЯНИЕ СИСТЕМЫ (System Health) === */}
-                {tab === 'health' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4">
-                        <div className="text-[12px] text-[#9A948A]">API Vercel</div>
-                        <div className="mt-2 text-[18px] font-semibold text-[#34D399]">
-                          {healthLoading ? 'Проверка…' : health?.apiStatus === 'ok' ? '● Работает' : 'Нет данных'}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4">
-                        <div className="text-[12px] text-[#9A948A]">Neon PostgreSQL</div>
-                        <div
-                          className={`mt-2 text-[18px] font-semibold ${
-                            health?.dbStatus === 'ok'
-                              ? 'text-[#34D399]'
-                              : health?.dbStatus === 'warn'
-                              ? 'text-[#F59E0B]'
-                              : 'text-[#E05A6D]'
-                          }`}
-                        >
-                          {healthLoading
-                            ? 'Проверка…'
-                            : health?.dbStatus === 'ok'
-                            ? `● ${health.dbLatencyMs} мс`
-                            : health?.dbStatus === 'warn'
-                            ? `▲ Медленно (${health.dbLatencyMs} мс)`
-                            : '✕ Ошибка'}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4">
-                        <div className="text-[12px] text-[#9A948A]">Последнее событие</div>
-                        <div className="mt-2 font-mono text-[15px] font-semibold text-[#F5F1EB]">
-                          {formatTime(health?.lastEventAt)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {health && (
-                      <div className="rounded-2xl bg-[#141413] border border-[#F4F0E8]/[0.08] p-4 sm:p-5 divide-y divide-[#F4F0E8]/[0.06] text-[13px]">
-                        <div className="py-2.5 flex justify-between">
-                          <span className="text-[#9A948A]">Таблица app_events</span>
-                          <span className="font-mono text-[#F5F1EB]">
-                            {health.tables.app_events ?? 'Недоступна'} строк
-                          </span>
-                        </div>
-                        <div className="py-2.5 flex justify-between">
-                          <span className="text-[#9A948A]">Таблица user_purchases</span>
-                          <span className="font-mono text-[#F5F1EB]">
-                            {health.tables.user_purchases ?? 'Недоступна'} строк
-                          </span>
-                        </div>
-                        <div className="py-2.5 flex justify-between">
-                          <span className="text-[#9A948A]">Таблица banned_users</span>
-                          <span className="font-mono text-[#F5F1EB]">
-                            {health.tables.banned_users === null
-                              ? 'Не создана'
-                              : `${health.tables.banned_users} строк`}
-                          </span>
-                        </div>
-                        <div className="py-2.5 flex justify-between">
-                          <span className="text-[#9A948A]">TELEGRAM_BOT_TOKEN</span>
-                          <span className="font-mono text-[#34D399]">
-                            {health.botTokenConfigured ? 'Подключён' : 'Отсутствует'}
-                          </span>
-                        </div>
-                        <div className="py-2.5 flex justify-between">
-                          <span className="text-[#9A948A]">ADMIN_TELEGRAM_ID</span>
-                          <span className="font-mono text-[#34D399]">
-                            {health.adminIdConfigured ? 'Подключён' : 'Отсутствует'}
-                          </span>
-                        </div>
+                              <div className="text-[11px] text-[#8D867C] truncate">
+                                {entry.meta || '—'} · via {entry.via}
+                              </div>
+                            </div>
+                            <div className="shrink-0 font-mono text-[11px] text-[#8D867C]">
+                              {formatShortDate(entry.created_at)}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
                 )}
+
+                {/* TAB 6: SYSTEM HEALTH */}
+                {tab === 'system' && (
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Database className="w-4 h-4 text-[#3FD08F]" />
+                          <span className="text-[14px] font-semibold">Состояние Neon PostgreSQL</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={fetchHealth}
+                          className="rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-[#C9A86A]"
+                        >
+                          {healthLoading ? 'Пинг...' : 'Проверить'}
+                        </button>
+                      </div>
+
+                      {health ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
+                            <div className="text-[11px] text-[#8D867C]">Задержка БД</div>
+                            <div className="text-[18px] font-bold font-mono text-[#3FD08F] mt-1">
+                              {health.latencyMs} мс
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
+                            <div className="text-[11px] text-[#8D867C]">app_events</div>
+                            <div className="text-[18px] font-bold font-mono text-[#F5F1EB] mt-1">
+                              {health.eventsCount}
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
+                            <div className="text-[11px] text-[#8D867C]">user_purchases</div>
+                            <div className="text-[18px] font-bold font-mono text-[#C9A86A] mt-1">
+                              {health.purchasesCount}
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
+                            <div className="text-[11px] text-[#8D867C]">banned_users</div>
+                            <div className="text-[18px] font-bold font-mono text-[#F06A7E] mt-1">
+                              {health.bannedCount}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[12px] text-[#8D867C]">Загрузка телеметрии...</div>
+                      )}
+
+                      {health && (
+                        <div className="mt-3 pt-3 border-t border-white/[0.07] space-y-1.5 text-[12px] text-[#BDB6AC]">
+                          <div className="flex justify-between">
+                            <span>Последнее событие:</span>
+                            <span className="font-mono text-[#F5F1EB]">
+                              {health.lastEventAt ? formatShortDate(health.lastEventAt) : '—'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>ADMIN_TELEGRAM_ID:</span>
+                            <span className={health.adminIdConfigured ? 'text-[#3FD08F]' : 'text-[#F06A7E]'}>
+                              {health.adminIdConfigured ? 'Настроен' : 'Не задан'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>ADMIN_WEB_KEY (Chrome):</span>
+                            <span className={health.webKeyConfigured ? 'text-[#3FD08F]' : 'text-[#F5B041]'}>
+                              {health.webKeyConfigured ? 'Настроен (/#admin)' : 'Не задан в Vercel'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4 text-[12px] text-[#A8A095] flex items-start gap-2.5">
+                      <Activity className="w-4 h-4 text-[#C9A86A] shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-semibold text-[#F5F1EB] mb-0.5">
+                          Доступ с ПК / Chrome
+                        </div>
+                        Откройте ваш домен с хвостом <span className="font-mono text-[#C9A86A]">/#admin</span> и введите ключ <span className="font-mono text-[#DED7CC]">ADMIN_WEB_KEY</span>. В Chrome сразу доступны широкая десктоп-версия, прямое скачивание CSV/Excel и печать PDF.
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* Модалка подтверждения критических действий */}
-            {pendingConfirm && (
-              <div className="absolute inset-0 z-40 bg-black/75 flex items-center justify-center p-4">
-                <div className="max-w-sm w-full rounded-2xl bg-[#141413] border border-[#E05A6D]/40 p-5 space-y-4 shadow-2xl">
-                  <div className="text-[15px] font-semibold text-[#F5F1EB]">
-                    {pendingConfirm.title}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setPendingConfirm(null)}
-                      className="h-10 rounded-xl border border-[#F4F0E8]/[0.15] text-[13px] text-[#CFC9BE] cursor-pointer"
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const fn = pendingConfirm.onConfirm
-                        setPendingConfirm(null)
-                        fn()
-                      }}
-                      className="h-10 rounded-xl bg-[#C83E52] text-[#F5F1EB] font-semibold text-[13px] cursor-pointer"
-                    >
-                      Подтвердить
-                    </button>
-                  </div>
+          {/* Toast */}
+          {toast && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[140] rounded-xl border border-[#C9A86A]/40 bg-[#171614] px-4 py-2.5 text-[13px] text-[#F5F1EB] shadow-2xl">
+              {toast}
+            </div>
+          )}
+
+          {/* Confirmation Modal */}
+          {confirmAction && (
+            <div className="fixed inset-0 z-[130] bg-black/75 flex items-center justify-center p-4">
+              <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#151513] p-5 space-y-4">
+                <div>
+                  <div className="text-[16px] font-semibold text-[#F5F1EB]">{confirmAction.title}</div>
+                  <div className="text-[13px] text-[#A8A095] mt-1">{confirmAction.description}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction(null)}
+                    className="rounded-xl border border-white/15 py-2.5 text-[13px] text-[#DED7CC]"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const fn = confirmAction.onConfirm;
+                      setConfirmAction(null);
+                      await fn();
+                    }}
+                    className={`rounded-xl py-2.5 text-[13px] font-semibold ${
+                      confirmAction.danger
+                        ? 'bg-[#D94A64] text-white'
+                        : 'bg-[#C9A86A] text-[#121210]'
+                    }`}
+                  >
+                    {confirmAction.confirmLabel}
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Toast-уведомление */}
-            {toast && (
-              <div className="absolute bottom-4 right-4 z-40 px-4 py-2.5 rounded-xl bg-[#1C1B19] border border-[#C9A86A]/45 text-[12.5px] font-mono text-[#E5C992] shadow-xl">
-                {toast}
+          {/* In-App Export / Report Preview Modal (Telegram WebView fallback) */}
+          {previewModal && (
+            <div className="fixed inset-0 z-[135] bg-black/80 flex items-center justify-center p-4">
+              <div className="w-full max-w-lg max-h-[82dvh] rounded-2xl border border-white/15 bg-[#141412] flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+                  <span className="text-[14px] font-semibold text-[#F5F1EB]">{previewModal.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewModal(null)}
+                    className="p-1 text-[#8D867C]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="px-4 pt-3 text-[12px] text-[#C9A86A]">{previewModal.hint}</div>
+                <pre className="flex-1 overflow-auto m-4 p-3 rounded-xl bg-[#0B0B0A] border border-white/[0.07] text-[11px] font-mono text-[#E7E1D7] whitespace-pre-wrap break-all">
+                  {previewModal.content}
+                </pre>
+                <div className="px-4 pb-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await copyTextToClipboard(previewModal.content);
+                      showToast(ok ? 'Скопировано в буфер' : 'Не удалось скопировать');
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#C9A86A] py-2.5 text-[13px] font-semibold text-[#121210]"
+                  >
+                    <Copy className="w-4 h-4" /> Скопировать всё
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewModal(null)}
+                    className="rounded-xl border border-white/15 px-4 py-2.5 text-[13px] text-[#DED7CC]"
+                  >
+                    Закрыть
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </>
-  )
-}
+  );
+};
+
+export default AdminStatsButton;
