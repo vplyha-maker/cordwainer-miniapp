@@ -8,8 +8,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import crypto from 'crypto';
+
+type SqlClient = NeonQueryFunction<false, false>;
 
 type StoredPdfItem = {
   buffer: Buffer;
@@ -51,7 +53,7 @@ function normalizePhone(raw: unknown): string {
 /**
  * Гарантирует наличие таблиц и колонок для архива заказов и OTP-авторизации в базе Neon
  */
-async function ensureDatabaseSchema(sql: ReturnType<typeof neon>) {
+async function ensureDatabaseSchema(sql: SqlClient) {
   await sql`
     ALTER TABLE orders
     ADD COLUMN IF NOT EXISTS invoice_number TEXT,
@@ -84,7 +86,7 @@ async function ensureDatabaseSchema(sql: ReturnType<typeof neon>) {
  * Загружает заказы проверенного клиента из базы Neon
  */
 async function fetchVerifiedOrdersFromDb(
-  sql: ReturnType<typeof neon>,
+  sql: SqlClient,
   cleanPhone: string,
   tgClientUid?: string
 ) {
