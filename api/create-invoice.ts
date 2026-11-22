@@ -8,7 +8,7 @@ const MAX_AUTH_AGE_SECONDS = 86400; // 24 часа
 export const PRO_SIZES_PRICE_STARS = 150;
 export const PRO_MODULE_PRICE_STARS = 250;
 export const PRO_VIDEOS_PRICE_STARS = 350;
-export const PRO_PIGMENTS_PRICE_STARS = 450;
+export const PRO_PIGMENTS_PRICE_STARS = 1000;
 
 interface VerifiedTelegramUser {
   id: number;
