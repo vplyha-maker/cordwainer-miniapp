@@ -214,6 +214,10 @@ export default async function handler(req: any, res: any) {
     const hideAdmin = String(req.query?.hideAdmin ?? '1') === '1';
     const excludedId = hideAdmin ? adminId : '__none__';
 
+    const sinceIso = new Date(Date.now() - days * 86400 * 1000).toISOString();
+    const since14Iso = new Date(Date.now() - 14 * 86400 * 1000).toISOString();
+    const since30Iso = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+
     try {
       const sql = neon(connectionString);
 
@@ -234,14 +238,14 @@ export default async function handler(req: any, res: any) {
             COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_users,
             COUNT(*)::int AS total_events
           FROM app_events
-          WHERE created_at >= NOW() - (${days} * INTERVAL '1 day')
+          WHERE created_at >= ${sinceIso}::timestamptz
             AND user_id <> ${excludedId}
         `,
         sql`
           WITH per_user AS (
             SELECT user_id, COUNT(DISTINCT DATE(created_at)) AS active_days
             FROM app_events
-            WHERE created_at >= NOW() - INTERVAL '30 days'
+            WHERE created_at >= ${since30Iso}::timestamptz
               AND user_id <> ${excludedId}
             GROUP BY user_id
           )
@@ -257,7 +261,7 @@ export default async function handler(req: any, res: any) {
             COUNT(DISTINCT CASE WHEN source = 'telegram' THEN user_id END)::int AS tg_users,
             COUNT(DISTINCT CASE WHEN source = 'web' THEN user_id END)::int AS web_users
           FROM app_events
-          WHERE created_at >= NOW() - INTERVAL '14 days'
+          WHERE created_at >= ${since14Iso}::timestamptz
             AND user_id <> ${excludedId}
           GROUP BY DATE(created_at)
           ORDER BY DATE(created_at) ASC
@@ -270,7 +274,7 @@ export default async function handler(req: any, res: any) {
             COUNT(*)::int AS opens
           FROM app_events
           WHERE event = 'page_view'
-            AND created_at >= NOW() - (${days} * INTERVAL '1 day')
+            AND created_at >= ${sinceIso}::timestamptz
             AND user_id <> ${excludedId}
           GROUP BY COALESCE(page, 'unknown')
           ORDER BY opens DESC
@@ -281,7 +285,7 @@ export default async function handler(req: any, res: any) {
             COALESCE(NULLIF(lang, ''), 'unknown') AS lang,
             COUNT(DISTINCT user_id)::int AS users
           FROM app_events
-          WHERE created_at >= NOW() - (${days} * INTERVAL '1 day')
+          WHERE created_at >= ${sinceIso}::timestamptz
             AND user_id <> ${excludedId}
           GROUP BY COALESCE(NULLIF(lang, ''), 'unknown')
           ORDER BY users DESC
@@ -292,7 +296,7 @@ export default async function handler(req: any, res: any) {
             COALESCE(NULLIF(platform, ''), 'web') AS platform,
             COUNT(DISTINCT user_id)::int AS users
           FROM app_events
-          WHERE created_at >= NOW() - (${days} * INTERVAL '1 day')
+          WHERE created_at >= ${sinceIso}::timestamptz
             AND user_id <> ${excludedId}
           GROUP BY COALESCE(NULLIF(platform, ''), 'web')
           ORDER BY users DESC
@@ -304,7 +308,7 @@ export default async function handler(req: any, res: any) {
             COUNT(DISTINCT user_id)::int AS unique_users,
             COUNT(*)::int AS total
           FROM app_events
-          WHERE created_at >= NOW() - (${days} * INTERVAL '1 day')
+          WHERE created_at >= ${sinceIso}::timestamptz
             AND user_id <> ${excludedId}
           GROUP BY event
           ORDER BY total DESC
@@ -332,7 +336,7 @@ export default async function handler(req: any, res: any) {
             (
               SELECT COUNT(*)::int
               FROM user_purchases p
-              WHERE p.user_id = e.user_id
+              WHERE p.user_id::text = e.user_id::text
             ) AS pro_count
           FROM app_events e
           WHERE e.user_id <> ${excludedId}
@@ -397,9 +401,12 @@ export default async function handler(req: any, res: any) {
         users: usersRows,
         bannedUsers,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('[api/check-purchase:stats] DB error:', err);
-      return res.status(500).json({ error: 'Failed to load stats' });
+      return res.status(500).json({
+        error: 'Failed to load stats',
+        detail: String(err?.message || err),
+      });
     }
   }
 
@@ -425,7 +432,7 @@ export default async function handler(req: any, res: any) {
         sql`
           SELECT product_id
           FROM user_purchases
-          WHERE user_id = ${targetId}
+          WHERE user_id::text = ${targetId}
         `,
       ]);
       return res.status(200).json({
@@ -478,12 +485,12 @@ export default async function handler(req: any, res: any) {
         if (revoke) {
           await sql`
             DELETE FROM user_purchases
-            WHERE user_id = ${targetUserId} AND product_id = ${pid}
+            WHERE user_id::text = ${targetUserId} AND product_id = ${pid}
           `;
         } else {
           const exists = await sql`
             SELECT 1 FROM user_purchases
-            WHERE user_id = ${targetUserId} AND product_id = ${pid}
+            WHERE user_id::text = ${targetUserId} AND product_id = ${pid}
             LIMIT 1
           `;
           if (exists.length === 0) {
@@ -604,7 +611,7 @@ export default async function handler(req: any, res: any) {
     const result = await sql`
       SELECT 1
       FROM user_purchases
-      WHERE user_id = ${verifiedUserId}
+      WHERE user_id::text = ${verifiedUserId}
         AND product_id = ${rawProductId}
       LIMIT 1
     `;
