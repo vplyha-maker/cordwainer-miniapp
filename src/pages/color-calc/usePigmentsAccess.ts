@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { hapticError, hapticSuccess } from './haptics'
 
 export const PIGMENTS_PRODUCT_ID = 'pro_pigments'
-export const PIGMENTS_PRICE_STARS = 450
+export const PIGMENTS_PRICE_STARS = 1000
 export const TRIAL_MATCH_LIMIT = 3
 
 const TRIAL_STORAGE_KEY = 'cordwaine_pigments_trial_used_v1'
@@ -207,4 +207,3 @@ export function usePigmentsAccess() {
     verifyAccessFromServer,
   }
 }
-
