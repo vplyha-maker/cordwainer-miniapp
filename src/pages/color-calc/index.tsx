@@ -31,6 +31,12 @@ import {
   PigmentDossierModal,
 } from './PigmentArchive'
 import { ScienceMethodologyModal } from './ScienceMethodologyModal'
+import { PigmentsPaywallModal } from './PigmentsPaywallModal'
+import {
+  usePigmentsAccess,
+  PIGMENTS_PRICE_STARS,
+  TRIAL_MATCH_LIMIT,
+} from './usePigmentsAccess'
 import { useAtelierTheme } from './themeTokens'
 import {
   hapticConfirm,
@@ -75,6 +81,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const prefersReduced = useReducedMotion()
   const { isDark, toggleTheme, tokens } = useAtelierTheme()
 
+  const {
+    isPro,
+    purchasing,
+    purchaseError,
+    trialRemaining,
+    hasFullAccess,
+    consumeTrialMatch,
+    buyPro,
+  } = usePigmentsAccess()
+
+  const [showPaywall, setShowPaywall] = useState(false)
   const [hapticsOn, setHapticsOn] = useState<boolean>(() => isHapticsEnabled())
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -123,6 +140,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const workerRef = useRef<Worker | null>(null)
   const reqIdRef = useRef(0)
+
+  const requireProAccess = useCallback((): boolean => {
+    if (hasFullAccess) return true
+    hapticTap()
+    setShowPaywall(true)
+    return false
+  }, [hasFullAccess])
 
   const loadPigments = useCallback(() => {
     setLoading(true)
@@ -263,6 +287,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const scaleFormulaToVolume = useCallback(
     (targetMl: number) => {
+      if (!requireProAccess()) return
       if (!Number.isFinite(targetMl) || targetMl <= 0 || totalAmount <= 0) return
       hapticConfirm()
       const factor = targetMl / totalAmount
@@ -291,7 +316,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         )
       })
     },
-    [totalAmount, setPaints]
+    [requireProAccess, totalAmount, setPaints]
   )
 
   const handleFullReset = useCallback(() => {
@@ -308,6 +333,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const handleAddFromArchive = useCallback(
     (pigmentId: string) => {
+      if (paints.length >= 2 && !requireProAccess()) return
       hapticConfirm()
       setPaints((prev) => {
         if (prev.some((row) => row.pigmentId === pigmentId)) return prev
@@ -327,12 +353,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         ]
       })
     },
-    [setPaints]
+    [paints.length, requireProAccess, setPaints]
   )
 
-  // Копирование полной спецификации рецепта с компонентами, % и рекомендациями по смешиванию
   const copyRecipe = async () => {
     if (!displayHex) return
+    if (!requireProAccess()) return
 
     const activeRows = paints
       .map((row) => {
@@ -405,6 +431,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const runRecipeSearch = () => {
+    if (!requireProAccess()) return
     if (!/^#[0-9A-Fa-f]{6}$/.test(targetHex) || pigments.length === 0 || inventoryIds.length === 0) {
       hapticError()
       return
@@ -433,6 +460,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         hapticError()
         setRecipeError(dict.recipeError)
       } else {
+        consumeTrialMatch()
         hapticSuccess()
       }
     }
@@ -451,6 +479,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const autoAdjustCurrentMix = () => {
+    if (!requireProAccess()) return
     if (!activeTarget || paints.length === 0 || pigments.length === 0) return
     hapticConfirm()
     setIsAutoAdjusting(true)
@@ -604,6 +633,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (next) hapticTap()
   }
 
+  const handleBuyPro = async () => {
+    const ok = await buyPro()
+    if (ok) {
+      setShowPaywall(false)
+    }
+  }
+
   const themeVars = {
     '--color-bg': tokens.pageBg,
     '--color-surface': tokens.surface,
@@ -611,6 +647,28 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     '--color-accent': tokens.accent,
     '--color-danger': tokens.danger,
   } as CSSProperties
+
+  const accessBadge = (
+    <button
+      type="button"
+      onClick={() => {
+        hapticTap()
+        if (!isPro) setShowPaywall(true)
+      }}
+      className="h-9 px-3 rounded-xl text-[11.5px] font-mono font-semibold border cursor-pointer shrink-0 whitespace-nowrap"
+      style={{
+        backgroundColor: isPro ? tokens.activeTintBg : tokens.surface,
+        borderColor: isPro ? tokens.activeTintBorder : tokens.accent,
+        color: tokens.accent,
+      }}
+    >
+      {isPro
+        ? 'PRO ✓'
+        : trialRemaining > 0
+        ? `Trial ${trialRemaining}/${TRIAL_MATCH_LIMIT}`
+        : `PRO · ${PIGMENTS_PRICE_STARS} ⭐`}
+    </button>
+  )
 
   const formulaNode = (
     <FormulaPanel
@@ -624,6 +682,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       amountRefs={amountRefs}
       totalAmount={totalAmount}
       onAddPaint={() => {
+        if (paints.length >= 2 && !requireProAccess()) return
         hapticTap()
         addPaint()
       }}
@@ -641,6 +700,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }}
       illuminant={illuminant}
       onIlluminantChange={(ill) => {
+        if (ill !== 'D65' && !requireProAccess()) return
         hapticSelect()
         setIlluminant(ill)
       }}
@@ -848,6 +908,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {accessBadge}
+
           <div
             className="flex p-1 rounded-xl border"
             style={{ backgroundColor: tokens.surface, borderColor: tokens.border }}
@@ -939,6 +1001,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 key={tItem.id}
                 type="button"
                 onClick={() => {
+                  if (tItem.id === 'spectrum' && !requireProAccess()) return
                   hapticSelect()
                   setMobileTab(tItem.id)
                 }}
@@ -956,6 +1019,40 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
         {themeToggleButton}
       </div>
+
+      {/* КОМПАКТНАЯ ПОЛОСКА ПРОБНОГО / PRO НА МОБИЛЬНОМ */}
+      {!isPro && (
+        <div className="md:hidden px-4 pb-2 flex items-center justify-between gap-2">
+          <span className="text-[11.5px] font-mono" style={{ color: tokens.inkMuted }}>
+            {trialRemaining > 0
+              ? lang === 'uk'
+                ? `Повний пробний: ${trialRemaining} з ${TRIAL_MATCH_LIMIT}`
+                : lang === 'de'
+                ? `Testmodus: ${trialRemaining} von ${TRIAL_MATCH_LIMIT}`
+                : `Полный пробный: ${trialRemaining} из ${TRIAL_MATCH_LIMIT}`
+              : lang === 'uk'
+              ? 'Пробний ліміт вичерпано'
+              : lang === 'de'
+              ? 'Testlimit erreicht'
+              : 'Пробный лимит исчерпан'}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              hapticTap()
+              setShowPaywall(true)
+            }}
+            className="px-2.5 py-1 rounded-lg text-[11.5px] font-mono font-semibold border cursor-pointer"
+            style={{
+              borderColor: tokens.accent,
+              color: tokens.accent,
+              backgroundColor: tokens.activeTintBg,
+            }}
+          >
+            PRO · {PIGMENTS_PRICE_STARS} ⭐
+          </button>
+        </div>
+      )}
 
       {/* СМАРТФОН */}
       <main className="md:hidden px-4 pt-1 pb-24 flex-1">
@@ -1054,6 +1151,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         isDark={isDark}
         initialTab="science"
         onClose={() => setShowGuideModal(false)}
+      />
+
+      <PigmentsPaywallModal
+        open={showPaywall}
+        lang={lang}
+        trialRemaining={trialRemaining}
+        purchasing={purchasing}
+        purchaseError={purchaseError}
+        onBuy={handleBuyPro}
+        onClose={() => setShowPaywall(false)}
       />
     </motion.div>
   )
