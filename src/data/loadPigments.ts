@@ -1,6 +1,8 @@
 import { Pigment, PIGMENTS, initPigment } from './pigments'
-import { SpectrumPoint, parseSpectrum, spectrumToRGB, rgbToHex } from '../utils/colorScience'
+import { parseSpectrum, spectrumToRGB, rgbToHex } from '../utils/colorScience'
 import { THEME_PIGMENT_IDS } from '../theme/pigmentTheme'
+
+const SPECTRA_VERSION = '2'
 
 const SPECTRUM_FILES: Record<string, string> = {
   // === Классические ===
@@ -163,7 +165,7 @@ async function loadOnePigment(pigment: Pigment): Promise<Pigment> {
   }
 
   try {
-    const response = await fetch(`/spectra/${filename}`)
+    const response = await fetch(`/spectra/${filename}?v=${SPECTRA_VERSION}`)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const text = await response.text()
     const initialized = initPigment(pigment, text)
@@ -184,15 +186,12 @@ export async function loadThemePigments(): Promise<Pigment[]> {
 
 /** Полная загрузка всех пигментов (для колористики и т.д.) */
 export async function loadAllPigments(): Promise<Pigment[]> {
-  // Сначала быстро тема
   const theme = await loadThemePigments()
 
-  // Потом остальные
   const themeIds = new Set(THEME_PIGMENT_IDS as readonly string[])
   const rest = PIGMENTS.filter((p) => !themeIds.has(p.id))
   const restResults = await Promise.all(rest.map(loadOnePigment))
 
-  // Собираем полный список в том же порядке, что и PIGMENTS
   const map = new Map<string, Pigment>()
   ;[...theme, ...restResults].forEach((p) => map.set(p.id, p))
 
