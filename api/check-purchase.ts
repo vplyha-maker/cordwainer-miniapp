@@ -1004,11 +1004,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (search) {
         const allFiles = await listAllR2Objects(cfg, prefix);
-        const tokens = search.split(/[\s\-_/]+/).filter(Boolean);
-        const matched = allFiles.filter((f) => {
+        const tokens = search
+          .replace(/[^a-z0-9а-яё]+/gi, ' ')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+
+        let matched = allFiles.filter((f) => {
           const hay = f.key.toLowerCase();
           return tokens.every((t) => hay.includes(t));
         });
+
+        if (matched.length === 0 && tokens.length >= 2) {
+          const minHits = Math.max(2, Math.ceil(tokens.length * 0.6));
+          matched = allFiles
+            .map((f) => {
+              const hay = f.key.toLowerCase();
+              const hits = tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0);
+              return { f, hits };
+            })
+            .filter((x) => x.hits >= minHits)
+            .sort((a, b) => b.hits - a.hits)
+            .map((x) => x.f);
+        }
+
         const limited = matched.slice(0, 100);
         const totalSize = matched.reduce((sum, f) => sum + f.size, 0);
         return res.status(200).json({
