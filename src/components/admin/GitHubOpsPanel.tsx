@@ -175,13 +175,17 @@ export const GitHubOpsPanel: React.FC<GitHubOpsPanelProps> = ({
     );
   }
 
+  const manualWorkflows = (data?.workflows || []).filter((wf) =>
+    wf.path.startsWith('.github/workflows/'),
+  );
+
   return (
     <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-semibold truncate">{repo || 'GitHub'}</div>
           <div className="text-[10px] font-mono text-[#8D867C]">
-            Коммитов: {data?.commits.length || 0} · Actions: {data?.workflows.length || 0}
+            Коммитов: {data?.commits.length || 0} · Actions: {manualWorkflows.length}
           </div>
         </div>
         <button
@@ -289,10 +293,10 @@ export const GitHubOpsPanel: React.FC<GitHubOpsPanelProps> = ({
 
       {sub === 'actions' && (
         <div className="space-y-3">
-          {(data?.workflows || []).length > 0 && (
+          {manualWorkflows.length > 0 && (
             <div className="space-y-1.5">
               <div className="text-[11px] font-semibold text-[#A8A095]">Ручной запуск Workflows</div>
-              {(data?.workflows || []).map((wf) => (
+              {manualWorkflows.map((wf) => (
                 <div
                   key={wf.id}
                   className="flex items-center justify-between gap-2 rounded-xl border border-white/[0.07] bg-[#0F0F0E] px-3 py-2"
@@ -344,4 +348,3 @@ export const GitHubOpsPanel: React.FC<GitHubOpsPanelProps> = ({
     </div>
   );
 };
-
