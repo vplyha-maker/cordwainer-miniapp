@@ -279,6 +279,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.newKey) return `${String(obj.oldKey || '')} → ${String(obj.newKey)}`;
     if (obj.op) return String(obj.op);
     if (obj.deploymentId) return String(obj.deploymentId);
+    if (obj.repo) return String(obj.repo);
     if (obj.key) return String(obj.key);
     if (obj.pk) return `pk=${String(obj.pk)}`;
     return meta;
@@ -291,6 +292,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.newKey) return `${String(obj.oldKey || '')} → ${String(obj.newKey)}`;
     if (obj.op) return String(obj.op);
     if (obj.deploymentId) return String(obj.deploymentId);
+    if (obj.repo) return String(obj.repo);
     if (obj.key) return String(obj.key);
     if (obj.pk) return `pk=${String(obj.pk)}`;
     return JSON.stringify(obj);
@@ -1346,7 +1348,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // --- CLOUD OPS: VERCEL & RENDER ---
+    // --- CLOUD OPS: VERCEL, RENDER & GITHUB ---
     if (action === 'cloud-status') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -1540,9 +1542,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           { headers },
         );
         if (!r.ok) return res.status(502).json({ ok: false, error: `Vercel logs (${r.status})` });
+        const ansiRe = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
         const events = (await r.json()) as Array<{ text?: string; payload?: { text?: string } }>;
         const lines = events
-          .map((ev) => String(ev.text || ev.payload?.text || '').trim())
+          .map((ev) => String(ev.text || ev.payload?.text || '').replace(ansiRe, '').trim())
           .filter(Boolean)
           .slice(0, 30)
           .reverse();
@@ -1578,17 +1581,73 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
+      const body = (req.body || {}) as Record<string, unknown>;
+      const op = String(body.op || '').trim();
+
+      if (op === 'webhook') {
+        const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+        if (!botToken) return res.status(400).json({ ok: false, error: 'BOT_TOKEN не задан' });
+        const tgR = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`);
+        const tgJson = (await tgR.json()) as {
+          ok?: boolean;
+          result?: {
+            url?: string;
+            pending_update_count?: number;
+            last_error_message?: string;
+            last_error_date?: number;
+          };
+        };
+        if (!tgR.ok || !tgJson.ok || !tgJson.result) {
+          return res.status(502).json({ ok: false, error: 'Ошибка Telegram getWebhookInfo' });
+        }
+        const info = tgJson.result;
+        return res.status(200).json({
+          ok: true,
+          webhook: {
+            url: String(info.url || ''),
+            pendingCount: Number(info.pending_update_count || 0),
+            lastError: String(info.last_error_message || ''),
+            lastErrorDate: info.last_error_date ? new Date(info.last_error_date * 1000).toISOString() : '',
+          },
+        });
+      }
+
       const rKey = (process.env.RENDER_API_KEY || '').trim();
       if (!rKey) return res.status(400).json({ ok: false, error: 'RENDER_API_KEY не задан' });
 
-      const body = (req.body || {}) as Record<string, unknown>;
-      const op = String(body.op || '').trim();
       const serviceId = String(body.serviceId || '').trim();
       const serviceName = String(body.serviceName || serviceId).trim();
       if (!serviceId) return res.status(400).json({ ok: false, error: 'Не указан serviceId' });
 
       const headers = { Authorization: `Bearer ${rKey}`, 'Content-Type': 'application/json', Accept: 'application/json' };
       const base = `https://api.render.com/v1/services/${encodeURIComponent(serviceId)}`;
+
+      if (op === 'logs') {
+        const svcR = await fetch(base, { headers });
+        if (!svcR.ok) return res.status(502).json({ ok: false, error: `Render service (${svcR.status})` });
+        const svcJson = (await svcR.json()) as { ownerId?: string };
+        const ownerId = String(svcJson.ownerId || '');
+        if (!ownerId) return res.status(502).json({ ok: false, error: 'Не найден ownerId сервиса' });
+
+        const logsR = await fetch(
+          `https://api.render.com/v1/logs?ownerId=${encodeURIComponent(ownerId)}&resource=${encodeURIComponent(serviceId)}&limit=35`,
+          { headers },
+        );
+        if (!logsR.ok) {
+          const t = await logsR.text();
+          return res.status(502).json({ ok: false, error: `Render logs (${logsR.status}): ${t.slice(0, 100)}` });
+        }
+        const logsJson = (await logsR.json()) as { logs?: Array<{ timestamp?: string; message?: string }> };
+        const ansiRe = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+        const lines = (logsJson.logs || [])
+          .map((l) => {
+            const ts = l.timestamp ? String(l.timestamp).slice(11, 19) : '';
+            const msg = String(l.message || '').replace(ansiRe, '').trim();
+            return msg ? (ts ? `[${ts}] ${msg}` : msg) : '';
+          })
+          .filter(Boolean);
+        return res.status(200).json({ ok: true, lines });
+      }
 
       if (op === 'deploys') {
         const r = await fetch(`${base}/deploys?limit=6`, { headers });
@@ -1636,6 +1695,180 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'github-ops') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const ghToken = (process.env.GITHUB_TOKEN || '').trim();
+      const rawRepos = (process.env.GITHUB_REPOS || process.env.GITHUB_REPO || 'vplyha-maker/cordwainer-miniapp').trim();
+      const repos = rawRepos.split(',').map((s) => s.trim()).filter(Boolean);
+
+      if (!ghToken) {
+        return res.status(200).json({
+          ok: true,
+          configured: false,
+          missing: ['GITHUB_TOKEN'],
+          repos,
+          activeRepo: repos[0] || '',
+          commits: [],
+          workflows: [],
+          runs: [],
+        });
+      }
+
+      const ghHeaders = {
+        Authorization: `Bearer ${ghToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      };
+
+      if (req.method === 'POST') {
+        const body = (req.body || {}) as Record<string, unknown>;
+        const op = String(body.op || '').trim();
+        const targetRepo = String(body.repo || repos[0] || '').trim();
+        if (!repos.includes(targetRepo)) {
+          return res.status(400).json({ ok: false, error: 'Репозиторий не в списке разрешённых' });
+        }
+
+        if (op === 'commit-files') {
+          const sha = String(body.sha || '').trim();
+          if (!/^[0-9a-f]{7,40}$/i.test(sha)) return res.status(400).json({ ok: false, error: 'Неверный SHA' });
+          const r = await fetch(`https://api.github.com/repos/${targetRepo}/commits/${sha}`, { headers: ghHeaders });
+          if (!r.ok) return res.status(502).json({ ok: false, error: `GitHub commit (${r.status})` });
+          const j = (await r.json()) as {
+            files?: Array<{ filename?: string; status?: string; additions?: number; deletions?: number }>;
+          };
+          const files = (j.files || []).slice(0, 30).map((f) => ({
+            filename: String(f.filename || ''),
+            status: String(f.status || ''),
+            additions: Number(f.additions || 0),
+            deletions: Number(f.deletions || 0),
+          }));
+          return res.status(200).json({ ok: true, files });
+        }
+
+        if (op === 'dispatch') {
+          const workflowId = Number(body.workflowId || 0);
+          const workflowName = String(body.workflowName || workflowId);
+          const ref = String(body.ref || 'main').trim() || 'main';
+          if (!workflowId) return res.status(400).json({ ok: false, error: 'Не указан workflowId' });
+
+          const r = await fetch(
+            `https://api.github.com/repos/${targetRepo}/actions/workflows/${workflowId}/dispatches`,
+            {
+              method: 'POST',
+              headers: { ...ghHeaders, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ref }),
+            },
+          );
+          if (!r.ok && r.status !== 204) {
+            const t = await r.text();
+            return res.status(502).json({ ok: false, error: `GitHub dispatch (${r.status}): ${t.slice(0, 120)}` });
+          }
+
+          try {
+            const auditMeta = JSON.stringify({ repo: targetRepo, workflowId, ref });
+            await sql`
+              INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+              VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_gh_dispatch', ${workflowName}, ${auditMeta})
+            `;
+          } catch (e) {
+            console.error('gh audit err:', e);
+          }
+
+          return res.status(200).json({ ok: true });
+        }
+
+        return res.status(400).json({ ok: false, error: 'Неизвестная операция GitHub' });
+      }
+
+      const reqRepo = String(req.query.repo || '').trim();
+      const activeRepo = repos.includes(reqRepo) ? reqRepo : repos[0] || '';
+
+      try {
+        const [cResp, wfResp, runResp] = await Promise.all([
+          fetch(`https://api.github.com/repos/${activeRepo}/commits?per_page=10`, { headers: ghHeaders }),
+          fetch(`https://api.github.com/repos/${activeRepo}/actions/workflows?per_page=15`, { headers: ghHeaders }),
+          fetch(`https://api.github.com/repos/${activeRepo}/actions/runs?per_page=8`, { headers: ghHeaders }),
+        ]);
+
+        if (!cResp.ok) {
+          const t = await cResp.text();
+          return res.status(200).json({
+            ok: true,
+            configured: true,
+            missing: [],
+            repos,
+            activeRepo,
+            commits: [],
+            workflows: [],
+            runs: [],
+            error: `GitHub API (${cResp.status}): ${t.slice(0, 120)}`,
+          });
+        }
+
+        const cArr = (await cResp.json()) as Array<{
+          sha?: string;
+          commit?: { message?: string; author?: { name?: string; date?: string } };
+        }>;
+        const wfJson = wfResp.ok
+          ? ((await wfResp.json()) as { workflows?: Array<{ id?: number; name?: string; state?: string; path?: string }> })
+          : { workflows: [] };
+        const runJson = runResp.ok
+          ? ((await runResp.json()) as {
+              workflow_runs?: Array<{
+                id?: number;
+                name?: string;
+                status?: string;
+                conclusion?: string | null;
+                head_branch?: string;
+                created_at?: string;
+              }>;
+            })
+          : { workflow_runs: [] };
+
+        return res.status(200).json({
+          ok: true,
+          configured: true,
+          missing: [],
+          repos,
+          activeRepo,
+          commits: cArr.map((c) => ({
+            sha: String(c.sha || ''),
+            message: String(c.commit?.message || '').split('\n')[0].slice(0, 110),
+            author: String(c.commit?.author?.name || ''),
+            date: String(c.commit?.author?.date || ''),
+          })),
+          workflows: (wfJson.workflows || []).map((w) => ({
+            id: Number(w.id || 0),
+            name: String(w.name || ''),
+            state: String(w.state || ''),
+            path: String(w.path || ''),
+          })),
+          runs: (runJson.workflow_runs || []).map((r) => ({
+            id: Number(r.id || 0),
+            name: String(r.name || ''),
+            status: String(r.status || ''),
+            conclusion: String(r.conclusion || ''),
+            branch: String(r.head_branch || ''),
+            createdAt: String(r.created_at || ''),
+          })),
+        });
+      } catch (e) {
+        return res.status(200).json({
+          ok: true,
+          configured: true,
+          missing: [],
+          repos,
+          activeRepo,
+          commits: [],
+          workflows: [],
+          runs: [],
+          error: e instanceof Error ? e.message : 'GitHub fetch error',
+        });
+      }
     }
 
     // --- TELEGRAM OTP LOGIN ---
