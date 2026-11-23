@@ -164,7 +164,7 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
     }
   }, [mode, stats, r2?.configured, fetchStats]);
 
-  // Tool 5: Batch-sign thumbnails when Gallery mode is active
+  // Batch-sign thumbnails when Gallery mode is active
   useEffect(() => {
     if (viewLayout !== 'gallery' || !r2?.files.length) return;
     const missingKeys = r2.files
@@ -360,6 +360,7 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
                 ref={uploadInputRef}
                 type="file"
                 multiple
+                accept={autoWebp ? 'image/*' : undefined}
                 onChange={handleMultiUpload}
                 className="hidden"
               />
@@ -395,21 +396,21 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
             <button
               type="button"
               onClick={() => setAutoWebp((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-medium transition ${
+              className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap shrink-0 transition ${
                 autoWebp
                   ? 'border-[#3FD08F]/45 bg-[#3FD08F]/10 text-[#3FD08F]'
                   : 'border-white/10 bg-[#0F0F0E] text-[#8D867C]'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              Авто-WebP: {autoWebp ? 'ВКЛ' : 'ВЫКЛ'}
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              WebP: {autoWebp ? 'ВКЛ' : 'ВЫКЛ'}
             </button>
 
-            <div className="inline-flex rounded-xl border border-white/10 bg-[#0F0F0E] p-0.5">
+            <div className="inline-flex rounded-xl border border-white/10 bg-[#0F0F0E] p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setViewLayout('list')}
-                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] ${
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] whitespace-nowrap ${
                   viewLayout === 'list' ? 'bg-[#C9A86A] text-[#121210] font-semibold' : 'text-[#A8A095]'
                 }`}
               >
@@ -418,7 +419,7 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
               <button
                 type="button"
                 onClick={() => setViewLayout('gallery')}
-                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] ${
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] whitespace-nowrap ${
                   viewLayout === 'gallery' ? 'bg-[#C9A86A] text-[#121210] font-semibold' : 'text-[#A8A095]'
                 }`}
               >
@@ -720,7 +721,7 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
                       {stats.duplicates.map((grp) => (
                         <div
                           key={grp.etag}
-                          className="rounded-xl border border-[#F06A7E]/25 bg-[#0F0F0E] p-2.5 space-y-1.5"
+                          className="rounded-xl border border-[#F06A7E]/25 bg-[#0F0F0E] p-2.5 space-y-1"
                         >
                           <div className="flex justify-between text-[10px] font-mono text-[#8D867C]">
                             <span>ETag: {grp.etag.slice(0, 12)}...</span>
@@ -731,7 +732,7 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
                               key={k}
                               type="button"
                               onClick={() => setPreviewFile({ key: k, size: grp.size, lastModified: '' })}
-                              className="w-full text-left font-mono text-[11px] text-[#F5F1EB] truncate hover:text-[#C9A86A]"
+                              className="w-full py-1 text-left font-mono text-[11px] text-[#F5F1EB] truncate hover:text-[#C9A86A]"
                             >
                               • {k}
                             </button>
