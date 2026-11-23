@@ -1,1 +1,78 @@
+name: 🟣 Починить Тирский пурпур
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Calibrate tyrian_purple.txt
+        run: |
+          node << 'EOF'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          function findFile(dir) {
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, e.name);
+              if (e.isDirectory()) {
+                const hit = findFile(full);
+                if (hit) return hit;
+              } else if (e.isFile() && e.name.toLowerCase() === 'tyrian_purple.txt') {
+                return full;
+              }
+            }
+            return null;
+          }
+
+          const target = findFile('public');
+          if (!target) throw new Error('tyrian_purple.txt not found in public/');
+
+          const raw = fs.readFileSync(target, 'utf8');
+          const pts = raw.trim().split(/\r?\n/).map((l) => l.trim().split(/\s+/).map(Number));
+
+          const ksFromR = (r) => {
+            const c = Math.max(0.005, Math.min(0.995, r));
+            return ((1 - c) * (1 - c)) / (2 * c);
+          };
+          const rFromKS = (ks) => {
+            const k = Math.max(0.0001, ks);
+            return 1 + k - Math.sqrt(k * k + 2 * k);
+          };
+
+          const out = pts.map(([wl, val]) => {
+            const ksOrig = ksFromR(Math.max(0.01, Math.min(0.98, val / 100)));
+            const gMain = 25.0 * Math.exp(-0.5 * Math.pow((wl - 552) / 37, 2));
+            const gVib = 11.5 * Math.exp(-0.5 * Math.pow((wl - 512) / 26, 2));
+            const gUV = 15.0 / (1 + Math.exp((wl - 390) / 14));
+            const gBlueBase = 4.6 * Math.exp(-0.5 * Math.pow((wl - 442) / 52, 2));
+            const redRelease = 1 / (1 + Math.exp((wl - 640) / 16));
+            const ksRedFloor = 0.06 + 0.50 * Math.exp(-Math.max(0, wl - 650) / 55);
+            const ksMod = (gMain + gVib + gBlueBase) * redRelease + gUV + ksRedFloor + 0.22 * ksOrig;
+            return `${wl.toFixed(3)} ${(rFromKS(ksMod) * 100).toFixed(3)}`;
+          });
+
+          fs.writeFileSync(target, out.join('\n') + '\n', 'utf8');
+          console.log('Updated:', target, 'lines:', out.length);
+          EOF
+
+      - name: Commit calibrated spectrum
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/
+          git diff --cached --quiet || git commit -m "fix(spectral): calibrate tyrian_purple.txt reflectance"
+          git push
+
+      - name: Verify with pigment audit
+        run: node scripts/audit-pigments.mjs public
 
