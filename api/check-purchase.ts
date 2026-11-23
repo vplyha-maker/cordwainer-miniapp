@@ -209,7 +209,11 @@ function parseR2ListXml(xml: string) {
     im = itemRe.exec(xml);
   }
 
-  return { folders, files };
+  const isTruncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml);
+  const nextM = xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/);
+  const nextToken = nextM ? decodeXml(nextM[1]) : '';
+
+  return { folders, files, isTruncated, nextToken };
 }
 
 function parseMetaObj(meta: unknown): Record<string, unknown> {
@@ -377,7 +381,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const sql = getSql();
 
-    // --- NEON STUDIO: TABLES + HEALTH METRICS ---
+    // --- NEON STUDIO: TABLES + HEALTH ---
     if (action === 'db-tables') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -410,6 +414,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           JOIN information_schema.key_column_usage kcu
             ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
           WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public'
+          ORDER BY kcu.ordinal_position ASC
         `,
       ]);
 
@@ -440,7 +445,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // --- NEON STUDIO: BROWSER (SEARCH + SORT + PAGINATION + SCHEMA) ---
+    // --- NEON STUDIO: BROWSER (COMPOSITE PK SAFE + SEARCH + SORT + PAGINATION) ---
     if (action === 'db-rows') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -469,12 +474,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE tc.constraint_type = 'PRIMARY KEY'
             AND tc.table_schema = 'public'
             AND tc.table_name = ${safeTable}
-          LIMIT 1
+          ORDER BY kcu.ordinal_position ASC
         `,
       ]);
 
       const colNames = cols.map((c) => String(c.column_name));
-      const pkCol = pkRows.length > 0 ? String(pkRows[0].column_name) : null;
+      const pkCols = pkRows.map((p) => String(p.column_name));
 
       const limit = Math.min(100, Math.max(10, Number(req.query.limit || 25) || 25));
       const page = Math.max(1, Number(req.query.page || 1) || 1);
@@ -513,19 +518,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         ok: true,
         table: safeTable,
-        pkCol,
+        pkCols,
+        pkCol: pkCols[0] || null,
         total,
         page,
         limit,
         sortCol,
         sortDir: sortDir.toLowerCase(),
         columns: colNames,
-        columnTypes: cols.map((c) => ({ name: String(c.column_name), type: String(c.data_type) })),
         rows,
       });
     }
 
-    // --- NEON STUDIO: EXPORT TABLE BACKUP (UP TO 1000 ROWS) ---
+    // --- NEON STUDIO: EXPORT TABLE BACKUP ---
     if (action === 'db-export') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -542,20 +547,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, table: safeTable, columns, rows });
     }
 
-    // --- NEON STUDIO: SAFE ROW UPDATE BY PK ---
+    // --- NEON STUDIO: COMPOSITE-PK SAFE ROW UPDATE ---
     if (action === 'db-update' && req.method === 'POST') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
       const body = (req.body || {}) as Record<string, unknown>;
       const reqTable = String(body.table || '').trim();
-      const pkCol = String(body.pkCol || '').trim();
-      const pkVal = body.pkVal;
+      const pkValues = (body.pkValues || {}) as Record<string, unknown>;
       const updates = (body.updates || {}) as Record<string, unknown>;
-
-      if (!reqTable || !pkCol || pkVal === undefined || pkVal === null) {
-        return res.status(400).json({ ok: false, error: 'Не указаны таблица или первичный ключ' });
-      }
 
       const validTables = await sql`
         SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ${reqTable} LIMIT 1
@@ -563,31 +563,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (validTables.length === 0) return res.status(400).json({ ok: false, error: 'Таблица не найдена' });
       const safeTable = String(validTables[0].tablename);
 
-      const cols = await sql`
-        SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = ${safeTable}
-      `;
-      const validCols = new Set(cols.map((c) => String(c.column_name)));
-      if (!validCols.has(pkCol)) return res.status(400).json({ ok: false, error: 'Неверный ключ' });
+      const [cols, pkRows] = await Promise.all([
+        sql`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = ${safeTable}
+        `,
+        sql`
+          SELECT kcu.column_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+          WHERE tc.constraint_type = 'PRIMARY KEY'
+            AND tc.table_schema = 'public'
+            AND tc.table_name = ${safeTable}
+          ORDER BY kcu.ordinal_position ASC
+        `,
+      ]);
 
-      const keys = Object.keys(updates).filter((k) => validCols.has(k) && k !== pkCol);
+      const validCols = new Set(cols.map((c) => String(c.column_name)));
+      const pkCols = pkRows.map((p) => String(p.column_name));
+      if (pkCols.length === 0) {
+        return res.status(400).json({ ok: false, error: 'У таблицы нет Primary Key' });
+      }
+      for (const pk of pkCols) {
+        if (pkValues[pk] === undefined || pkValues[pk] === null) {
+          return res.status(400).json({ ok: false, error: `Отсутствует значение ключа ${pk}` });
+        }
+      }
+
+      const pkSet = new Set(pkCols);
+      const keys = Object.keys(updates).filter((k) => validCols.has(k) && !pkSet.has(k));
       if (keys.length === 0) return res.status(400).json({ ok: false, error: 'Нет полей для обновления' });
 
-      const setParts: string[] = [];
       const params: unknown[] = [];
-      keys.forEach((k, idx) => {
-        setParts.push(`${quoteIdent(k)} = $${idx + 1}`);
+      const setParts: string[] = [];
+      for (const k of keys) {
         params.push(updates[k] === '' ? null : updates[k]);
-      });
-      params.push(pkVal);
+        setParts.push(`${quoteIdent(k)} = $${params.length}`);
+      }
+
+      const whereParts: string[] = [];
+      for (const pk of pkCols) {
+        params.push(pkValues[pk]);
+        whereParts.push(`${quoteIdent(pk)} = $${params.length}`);
+      }
 
       await sql.query(
-        `UPDATE "public".${quoteIdent(safeTable)} SET ${setParts.join(', ')} WHERE ${quoteIdent(pkCol)} = $${params.length}`,
+        `UPDATE "public".${quoteIdent(safeTable)} SET ${setParts.join(', ')} WHERE ${whereParts.join(' AND ')}`,
         params,
       );
 
       try {
-        const meta = JSON.stringify({ pk: String(pkVal), fields: keys });
+        const meta = JSON.stringify({ pk: pkCols.map((k) => `${k}=${String(pkValues[k])}`).join(','), fields: keys });
         await sql`
           INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
           VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_db_update', ${safeTable}, ${meta})
@@ -599,15 +626,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
-    // --- NEON STUDIO: SAFE ROW DELETE BY PK ---
+    // --- NEON STUDIO: COMPOSITE-PK SAFE ROW DELETE ---
     if (action === 'db-delete' && req.method === 'POST') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
       const body = (req.body || {}) as Record<string, unknown>;
       const reqTable = String(body.table || '').trim();
-      const pkCol = String(body.pkCol || '').trim();
-      const pkVal = body.pkVal;
+      const pkValues = (body.pkValues || {}) as Record<string, unknown>;
 
       const validTables = await sql`
         SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ${reqTable} LIMIT 1
@@ -615,21 +641,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (validTables.length === 0) return res.status(400).json({ ok: false, error: 'Таблица не найдена' });
       const safeTable = String(validTables[0].tablename);
 
-      const cols = await sql`
-        SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = ${safeTable}
+      const pkRows = await sql`
+        SELECT kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+        WHERE tc.constraint_type = 'PRIMARY KEY'
+          AND tc.table_schema = 'public'
+          AND tc.table_name = ${safeTable}
+        ORDER BY kcu.ordinal_position ASC
       `;
-      if (!cols.some((c) => String(c.column_name) === pkCol)) {
-        return res.status(400).json({ ok: false, error: 'Неверный ключ' });
+      const pkCols = pkRows.map((p) => String(p.column_name));
+      if (pkCols.length === 0) {
+        return res.status(400).json({ ok: false, error: 'У таблицы нет Primary Key' });
+      }
+
+      const params: unknown[] = [];
+      const whereParts: string[] = [];
+      for (const pk of pkCols) {
+        if (pkValues[pk] === undefined || pkValues[pk] === null) {
+          return res.status(400).json({ ok: false, error: `Отсутствует значение ключа ${pk}` });
+        }
+        params.push(pkValues[pk]);
+        whereParts.push(`${quoteIdent(pk)} = $${params.length}`);
       }
 
       await sql.query(
-        `DELETE FROM "public".${quoteIdent(safeTable)} WHERE ${quoteIdent(pkCol)} = $1`,
-        [pkVal],
+        `DELETE FROM "public".${quoteIdent(safeTable)} WHERE ${whereParts.join(' AND ')}`,
+        params,
       );
 
       try {
-        const meta = JSON.stringify({ pk: String(pkVal) });
+        const meta = JSON.stringify({ pk: pkCols.map((k) => `${k}=${String(pkValues[k])}`).join(',') });
         await sql`
           INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
           VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_db_delete', ${safeTable}, ${meta})
@@ -711,7 +754,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // --- NEON STUDIO: 1-TAP PRO QUICK COMMANDS + R2 AUDIT ---
+    // --- NEON STUDIO: 1-TAP PRO QUICK COMMANDS + FULL 2-WAY R2 AUDIT ---
     if (action === 'db-preset' && req.method === 'POST') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -752,15 +795,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const nameCol = colList.find((c) => /name|title|model/i.test(c)) || colList[0];
         const idCol = colList.includes('id') ? 'id' : colList[0];
 
-        // Collect R2 keys (up to 1000)
-        const r2Resp = await r2SignedFetch(cfg, 'GET', '', { 'list-type': '2', 'max-keys': '1000' });
-        if (!r2Resp.ok) {
-          return res.status(502).json({ ok: false, error: `Ошибка чтения R2 (${r2Resp.status})` });
+        // Paginate ALL objects in R2 bucket via NextContinuationToken (up to 10 pages = 10,000 files)
+        const allR2Files: Array<{ key: string; size: number }> = [];
+        let token = '';
+        for (let pageIdx = 0; pageIdx < 10; pageIdx += 1) {
+          const q: Record<string, string> = { 'list-type': '2', 'max-keys': '1000' };
+          if (token) q['continuation-token'] = token;
+          const r2Resp = await r2SignedFetch(cfg, 'GET', '', q);
+          if (!r2Resp.ok) {
+            return res.status(502).json({ ok: false, error: `Ошибка чтения R2 (${r2Resp.status})` });
+          }
+          const parsed = parseR2ListXml(await r2Resp.text());
+          for (const f of parsed.files) {
+            allR2Files.push({ key: f.key, size: f.size });
+          }
+          if (!parsed.isTruncated || !parsed.nextToken) break;
+          token = parsed.nextToken;
         }
-        const r2Parsed = parseR2ListXml(await r2Resp.text());
+
         const r2Keys = new Set<string>();
         const r2Basenames = new Set<string>();
-        for (const f of r2Parsed.files) {
+        for (const f of allR2Files) {
           r2Keys.add(f.key);
           const base = f.key.split('/').pop() || f.key;
           r2Basenames.add(base);
@@ -769,47 +824,80 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const selectCols = imgCol
           ? `${quoteIdent(idCol)} AS id, ${quoteIdent(nameCol)} AS title, ${quoteIdent(imgCol)} AS img`
           : `${quoteIdent(idCol)} AS id, ${quoteIdent(nameCol)} AS title, NULL AS img`;
-        const snRows = await sql.query(`SELECT ${selectCols} FROM "public"."sneakers" LIMIT 1000`);
+        const snRows = await sql.query(`SELECT ${selectCols} FROM "public"."sneakers"`);
 
-        let emptyImg = 0;
-        const missingSamples: Array<{ id: string; title: string; issue: string }> = [];
+        const usedKeys = new Set<string>();
+        const usedBasenames = new Set<string>();
+        let emptyImgCount = 0;
+        let brokenNeonCount = 0;
+        const brokenNeon: Array<{ id: string; title: string; img: string; reason: string }> = [];
+
         for (const r of snRows as Array<{ id?: unknown; title?: unknown; img?: unknown }>) {
           const raw = String(r.img || '').trim();
           if (!raw) {
-            emptyImg += 1;
-            if (missingSamples.length < 20) {
-              missingSamples.push({ id: String(r.id ?? ''), title: String(r.title ?? ''), issue: 'Пустая ссылка на фото' });
+            emptyImgCount += 1;
+            if (brokenNeon.length < 40) {
+              brokenNeon.push({
+                id: String(r.id ?? ''),
+                title: String(r.title ?? ''),
+                img: '',
+                reason: 'Пустая ссылка в Neon',
+              });
             }
             continue;
           }
-          const cleanName = raw.split('?')[0].split('/').pop() || raw;
-          if (!r2Keys.has(raw) && !r2Basenames.has(cleanName)) {
-            if (missingSamples.length < 20) {
-              missingSamples.push({ id: String(r.id ?? ''), title: String(r.title ?? ''), issue: `Нет в R2 (из 1000): ${cleanName}` });
+          const cleanPath = raw.split('?')[0].replace(/^https?:\/\/[^/]+\//i, '').replace(/^\/+/, '');
+          const cleanName = cleanPath.split('/').pop() || cleanPath;
+          usedKeys.add(cleanPath);
+          usedBasenames.add(cleanName);
+
+          if (!r2Keys.has(cleanPath) && !r2Basenames.has(cleanName)) {
+            brokenNeonCount += 1;
+            if (brokenNeon.length < 40) {
+              brokenNeon.push({
+                id: String(r.id ?? ''),
+                title: String(r.title ?? ''),
+                img: cleanName,
+                reason: 'Файла нет в R2',
+              });
             }
           }
         }
 
-        const summaryRows = [
-          {
-            id: 'ИТОГО',
-            title: `Neon sneakers: ${snRows.length} · R2 проверено: ${r2Parsed.files.length}`,
-            issue: `Без фото: ${emptyImg} · Потенц. битых: ${missingSamples.length}`,
-          },
-          ...missingSamples,
-        ];
+        let orphanR2Count = 0;
+        const orphanR2: Array<{ key: string; size: number }> = [];
+        for (const f of allR2Files) {
+          const base = f.key.split('/').pop() || f.key;
+          if (!usedKeys.has(f.key) && !usedBasenames.has(base)) {
+            orphanR2Count += 1;
+            if (orphanR2.length < 40) {
+              orphanR2.push({ key: f.key, size: f.size });
+            }
+          }
+        }
 
         return res.status(200).json({
           ok: true,
           ms: Date.now() - t0,
-          columns: ['id', 'title', 'issue'],
-          rows: summaryRows,
+          r2Audit: {
+            neonCount: snRows.length,
+            r2Count: allR2Files.length,
+            emptyImgCount,
+            brokenNeonCount,
+            orphanR2Count,
+            idCol,
+            imgCol,
+            brokenNeon,
+            orphanR2,
+          },
+          columns: [],
+          rows: [],
         });
       }
 
       const presetQueries: Record<string, string> = {
         pro_owners:
-          'SELECT user_id, COUNT(DISTINCT product_id)::int AS modules, STRING_AGG(DISTINCT product_id, \', \') AS list FROM user_purchases GROUP BY user_id ORDER BY modules DESC LIMIT 50',
+          'SELECT user_id, COUNT(DISTINCT product_id)::int AS modules, STRING_AGG(DISTINCT product_id, \', \') AS list FROM user_purchases GROUP BY user_id ORDER BY modules DESC LIMIT 100',
         pro_dupes:
           'SELECT user_id, product_id, COUNT(*)::int AS duplicates FROM user_purchases GROUP BY user_id, product_id HAVING COUNT(*) > 1 LIMIT 50',
         today_activity:
@@ -817,11 +905,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         recent_orders:
           'SELECT * FROM orders ORDER BY 1 DESC LIMIT 25',
         top_brands:
-          'SELECT brand, COUNT(*)::int AS models FROM sneakers GROUP BY brand ORDER BY models DESC LIMIT 30',
+          'SELECT COALESCE(NULLIF(brand, \'\'), \'Без бренда\') AS brand, COUNT(*)::int AS models FROM sneakers GROUP BY COALESCE(NULLIF(brand, \'\'), \'Без бренда\') ORDER BY models DESC LIMIT 500',
         top_favorites:
-          'SELECT * FROM user_favorites ORDER BY 1 DESC LIMIT 25',
+          'SELECT * FROM user_favorites ORDER BY 1 DESC LIMIT 50',
         indexes_info:
-          'SELECT tablename AS table_name, indexname AS index_name FROM pg_indexes WHERE schemaname = \'public\' ORDER BY tablename, indexname LIMIT 50',
+          'SELECT tablename AS table_name, indexname AS index_name FROM pg_indexes WHERE schemaname = \'public\' ORDER BY tablename, indexname LIMIT 100',
       };
 
       const chosenSql = presetQueries[preset];
@@ -855,7 +943,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ ok: false, error: 'Изменяющие команды запрещены в консоли' });
       }
 
-      const wrapped = `SELECT * FROM (${rawSql}) AS _q LIMIT 50`;
+      const wrapped = `SELECT * FROM (${rawSql}) AS _q LIMIT 100`;
       const rows = await sql.query(wrapped);
       const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
       return res.status(200).json({ ok: true, ms: Date.now() - t0, columns, rows });
