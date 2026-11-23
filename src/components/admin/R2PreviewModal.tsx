@@ -276,7 +276,7 @@ export const R2PreviewModal: React.FC<R2PreviewModalProps> = ({
             <span>{formatShortDate(file.lastModified)}</span>
           </div>
 
-          {/* Tool 2: Neon Sneakers Link */}
+          {/* Neon Sneakers Link */}
           <div className="rounded-xl border border-white/[0.08] bg-[#0F0F0E] p-2.5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#DED7CC]">
@@ -294,13 +294,14 @@ export const R2PreviewModal: React.FC<R2PreviewModalProps> = ({
             </div>
 
             {neonMatches.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {neonMatches.map((m) => (
-                  <div key={m.id} className="text-[11px] font-mono text-[#E7E1D7] flex justify-between gap-2">
-                    <span className="truncate">
-                      {m.brand ? `[${m.brand}] ` : ''}{m.title}
-                    </span>
-                    <span className="text-[#8D867C] shrink-0">#{m.id}</span>
+                  <div key={m.id} className="space-y-0.5">
+                    <div className="text-[12px] text-[#F5F1EB] font-medium leading-snug break-words">
+                      {m.brand ? <span className="text-[#C9A86A]">[{m.brand}] </span> : null}
+                      {m.title}
+                    </div>
+                    <div className="text-[10px] font-mono text-[#8D867C] truncate">#{m.id}</div>
                   </div>
                 ))}
               </div>
@@ -338,7 +339,7 @@ export const R2PreviewModal: React.FC<R2PreviewModalProps> = ({
             )}
           </div>
 
-          {/* Tool 3: Safe Rename / Move */}
+          {/* Safe Rename / Move */}
           {showRename && (
             <div className="rounded-xl border border-[#C9A86A]/35 bg-[#15130E] p-2.5 space-y-2">
               <div className="text-[11px] font-semibold text-[#C9A86A]">Переименовать / Перенести в R2</div>
@@ -377,7 +378,7 @@ export const R2PreviewModal: React.FC<R2PreviewModalProps> = ({
             </div>
           )}
 
-          {/* Tool 6: Temporary Share Links */}
+          {/* Temporary Share Links */}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -410,7 +411,7 @@ export const R2PreviewModal: React.FC<R2PreviewModalProps> = ({
             <button
               type="button"
               onClick={async () => {
-                const modelName = keyToModelName(file.key);
+                const modelName = neonMatches[0]?.title?.trim() || keyToModelName(file.key);
                 await copyTextToClipboard(modelName);
                 showToast(`Скопировано: ${modelName}`);
               }}
@@ -457,4 +458,3 @@ export const R2PreviewModal: React.FC<R2PreviewModalProps> = ({
     </div>
   );
 };
-
