@@ -448,22 +448,22 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => handleVercelLogs(d.uid)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[#DED7CC]"
+                        className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[#DED7CC] whitespace-nowrap"
                       >
-                        <Terminal className="w-3 h-3 text-[#5B9BFF]" />
-                        {logsUid === d.uid ? 'Скрыть логи' : 'Логи'}
+                        <Terminal className="w-3 h-3 text-[#5B9BFF] shrink-0" />
+                        {logsUid === d.uid ? 'Скрыть' : 'Логи'}
                       </button>
                       <button
                         type="button"
                         disabled={Boolean(busyKey)}
                         onClick={() => handleVercelRedeploy(d)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-[#C9A86A]/35 px-2 py-1 text-[11px] text-[#C9A86A] disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#C9A86A]/35 px-2 py-1 text-[11px] text-[#C9A86A] whitespace-nowrap disabled:opacity-50"
                       >
-                        <RotateCcw className="w-3 h-3" /> Повторить
+                        <RotateCcw className="w-3 h-3 shrink-0" /> Повторить
                       </button>
                       {logsUid === d.uid && logsLines.length > 0 && (
                         <button
@@ -472,9 +472,9 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
                             await copyTextToClipboard(logsLines.join('\n'));
                             showToast('Лог скопирован');
                           }}
-                          className="ml-auto inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[#A8A095]"
+                          className="ml-auto inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[#A8A095] whitespace-nowrap"
                         >
-                          <Copy className="w-3 h-3" /> Копировать
+                          <Copy className="w-3 h-3 shrink-0" /> Копировать
                         </button>
                       )}
                     </div>
