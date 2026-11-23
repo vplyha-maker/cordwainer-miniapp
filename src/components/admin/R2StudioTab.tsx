@@ -76,6 +76,15 @@ function isImageKey(key: string): boolean {
   return /\.(webp|jpe?g|png|gif|avif|svg)$/i.test(key);
 }
 
+function keyToModelName(key: string): string {
+  const fileName = key.split('/').pop() || key;
+  return fileName
+    .replace(/\.[^.]+$/, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export const R2StudioTab: React.FC<R2StudioTabProps> = ({
   buildAuthHeaders,
   showToast,
@@ -515,7 +524,16 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
             ))}
 
             {r2.folders.length === 0 && r2.files.length === 0 && !loading && (
-              <div className="text-[12px] text-[#8D867C] text-center py-6">Файлы не найдены</div>
+              <div className="text-center py-6 space-y-1">
+                <div className="text-[12px] text-[#8D867C]">
+                  {search.trim() ? 'Файлы не найдены' : 'Папка пуста'}
+                </div>
+                {!search.trim() && prefix && (
+                  <div className="text-[11px] text-[#C9A86A]/80">
+                    Папка сохранится в R2 после загрузки первого файла
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -677,18 +695,22 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
               <input
                 ref={replaceInputRef}
                 type="file"
+                accept={isImageKey(preview.file.key) ? 'image/*' : undefined}
                 onChange={handleReplaceFile}
                 className="hidden"
               />
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  disabled={replacing}
-                  onClick={() => replaceInputRef.current?.click()}
-                  className="inline-flex items-center justify-center gap-1 rounded-xl bg-[#C9A86A] py-2 px-2 text-[12px] font-semibold text-[#121210] disabled:opacity-50"
+                  onClick={async () => {
+                    const modelName = keyToModelName(preview.file.key);
+                    await copyTextToClipboard(modelName);
+                    showToast(`Скопировано: ${modelName}`);
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 py-2 px-2.5 text-[12px] text-[#F5F1EB]"
                 >
-                  <Replace className="w-3.5 h-3.5" /> {replacing ? '...' : 'Заменить'}
+                  <Copy className="w-3.5 h-3.5" /> Название
                 </button>
                 <button
                   type="button"
@@ -696,14 +718,22 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
                     await copyTextToClipboard(preview.file.key);
                     showToast('Путь скопирован');
                   }}
-                  className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/15 py-2 px-2 text-[12px] text-[#F5F1EB]"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 py-2 px-2.5 text-[12px] text-[#F5F1EB]"
                 >
                   <Copy className="w-3.5 h-3.5" /> Путь
                 </button>
                 <button
                   type="button"
+                  disabled={replacing}
+                  onClick={() => replaceInputRef.current?.click()}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#C9A86A] py-2 px-2.5 text-[12px] font-semibold text-[#121210] disabled:opacity-50"
+                >
+                  <Replace className="w-3.5 h-3.5" /> {replacing ? '...' : 'Заменить'}
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleDeleteKey(preview.file.key)}
-                  className="inline-flex items-center justify-center gap-1 rounded-xl border border-[#F06A7E]/40 bg-[#F06A7E]/10 py-2 px-2 text-[12px] text-[#F06A7E]"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#F06A7E]/40 bg-[#F06A7E]/10 py-2 px-2.5 text-[12px] text-[#F06A7E]"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Удалить
                 </button>
@@ -715,4 +745,3 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
     </div>
   );
 };
-
