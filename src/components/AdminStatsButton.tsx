@@ -1,14 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as echarts from 'echarts';
 import {
-  Activity,
   BarChart3,
   Check,
   ChevronDown,
   Copy,
-  Database,
   Download,
-  ExternalLink,
   FileSpreadsheet,
   FileText,
   KeyRound,
@@ -27,6 +24,7 @@ import {
   DonutCard,
   PagesBarChart,
 } from './admin/AdminCharts';
+import { AdminSystemTab } from './admin/AdminSystemTab';
 import {
   buildExcelXml,
   buildPagesCsv,
@@ -43,7 +41,6 @@ import type {
   AdminTab,
   DayDetail,
   FilterPreset,
-  HealthData,
   UserProfile,
 } from './admin/types';
 import {
@@ -62,7 +59,6 @@ type TgWindow = {
   Telegram?: {
     WebApp?: {
       initData?: string;
-      openLink?: (url: string) => void;
     };
   };
 };
@@ -127,9 +123,7 @@ function loadPresets(): PresetList {
 export const AdminStatsButton: React.FC = () => {
   const [authMode, setAuthMode] = useState<AuthMode>('none');
   const [webToken, setWebToken] = useState<string>('');
-  const [mintingLink, setMintingLink] = useState<boolean>(false);
 
-  // One-time Telegram OTP login modal (shown ONLY on /#admin in browser)
   const [showOtpModal, setShowOtpModal] = useState<boolean>(false);
   const [otpChallengeId, setOtpChallengeId] = useState<string>('');
   const [otpCode, setOtpCode] = useState<string>('');
@@ -171,8 +165,6 @@ export const AdminStatsButton: React.FC = () => {
   const [userProfiles, setUserProfiles] = useState<UserProfileMap>({});
   const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [healthLoading, setHealthLoading] = useState<boolean>(false);
   const [previewModal, setPreviewModal] = useState<PreviewModalData | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -186,13 +178,9 @@ export const AdminStatsButton: React.FC = () => {
     (overrideToken?: string): Record<string, string> => {
       const headers: Record<string, string> = {};
       const initData = getTgInitData();
-      if (initData) {
-        headers['X-Telegram-Init-Data'] = initData;
-      }
+      if (initData) headers['X-Telegram-Init-Data'] = initData;
       const tok = overrideToken !== undefined ? overrideToken : webToken;
-      if (tok) {
-        headers['X-Admin-Token'] = tok;
-      }
+      if (tok) headers['X-Admin-Token'] = tok;
       return headers;
     },
     [webToken],
@@ -266,11 +254,8 @@ export const AdminStatsButton: React.FC = () => {
 
     const onHashChange = () => {
       if (hasAdminHash()) {
-        if (authMode === 'none') {
-          setShowOtpModal(true);
-        } else {
-          setOpen(true);
-        }
+        if (authMode === 'none') setShowOtpModal(true);
+        else setOpen(true);
       }
     };
     window.addEventListener('hashchange', onHashChange);
@@ -343,39 +328,6 @@ export const AdminStatsButton: React.FC = () => {
     setOpen(false);
   };
 
-  const handleMintChromeLink = async (mode: 'open' | 'copy') => {
-    if (authMode !== 'telegram') return;
-    setMintingLink(true);
-    try {
-      const r = await fetch('/api/check-purchase?action=web-token', {
-        method: 'POST',
-        headers: buildAuthHeaders(),
-      });
-      const data = (await r.json()) as { ok?: boolean; token?: string; error?: string };
-      if (!r.ok || !data.ok || !data.token) {
-        showToast(data.error || 'Не удалось создать ссылку');
-        return;
-      }
-      const magicUrl = `${window.location.origin}/#admin_token=${data.token}`;
-      if (mode === 'copy') {
-        const copied = await copyTextToClipboard(magicUrl);
-        showToast(copied ? 'Ссылка (12 ч) скопирована — вставьте в Chrome' : 'Не удалось скопировать');
-        return;
-      }
-      const tgWebApp = (window as unknown as TgWindow).Telegram?.WebApp;
-      if (tgWebApp && typeof tgWebApp.openLink === 'function') {
-        tgWebApp.openLink(magicUrl);
-        showToast('Открываю панель в Chrome...');
-      } else {
-        window.open(magicUrl, '_blank');
-      }
-    } catch {
-      showToast('Ошибка сети при выпуске ссылки');
-    } finally {
-      setMintingLink(false);
-    }
-  };
-
   const fetchStats = useCallback(async () => {
     if (authMode === 'none') return;
     setLoading(true);
@@ -402,33 +354,9 @@ export const AdminStatsButton: React.FC = () => {
     }
   }, [authMode, days, hideAdmin, buildAuthHeaders]);
 
-  const fetchHealth = useCallback(async () => {
-    if (authMode === 'none') return;
-    setHealthLoading(true);
-    try {
-      const r = await fetch('/api/check-purchase?action=health', {
-        headers: buildAuthHeaders(),
-      });
-      const data = (await r.json()) as HealthData;
-      if (r.ok && data.ok) setHealth(data);
-    } catch {
-      // ignore
-    } finally {
-      setHealthLoading(false);
-    }
-  }, [authMode, buildAuthHeaders]);
-
   useEffect(() => {
-    if (open && authMode !== 'none') {
-      fetchStats();
-    }
+    if (open && authMode !== 'none') fetchStats();
   }, [open, authMode, fetchStats]);
-
-  useEffect(() => {
-    if (open && tab === 'system' && authMode !== 'none') {
-      fetchHealth();
-    }
-  }, [open, tab, authMode, fetchHealth]);
 
   const handleSelectDay = useCallback(
     async (dayIso: string) => {
@@ -437,9 +365,7 @@ export const AdminStatsButton: React.FC = () => {
         const url = `/api/check-purchase?action=day&date=${encodeURIComponent(dayIso)}&hideAdmin=${hideAdmin ? '1' : '0'}`;
         const r = await fetch(url, { headers: buildAuthHeaders() });
         const data = (await r.json()) as DayDetail & { ok?: boolean };
-        if (r.ok && data.ok) {
-          setDayDetail(data);
-        }
+        if (r.ok && data.ok) setDayDetail(data);
       } catch {
         showToast('Не удалось загрузить детализацию дня');
       } finally {
@@ -561,7 +487,7 @@ export const AdminStatsButton: React.FC = () => {
         setPreviewModal({
           title: 'Отчёт CORDWAINE (для Telegram)',
           content: buildReportSummaryText(stats, days),
-          hint: 'Telegram WebView блокирует печать. Скопируйте отчёт ниже или откройте панель в Chrome (вкладка «Система» → «Открыть в Chrome»).',
+          hint: 'Telegram WebView блокирует печать. Скопируйте отчёт ниже или откройте панель в Chrome.',
         });
       }
       return;
@@ -670,7 +596,6 @@ export const AdminStatsButton: React.FC = () => {
   const selectedProductObj =
     PRO_CATALOG.find((p) => p.id === crmProduct) || PRO_CATALOG[0];
 
-  // One-time Telegram OTP Modal on /#admin (zero static password!)
   if (authMode === 'none') {
     if (!showOtpModal) return null;
     return (
@@ -860,10 +785,7 @@ export const AdminStatsButton: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        fetchStats();
-                        if (tab === 'system') fetchHealth();
-                      }}
+                      onClick={fetchStats}
                       title="Обновить"
                       className="p-2 rounded-xl border border-[#C9A86A]/35 bg-[#C9A86A]/10 text-[#C9A86A]"
                     >
@@ -1063,7 +985,7 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 )}
 
-                {!stats && loading && (
+                {!stats && loading && tab !== 'system' && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {[1, 2, 3, 4].map((i) => (
                       <div key={i} className="h-24 rounded-2xl bg-white/[0.04] animate-pulse" />
@@ -1558,9 +1480,7 @@ export const AdminStatsButton: React.FC = () => {
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-[13px] font-semibold text-[#F5F1EB] truncate">
-                                      {u.username
-                                        ? `@${u.username}`
-                                        : u.first_name || 'Guest'}
+                                      {u.username ? `@${u.username}` : u.first_name || 'Guest'}
                                     </span>
                                     {u.pro_count > 0 && (
                                       <span className="rounded-md bg-[#3FD08F]/15 px-1.5 py-0.5 text-[10px] font-mono text-[#3FD08F]">
@@ -1653,14 +1573,14 @@ export const AdminStatsButton: React.FC = () => {
                       <div>
                         <div className="text-[14px] font-semibold">Журнал действий администратора</div>
                         <div className="text-[11px] text-[#8D867C]">
-                          Выдача PRO, блокировки и входы в Chrome из Neon
+                          PRO, блокировки, R2 и входы в Chrome
                         </div>
                       </div>
                     </div>
 
                     {stats.auditLog.length === 0 ? (
                       <div className="text-[12px] text-[#8D867C] py-6 text-center">
-                        Пока нет записей. Любая операция в «PRO · CRM» или вход в Chrome появится здесь.
+                        Пока нет записей.
                       </div>
                     ) : (
                       <div className="divide-y divide-white/[0.06]">
@@ -1679,7 +1599,7 @@ export const AdminStatsButton: React.FC = () => {
                                 >
                                   {entry.event}
                                 </span>{' '}
-                                → #{entry.target}
+                                → {entry.target}
                               </div>
                               <div className="text-[11px] text-[#8D867C] truncate">
                                 {entry.meta || '—'} · via {entry.via}
@@ -1695,124 +1615,13 @@ export const AdminStatsButton: React.FC = () => {
                   </div>
                 )}
 
-                {/* TAB 6: SYSTEM HEALTH + CHROME LAUNCH */}
+                {/* TAB 6: SYSTEM (HEALTH + NEON EXPLORER + CLOUDFLARE R2) */}
                 {tab === 'system' && (
-                  <div className="space-y-3">
-                    {authMode === 'telegram' && (
-                      <div className="rounded-2xl border border-[#C9A86A]/35 bg-[#15130E] p-4 space-y-3">
-                        <div className="flex items-start gap-2.5">
-                          <ExternalLink className="w-4 h-4 text-[#C9A86A] shrink-0 mt-0.5" />
-                          <div>
-                            <div className="text-[14px] font-semibold text-[#F5F1EB]">
-                              Вход с ПК / Chrome (без пароля)
-                            </div>
-                            <div className="text-[12px] text-[#A8A095] mt-0.5">
-                              На ПК откройте <span className="font-mono text-[#C9A86A]">cordwaine.app/#admin</span> — бот пришлёт одноразовый 6-значный код прямо сюда (2 мин, макс. 3 попытки). Или откройте Chrome прямо с телефона:
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            disabled={mintingLink}
-                            onClick={() => handleMintChromeLink('open')}
-                            className="flex items-center justify-center gap-2 rounded-xl bg-[#C9A86A] py-2.5 px-3 text-[13px] font-semibold text-[#121210] disabled:opacity-50"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            {mintingLink ? 'Создание...' : 'Открыть в Chrome'}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={mintingLink}
-                            onClick={() => handleMintChromeLink('copy')}
-                            className="flex items-center justify-center gap-2 rounded-xl border border-[#C9A86A]/40 bg-white/[0.04] py-2.5 px-3 text-[13px] font-semibold text-[#F5F1EB] disabled:opacity-50"
-                          >
-                            <Copy className="w-4 h-4 text-[#C9A86A]" />
-                            Скопировать ссылку (12 ч)
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Database className="w-4 h-4 text-[#3FD08F]" />
-                          <span className="text-[14px] font-semibold">Состояние Neon PostgreSQL</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={fetchHealth}
-                          className="rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-[#C9A86A]"
-                        >
-                          {healthLoading ? 'Пинг...' : 'Проверить'}
-                        </button>
-                      </div>
-
-                      {health ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
-                            <div className="text-[11px] text-[#8D867C]">Задержка БД</div>
-                            <div className="text-[18px] font-bold font-mono text-[#3FD08F] mt-1">
-                              {health.latencyMs} мс
-                            </div>
-                          </div>
-                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
-                            <div className="text-[11px] text-[#8D867C]">app_events</div>
-                            <div className="text-[18px] font-bold font-mono text-[#F5F1EB] mt-1">
-                              {health.eventsCount}
-                            </div>
-                          </div>
-                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
-                            <div className="text-[11px] text-[#8D867C]">user_purchases</div>
-                            <div className="text-[18px] font-bold font-mono text-[#C9A86A] mt-1">
-                              {health.purchasesCount}
-                            </div>
-                          </div>
-                          <div className="rounded-xl bg-[#0F0F0E] border border-white/[0.06] p-3">
-                            <div className="text-[11px] text-[#8D867C]">banned_users</div>
-                            <div className="text-[18px] font-bold font-mono text-[#F06A7E] mt-1">
-                              {health.bannedCount}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-[12px] text-[#8D867C]">Загрузка телеметрии...</div>
-                      )}
-
-                      {health && (
-                        <div className="mt-3 pt-3 border-t border-white/[0.07] space-y-1.5 text-[12px] text-[#BDB6AC]">
-                          <div className="flex justify-between">
-                            <span>Последнее событие:</span>
-                            <span className="font-mono text-[#F5F1EB]">
-                              {health.lastEventAt ? formatShortDate(health.lastEventAt) : '—'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>ADMIN_TELEGRAM_ID:</span>
-                            <span className={health.adminIdConfigured ? 'text-[#3FD08F]' : 'text-[#F06A7E]'}>
-                              {health.adminIdConfigured ? 'Настроен' : 'Не задан'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Вход с ПК (Telegram OTP):</span>
-                            <span className={health.webKeyConfigured ? 'text-[#3FD08F]' : 'text-[#F06A7E]'}>
-                              {health.webKeyConfigured ? 'Активен (/#admin)' : 'Нет BOT_TOKEN'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {authMode === 'web' && (
-                      <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-4 text-[12px] text-[#A8A095] flex items-start gap-2.5">
-                        <Activity className="w-4 h-4 text-[#3FD08F] shrink-0 mt-0.5" />
-                        <div>
-                          Вы вошли в Chrome по крипто-сессии (действует 12 часов). В Chrome работают прямое скачивание CSV/Excel, печать PDF и широкая десктоп-панель.
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <AdminSystemTab
+                    authMode={authMode}
+                    buildAuthHeaders={buildAuthHeaders}
+                    showToast={showToast}
+                  />
                 )}
               </div>
             </div>
