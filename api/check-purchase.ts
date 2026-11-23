@@ -134,7 +134,7 @@ async function r2SignedFetch(
   });
 }
 
-function r2PresignPut(cfg: R2Config, key: string): string {
+function r2PresignUrl(cfg: R2Config, method: 'GET' | 'PUT', key: string, expiresSec = 300): string {
   const host = `${cfg.accountId}.r2.cloudflarestorage.com`;
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
@@ -146,7 +146,7 @@ function r2PresignPut(cfg: R2Config, key: string): string {
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
     'X-Amz-Credential': `${cfg.accessKeyId}/${scope}`,
     'X-Amz-Date': amzDate,
-    'X-Amz-Expires': '300',
+    'X-Amz-Expires': String(expiresSec),
     'X-Amz-SignedHeaders': 'host',
   };
 
@@ -156,7 +156,7 @@ function r2PresignPut(cfg: R2Config, key: string): string {
     .join('&');
 
   const canonicalRequest = [
-    'PUT',
+    method,
     canonicalUri,
     canonicalQuery,
     `host:${host}\n`,
@@ -214,6 +214,23 @@ function parseR2ListXml(xml: string) {
   const nextToken = nextM ? decodeXml(nextM[1]) : '';
 
   return { folders, files, isTruncated, nextToken };
+}
+
+async function listAllR2Objects(cfg: R2Config, prefix = '') {
+  const allFiles: Array<{ key: string; size: number; lastModified: string }> = [];
+  let token = '';
+  for (let i = 0; i < 10; i += 1) {
+    const q: Record<string, string> = { 'list-type': '2', 'max-keys': '1000' };
+    if (prefix) q.prefix = prefix;
+    if (token) q['continuation-token'] = token;
+    const resp = await r2SignedFetch(cfg, 'GET', '', q);
+    if (!resp.ok) throw new Error(`R2 status ${resp.status}`);
+    const parsed = parseR2ListXml(await resp.text());
+    for (const f of parsed.files) allFiles.push(f);
+    if (!parsed.isTruncated || !parsed.nextToken) break;
+    token = parsed.nextToken;
+  }
+  return allFiles;
 }
 
 function parseMetaObj(meta: unknown): Record<string, unknown> {
@@ -445,7 +462,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // --- NEON STUDIO: BROWSER (COMPOSITE PK SAFE + SEARCH + SORT + PAGINATION) ---
+    // --- NEON STUDIO: BROWSER ---
     if (action === 'db-rows') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -530,7 +547,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // --- NEON STUDIO: EXPORT TABLE BACKUP ---
     if (action === 'db-export') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -547,7 +563,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, table: safeTable, columns, rows });
     }
 
-    // --- NEON STUDIO: COMPOSITE-PK SAFE ROW UPDATE ---
     if (action === 'db-update' && req.method === 'POST') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -582,9 +597,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const validCols = new Set(cols.map((c) => String(c.column_name)));
       const pkCols = pkRows.map((p) => String(p.column_name));
-      if (pkCols.length === 0) {
-        return res.status(400).json({ ok: false, error: 'У таблицы нет Primary Key' });
-      }
+      if (pkCols.length === 0) return res.status(400).json({ ok: false, error: 'У таблицы нет Primary Key' });
+
       for (const pk of pkCols) {
         if (pkValues[pk] === undefined || pkValues[pk] === null) {
           return res.status(400).json({ ok: false, error: `Отсутствует значение ключа ${pk}` });
@@ -626,7 +640,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
-    // --- NEON STUDIO: COMPOSITE-PK SAFE ROW DELETE ---
     if (action === 'db-delete' && req.method === 'POST') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -652,9 +665,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ORDER BY kcu.ordinal_position ASC
       `;
       const pkCols = pkRows.map((p) => String(p.column_name));
-      if (pkCols.length === 0) {
-        return res.status(400).json({ ok: false, error: 'У таблицы нет Primary Key' });
-      }
+      if (pkCols.length === 0) return res.status(400).json({ ok: false, error: 'У таблицы нет Primary Key' });
 
       const params: unknown[] = [];
       const whereParts: string[] = [];
@@ -684,7 +695,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
-    // --- NEON STUDIO: NO-CODE VISUAL QUERY BUILDER ---
     if (action === 'db-builder' && req.method === 'POST') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -746,15 +756,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
       const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
 
-      return res.status(200).json({
-        ok: true,
-        ms: Date.now() - t0,
-        columns,
-        rows,
-      });
+      return res.status(200).json({ ok: true, ms: Date.now() - t0, columns, rows });
     }
 
-    // --- NEON STUDIO: 1-TAP PRO QUICK COMMANDS + FULL 2-WAY R2 AUDIT ---
     if (action === 'db-preset' && req.method === 'POST') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -795,30 +799,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const nameCol = colList.find((c) => /name|title|model/i.test(c)) || colList[0];
         const idCol = colList.includes('id') ? 'id' : colList[0];
 
-        // Paginate ALL objects in R2 bucket via NextContinuationToken (up to 10 pages = 10,000 files)
-        const allR2Files: Array<{ key: string; size: number }> = [];
-        let token = '';
-        for (let pageIdx = 0; pageIdx < 10; pageIdx += 1) {
-          const q: Record<string, string> = { 'list-type': '2', 'max-keys': '1000' };
-          if (token) q['continuation-token'] = token;
-          const r2Resp = await r2SignedFetch(cfg, 'GET', '', q);
-          if (!r2Resp.ok) {
-            return res.status(502).json({ ok: false, error: `Ошибка чтения R2 (${r2Resp.status})` });
-          }
-          const parsed = parseR2ListXml(await r2Resp.text());
-          for (const f of parsed.files) {
-            allR2Files.push({ key: f.key, size: f.size });
-          }
-          if (!parsed.isTruncated || !parsed.nextToken) break;
-          token = parsed.nextToken;
-        }
-
+        const allR2Files = await listAllR2Objects(cfg);
         const r2Keys = new Set<string>();
         const r2Basenames = new Set<string>();
         for (const f of allR2Files) {
           r2Keys.add(f.key);
-          const base = f.key.split('/').pop() || f.key;
-          r2Basenames.add(base);
+          r2Basenames.add(f.key.split('/').pop() || f.key);
         }
 
         const selectCols = imgCol
@@ -837,12 +823,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!raw) {
             emptyImgCount += 1;
             if (brokenNeon.length < 40) {
-              brokenNeon.push({
-                id: String(r.id ?? ''),
-                title: String(r.title ?? ''),
-                img: '',
-                reason: 'Пустая ссылка в Neon',
-              });
+              brokenNeon.push({ id: String(r.id ?? ''), title: String(r.title ?? ''), img: '', reason: 'Пустая ссылка в Neon' });
             }
             continue;
           }
@@ -854,12 +835,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!r2Keys.has(cleanPath) && !r2Basenames.has(cleanName)) {
             brokenNeonCount += 1;
             if (brokenNeon.length < 40) {
-              brokenNeon.push({
-                id: String(r.id ?? ''),
-                title: String(r.title ?? ''),
-                img: cleanName,
-                reason: 'Файла нет в R2',
-              });
+              brokenNeon.push({ id: String(r.id ?? ''), title: String(r.title ?? ''), img: cleanName, reason: 'Файла нет в R2' });
             }
           }
         }
@@ -870,9 +846,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const base = f.key.split('/').pop() || f.key;
           if (!usedKeys.has(f.key) && !usedBasenames.has(base)) {
             orphanR2Count += 1;
-            if (orphanR2.length < 40) {
-              orphanR2.push({ key: f.key, size: f.size });
-            }
+            if (orphanR2.length < 40) orphanR2.push({ key: f.key, size: f.size });
           }
         }
 
@@ -902,12 +876,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'SELECT user_id, product_id, COUNT(*)::int AS duplicates FROM user_purchases GROUP BY user_id, product_id HAVING COUNT(*) > 1 LIMIT 50',
         today_activity:
           'SELECT source, page, COUNT(*)::int AS events, COUNT(DISTINCT user_id)::int AS users FROM app_events WHERE created_at >= CURRENT_DATE AND source IN (\'telegram\', \'web\') GROUP BY source, page ORDER BY events DESC LIMIT 50',
-        recent_orders:
-          'SELECT * FROM orders ORDER BY 1 DESC LIMIT 25',
+        recent_orders: 'SELECT * FROM orders ORDER BY 1 DESC LIMIT 25',
         top_brands:
           'SELECT COALESCE(NULLIF(brand, \'\'), \'Без бренда\') AS brand, COUNT(*)::int AS models FROM sneakers GROUP BY COALESCE(NULLIF(brand, \'\'), \'Без бренда\') ORDER BY models DESC LIMIT 500',
-        top_favorites:
-          'SELECT * FROM user_favorites ORDER BY 1 DESC LIMIT 50',
+        top_favorites: 'SELECT * FROM user_favorites ORDER BY 1 DESC LIMIT 50',
         indexes_info:
           'SELECT tablename AS table_name, indexname AS index_name FROM pg_indexes WHERE schemaname = \'public\' ORDER BY tablename, indexname LIMIT 100',
       };
@@ -917,12 +889,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const rows = await sql.query(chosenSql);
       const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
-      return res.status(200).json({
-        ok: true,
-        ms: Date.now() - t0,
-        columns,
-        rows,
-      });
+      return res.status(200).json({ ok: true, ms: Date.now() - t0, columns, rows });
     }
 
     if (action === 'db-sql' && req.method === 'POST') {
@@ -933,9 +900,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const body = (req.body || {}) as Record<string, unknown>;
       const rawSql = String(body.query || '').trim().replace(/;+\s*$/, '');
       if (!rawSql) return res.status(400).json({ ok: false, error: 'Введите SELECT-запрос' });
-      if (rawSql.includes(';')) {
-        return res.status(400).json({ ok: false, error: 'Разрешён только один SELECT-запрос' });
-      }
+      if (rawSql.includes(';')) return res.status(400).json({ ok: false, error: 'Разрешён только один SELECT-запрос' });
       if (!/^(SELECT|WITH)\b/i.test(rawSql)) {
         return res.status(400).json({ ok: false, error: 'Консоль работает только на чтение (SELECT)' });
       }
@@ -979,7 +944,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, error: 'Неизвестный режим очистки' });
     }
 
-    // --- CLOUDFLARE R2 MANAGER ---
+    // --- CLOUDFLARE R2 STUDIO ---
     if (action === 'r2-list') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -994,16 +959,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           publicUrl: cfg.publicUrl,
           folders: [],
           files: [],
+          isTruncated: false,
+          nextToken: '',
         });
       }
 
       const prefix = String(req.query.prefix || '').trim();
+      const search = String(req.query.search || '').trim().toLowerCase();
+      const continuationToken = String(req.query.token || '').trim();
+
+      if (search) {
+        const allFiles = await listAllR2Objects(cfg, prefix);
+        const matched = allFiles.filter((f) => f.key.toLowerCase().includes(search));
+        const limited = matched.slice(0, 100);
+        const totalSize = matched.reduce((sum, f) => sum + f.size, 0);
+        return res.status(200).json({
+          ok: true,
+          configured: true,
+          missing: [],
+          bucket: cfg.bucket,
+          publicUrl: cfg.publicUrl,
+          prefix,
+          searchTotal: matched.length,
+          totalSize,
+          folders: [],
+          files: limited,
+          isTruncated: false,
+          nextToken: '',
+        });
+      }
+
       const queryObj: Record<string, string> = {
         'list-type': '2',
         delimiter: '/',
         'max-keys': '100',
       };
       if (prefix) queryObj.prefix = prefix;
+      if (continuationToken) queryObj['continuation-token'] = continuationToken;
 
       const r2Resp = await r2SignedFetch(cfg, 'GET', '', queryObj);
       if (!r2Resp.ok) {
@@ -1014,8 +1006,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      const xml = await r2Resp.text();
-      const parsed = parseR2ListXml(xml);
+      const parsed = parseR2ListXml(await r2Resp.text());
       const totalSize = parsed.files.reduce((sum, f) => sum + f.size, 0);
 
       return res.status(200).json({
@@ -1028,6 +1019,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         totalSize,
         folders: parsed.folders,
         files: parsed.files,
+        isTruncated: parsed.isTruncated,
+        nextToken: parsed.nextToken,
+      });
+    }
+
+    if (action === 'r2-view') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const cfg = getR2Config();
+      if (cfg.missing.length > 0) return res.status(400).json({ ok: false, error: 'R2 не настроен' });
+      const key = String(req.query.key || '').trim();
+      if (!key) return res.status(400).json({ ok: false, error: 'Не указан ключ файла' });
+
+      const url = r2PresignUrl(cfg, 'GET', key, 300);
+      return res.status(200).json({ ok: true, key, url, ttlSec: 300 });
+    }
+
+    if (action === 'r2-stats' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const cfg = getR2Config();
+      if (cfg.missing.length > 0) return res.status(400).json({ ok: false, error: 'R2 не настроен' });
+
+      const t0 = Date.now();
+      const allFiles = await listAllR2Objects(cfg);
+      let totalBytes = 0;
+      const extMap: Record<string, { count: number; bytes: number }> = {};
+
+      for (const f of allFiles) {
+        totalBytes += f.size;
+        const name = f.key.split('/').pop() || '';
+        const dot = name.lastIndexOf('.');
+        const ext = dot > 0 ? name.slice(dot + 1).toLowerCase().slice(0, 8) : 'other';
+        if (!extMap[ext]) extMap[ext] = { count: 0, bytes: 0 };
+        extMap[ext].count += 1;
+        extMap[ext].bytes += f.size;
+      }
+
+      const formats = Object.keys(extMap)
+        .map((ext) => ({ ext, count: extMap[ext].count, bytes: extMap[ext].bytes }))
+        .sort((a, b) => b.bytes - a.bytes);
+
+      const largest = [...allFiles].sort((a, b) => b.size - a.size).slice(0, 20);
+      const newest = [...allFiles]
+        .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
+        .slice(0, 20);
+
+      return res.status(200).json({
+        ok: true,
+        ms: Date.now() - t0,
+        bucket: cfg.bucket,
+        totalFiles: allFiles.length,
+        totalBytes,
+        formats,
+        largest,
+        newest,
       });
     }
 
@@ -1069,7 +1118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const rawKey = String(body.key || '').trim().replace(/^\/+/, '');
       if (!rawKey) return res.status(400).json({ ok: false, error: 'Не указано имя файла' });
 
-      const uploadUrl = r2PresignPut(cfg, rawKey);
+      const uploadUrl = r2PresignUrl(cfg, 'PUT', rawKey, 300);
       return res.status(200).json({
         ok: true,
         key: rawKey,
@@ -1138,9 +1187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'otp-verify' && req.method === 'POST') {
       const adminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
       const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
-      if (!adminId || !botToken) {
-        return res.status(500).json({ ok: false, error: 'Сервер не настроен' });
-      }
+      if (!adminId || !botToken) return res.status(500).json({ ok: false, error: 'Сервер не настроен' });
 
       const body = (req.body || {}) as Record<string, unknown>;
       const challengeId = String(body.challengeId || '').trim();
@@ -1180,10 +1227,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ]);
 
       if (usedRows.length > 0 || Number(failRows[0]?.cnt || 0) >= 3 || sentRows.length === 0) {
-        return res.status(403).json({
-          ok: false,
-          error: 'Код больше не действителен. Запросите новый.',
-        });
+        return res.status(403).json({ ok: false, error: 'Код больше не действителен. Запросите новый.' });
       }
 
       const metaObj = parseMetaObj(sentRows[0].meta);
@@ -1191,10 +1235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const savedSig = String(metaObj.sig || '');
 
       if (!Number.isFinite(expMs) || Date.now() > expMs || !/^[0-9a-f]{64}$/i.test(savedSig)) {
-        return res.status(403).json({
-          ok: false,
-          error: 'Срок действия кода (2 мин) истёк. Запросите новый.',
-        });
+        return res.status(403).json({ ok: false, error: 'Срок действия кода (2 мин) истёк. Запросите новый.' });
       }
 
       const candidateSig = computeOtpSig(botToken, challengeId, expMs, code);
@@ -1233,19 +1274,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('audit otp login log error:', logErr);
       }
 
-      return res.status(200).json({
-        ok: true,
-        token,
-        expiresAt: new Date(sessionExp).toISOString(),
-        ttlHours: 12,
-      });
+      return res.status(200).json({ ok: true, token, expiresAt: new Date(sessionExp).toISOString(), ttlHours: 12 });
     }
 
     if (action === 'web-token' && req.method === 'POST') {
       const tgAuth = authorizeTelegramOnly(req);
-      if (!tgAuth.ok) {
-        return res.status(403).json({ ok: false, error: 'Выпуск ссылки доступен только из Telegram' });
-      }
+      if (!tgAuth.ok) return res.status(403).json({ ok: false, error: 'Выпуск ссылки доступен только из Telegram' });
       const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
       const { token, expMs } = createWebSessionToken(tgAuth.adminId, botToken);
 
@@ -1259,12 +1293,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('audit web-token log error:', logErr);
       }
 
-      return res.status(200).json({
-        ok: true,
-        token,
-        expiresAt: new Date(expMs).toISOString(),
-        ttlHours: 12,
-      });
+      return res.status(200).json({ ok: true, token, expiresAt: new Date(expMs).toISOString(), ttlHours: 12 });
     }
 
     if (action === 'track' && req.method === 'POST') {
@@ -1281,9 +1310,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (!userId) return res.status(200).json({ ok: true, banned: false });
 
-      const banRows = await sql`
-        SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
-      `;
+      const banRows = await sql`SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1`;
       if (banRows.length > 0) {
         return res.status(200).json({
           ok: true,
@@ -1404,15 +1431,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const iso = d.toISOString().slice(0, 10);
         const dd = String(d.getUTCDate()).padStart(2, '0');
         const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-        daily.push(
-          dailyMap[iso] || {
-            day_iso: iso,
-            label: `${dd}.${mm}`,
-            tg: 0,
-            web: 0,
-            events: 0,
-          },
-        );
+        daily.push(dailyMap[iso] || { day_iso: iso, label: `${dd}.${mm}`, tg: 0, web: 0, events: 0 });
       }
 
       const pagesRows = await sql`
@@ -1525,10 +1544,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
 
       const bannedRows = await sql`
-        SELECT user_id, reason, created_at
-        FROM banned_users
-        ORDER BY created_at DESC
-        LIMIT 50
+        SELECT user_id, reason, created_at FROM banned_users ORDER BY created_at DESC LIMIT 50
       `;
 
       const auditRows = await sql`
@@ -1541,12 +1557,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const cur = summaryRows[0] || { tg_unique: 0, web_unique: 0, total_events: 0 };
       const prev = prevSummaryRows[0] || { tg_unique: 0, web_unique: 0, total_events: 0 };
-      const ret = retentionRows[0] || {
-        new_users: 0,
-        returning_users: 0,
-        retained_30d: 0,
-        total_30d: 0,
-      };
+      const ret = retentionRows[0] || { new_users: 0, returning_users: 0, retained_30d: 0, total_30d: 0 };
 
       const totalUnique = Number(cur.tg_unique || 0) + Number(cur.web_unique || 0);
       const retentionPct =
@@ -1588,14 +1599,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           users: Number(r.users || 0),
           count: Number(r.count || 0),
         })),
-        languages: langRows.map((r) => ({
-          name: String(r.name),
-          value: Number(r.value || 0),
-        })),
-        platforms: platformRows.map((r) => ({
-          name: String(r.name),
-          value: Number(r.value || 0),
-        })),
+        languages: langRows.map((r) => ({ name: String(r.name), value: Number(r.value || 0) })),
+        platforms: platformRows.map((r) => ({ name: String(r.name), value: Number(r.value || 0) })),
         proBreakdown,
         users: usersRows.map((r) => ({
           user_id: String(r.user_id),
@@ -1632,9 +1637,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
       const dateStr = String(req.query.date || '').trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        return res.status(400).json({ ok: false, error: 'Invalid date' });
-      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return res.status(400).json({ ok: false, error: 'Invalid date' });
       const hideAdmin = String(req.query.hideAdmin || '1') !== '0';
       const excludeId = hideAdmin && auth.adminId ? auth.adminId : '__none__';
 
@@ -1745,12 +1748,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ORDER BY created_at DESC
           LIMIT 25
         `,
-        sql`
-          SELECT product_id FROM user_purchases WHERE user_id::text = ${targetId}
-        `,
-        sql`
-          SELECT reason, created_at FROM banned_users WHERE user_id = ${targetId} LIMIT 1
-        `,
+        sql`SELECT product_id FROM user_purchases WHERE user_id::text = ${targetId}`,
+        sql`SELECT reason, created_at FROM banned_users WHERE user_id = ${targetId} LIMIT 1`,
         sql`
           SELECT event, meta, created_at
           FROM app_events
@@ -1789,9 +1788,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const productId = String(body.productId || '').trim();
       const mode = body.mode === 'revoke' ? 'revoke' : 'grant';
 
-      if (!targetId || !productId) {
-        return res.status(400).json({ ok: false, error: 'Укажите ID пользователя и модуль' });
-      }
+      if (!targetId || !productId) return res.status(400).json({ ok: false, error: 'Укажите ID пользователя и модуль' });
 
       const targets = productId === 'all' ? ALL_CORE_PRO_IDS : [productId];
 
@@ -1801,16 +1798,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             SELECT 1 FROM user_purchases WHERE user_id::text = ${targetId} AND product_id = ${pid} LIMIT 1
           `;
           if (exists.length === 0) {
-            await sql`
-              INSERT INTO user_purchases (user_id, product_id) VALUES (${targetId}, ${pid})
-            `;
+            await sql`INSERT INTO user_purchases (user_id, product_id) VALUES (${targetId}, ${pid})`;
           }
         }
       } else {
         for (const pid of targets) {
-          await sql`
-            DELETE FROM user_purchases WHERE user_id::text = ${targetId} AND product_id = ${pid}
-          `;
+          await sql`DELETE FROM user_purchases WHERE user_id::text = ${targetId} AND product_id = ${pid}`;
         }
       }
 
@@ -1871,9 +1864,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!userId) return res.status(200).json({ purchased: false, banned: false });
 
-    const banCheck = await sql`
-      SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
-    `;
+    const banCheck = await sql`SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1`;
     if (banCheck.length > 0) {
       return res.status(200).json({
         purchased: false,
