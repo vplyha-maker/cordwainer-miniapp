@@ -25,12 +25,192 @@ const ALL_CORE_PRO_IDS = [
 
 const WEB_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const OTP_TTL_MS = 2 * 60 * 1000;
+const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
 type AuthResult = {
   ok: boolean;
   adminId: string;
   via: 'telegram' | 'web' | 'none';
 };
+
+type R2Config = {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  publicUrl: string;
+  missing: string[];
+};
+
+function getR2Config(): R2Config {
+  const accountId = (process.env.R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const accessKeyId = (process.env.R2_ACCESS_KEY_ID || process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || '').trim();
+  const secretAccessKey = (process.env.R2_SECRET_ACCESS_KEY || process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || '').trim();
+  const bucket = (process.env.R2_BUCKET_NAME || process.env.CLOUDFLARE_R2_BUCKET || '').trim();
+  const publicUrl = (process.env.R2_PUBLIC_URL || process.env.VITE_R2_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+
+  const missing: string[] = [];
+  if (!accountId) missing.push('R2_ACCOUNT_ID');
+  if (!accessKeyId) missing.push('R2_ACCESS_KEY_ID');
+  if (!secretAccessKey) missing.push('R2_SECRET_ACCESS_KEY');
+  if (!bucket) missing.push('R2_BUCKET_NAME');
+
+  return { accountId, accessKeyId, secretAccessKey, bucket, publicUrl, missing };
+}
+
+function sha256Hex(str: string): string {
+  return crypto.createHash('sha256').update(str, 'utf8').digest('hex');
+}
+
+function hmacBin(key: Buffer | string, data: string): Buffer {
+  return crypto.createHmac('sha256', key).update(data, 'utf8').digest();
+}
+
+function r2Encode(s: string): string {
+  return encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function r2EncodePath(pathStr: string): string {
+  return pathStr
+    .split('/')
+    .map((seg) => r2Encode(seg))
+    .join('/');
+}
+
+function getSigningKey(secretKey: string, dateStamp: string): Buffer {
+  const kDate = hmacBin(`AWS4${secretKey}`, dateStamp);
+  const kRegion = hmacBin(kDate, 'auto');
+  const kService = hmacBin(kRegion, 's3');
+  return hmacBin(kService, 'aws4_request');
+}
+
+async function r2SignedFetch(
+  cfg: R2Config,
+  method: 'GET' | 'DELETE',
+  key: string,
+  queryObj: Record<string, string>,
+): Promise<Response> {
+  const host = `${cfg.accountId}.r2.cloudflarestorage.com`;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+
+  const canonicalUri = key
+    ? `/${r2Encode(cfg.bucket)}/${r2EncodePath(key)}`
+    : `/${r2Encode(cfg.bucket)}`;
+
+  const queryKeys = Object.keys(queryObj).sort();
+  const canonicalQuery = queryKeys
+    .map((k) => `${r2Encode(k)}=${r2Encode(queryObj[k])}`)
+    .join('&');
+
+  const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${EMPTY_SHA256}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaders,
+    EMPTY_SHA256,
+  ].join('\n');
+
+  const scope = `${dateStamp}/auto/s3/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
+  const sig = crypto
+    .createHmac('sha256', getSigningKey(cfg.secretAccessKey, dateStamp))
+    .update(stringToSign, 'utf8')
+    .digest('hex');
+
+  const url = `https://${host}${canonicalUri}${canonicalQuery ? `?${canonicalQuery}` : ''}`;
+  return fetch(url, {
+    method,
+    headers: {
+      Host: host,
+      'x-amz-content-sha256': EMPTY_SHA256,
+      'x-amz-date': amzDate,
+      Authorization: `AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${sig}`,
+    },
+  });
+}
+
+function r2PresignPut(cfg: R2Config, key: string): string {
+  const host = `${cfg.accountId}.r2.cloudflarestorage.com`;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const scope = `${dateStamp}/auto/s3/aws4_request`;
+  const canonicalUri = `/${r2Encode(cfg.bucket)}/${r2EncodePath(key)}`;
+
+  const queryObj: Record<string, string> = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${cfg.accessKeyId}/${scope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': '300',
+    'X-Amz-SignedHeaders': 'host',
+  };
+
+  const canonicalQuery = Object.keys(queryObj)
+    .sort()
+    .map((k) => `${r2Encode(k)}=${r2Encode(queryObj[k])}`)
+    .join('&');
+
+  const canonicalRequest = [
+    'PUT',
+    canonicalUri,
+    canonicalQuery,
+    `host:${host}\n`,
+    'host',
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
+  const sig = crypto
+    .createHmac('sha256', getSigningKey(cfg.secretAccessKey, dateStamp))
+    .update(stringToSign, 'utf8')
+    .digest('hex');
+
+  return `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${sig}`;
+}
+
+function decodeXml(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function parseR2ListXml(xml: string) {
+  const folders: string[] = [];
+  const folderRe = /<CommonPrefixes>\s*<Prefix>([\s\S]*?)<\/Prefix>\s*<\/CommonPrefixes>/g;
+  let fm: RegExpExecArray | null = folderRe.exec(xml);
+  while (fm) {
+    folders.push(decodeXml(fm[1]));
+    fm = folderRe.exec(xml);
+  }
+
+  const files: Array<{ key: string; size: number; lastModified: string }> = [];
+  const itemRe = /<Contents>([\s\S]*?)<\/Contents>/g;
+  let im: RegExpExecArray | null = itemRe.exec(xml);
+  while (im) {
+    const block = im[1];
+    const keyM = block.match(/<Key>([\s\S]*?)<\/Key>/);
+    const sizeM = block.match(/<Size>(\d+)<\/Size>/);
+    const modM = block.match(/<LastModified>([\s\S]*?)<\/LastModified>/);
+    if (keyM) {
+      files.push({
+        key: decodeXml(keyM[1]),
+        size: sizeM ? Number(sizeM[1]) : 0,
+        lastModified: modM ? decodeXml(modM[1]) : '',
+      });
+    }
+    im = itemRe.exec(xml);
+  }
+
+  return { folders, files };
+}
 
 function parseMetaObj(meta: unknown): Record<string, unknown> {
   if (!meta) return {};
@@ -53,6 +233,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.productId) return String(obj.productId);
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
+    if (obj.key) return String(obj.key);
     return meta;
   }
   if (typeof meta === 'object') {
@@ -60,6 +241,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.productId) return String(obj.productId);
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
+    if (obj.key) return String(obj.key);
     return JSON.stringify(obj);
   }
   return String(meta);
@@ -189,7 +371,225 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const sql = getSql();
 
-    // 1) Request one-time 6-digit Telegram OTP for PC/Chrome login
+    // --- NEON DB EXPLORER ---
+    if (action === 'db-tables') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const [tables, dbSizeRows] = await Promise.all([
+        sql`
+          SELECT
+            relname AS name,
+            n_live_tup::int AS rows,
+            pg_size_pretty(pg_total_relation_size(relid)) AS size_pretty,
+            pg_total_relation_size(relid)::bigint AS size_bytes
+          FROM pg_stat_user_tables
+          WHERE schemaname = 'public'
+          ORDER BY pg_total_relation_size(relid) DESC
+        `,
+        sql`SELECT pg_size_pretty(pg_database_size(current_database())) AS db_size`,
+      ]);
+
+      return res.status(200).json({
+        ok: true,
+        dbSize: String(dbSizeRows[0]?.db_size || '—'),
+        tables: tables.map((t) => ({
+          name: String(t.name),
+          rows: Number(t.rows || 0),
+          sizePretty: String(t.size_pretty || '0 bytes'),
+          sizeBytes: Number(t.size_bytes || 0),
+        })),
+      });
+    }
+
+    if (action === 'db-rows') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const reqTable = String(req.query.table || '').trim();
+      const validTables = await sql`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ${reqTable} LIMIT 1
+      `;
+      if (validTables.length === 0) {
+        return res.status(400).json({ ok: false, error: 'Таблица не найдена' });
+      }
+      const safeTable = String(validTables[0].tablename);
+
+      const cols = await sql`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = ${safeTable}
+      `;
+      const colNames = cols.map((c) => String(c.column_name));
+      let orderClause = '';
+      if (colNames.includes('created_at')) orderClause = 'ORDER BY created_at DESC';
+      else if (colNames.includes('id')) orderClause = 'ORDER BY id DESC';
+
+      const rows = await sql.query(`SELECT * FROM "public"."${safeTable}" ${orderClause} LIMIT 25`);
+      return res.status(200).json({
+        ok: true,
+        table: safeTable,
+        columns: colNames,
+        rows,
+      });
+    }
+
+    if (action === 'db-sql' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const rawSql = String(body.query || '').trim().replace(/;+\s*$/, '');
+      if (!rawSql) return res.status(400).json({ ok: false, error: 'Введите SELECT-запрос' });
+      if (rawSql.includes(';')) {
+        return res.status(400).json({ ok: false, error: 'Разрешён только один SELECT-запрос' });
+      }
+      if (!/^(SELECT|WITH)\b/i.test(rawSql)) {
+        return res.status(400).json({ ok: false, error: 'Консоль работает в режиме только чтения (SELECT)' });
+      }
+      if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|COPY|EXECUTE|CALL)\b/i.test(rawSql)) {
+        return res.status(400).json({ ok: false, error: 'Изменяющие команды запрещены в консоли' });
+      }
+
+      const wrapped = `SELECT * FROM (${rawSql}) AS _q LIMIT 50`;
+      const rows = await sql.query(wrapped);
+      const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
+      return res.status(200).json({ ok: true, columns, rows });
+    }
+
+    if (action === 'db-cleanup' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const mode = String(body.mode || '');
+
+      if (mode === 'otp') {
+        const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+        const del = await sql`
+          DELETE FROM app_events
+          WHERE source = 'admin_otp' AND created_at < ${cutoff}::timestamptz
+          RETURNING id
+        `;
+        return res.status(200).json({ ok: true, deleted: del.length });
+      }
+
+      if (mode === 'old_events') {
+        const cutoff = new Date(Date.now() - 90 * 86400000).toISOString();
+        const del = await sql`
+          DELETE FROM app_events
+          WHERE source IN ('telegram', 'web') AND created_at < ${cutoff}::timestamptz
+          RETURNING id
+        `;
+        return res.status(200).json({ ok: true, deleted: del.length });
+      }
+
+      return res.status(400).json({ ok: false, error: 'Неизвестный режим очистки' });
+    }
+
+    // --- CLOUDFLARE R2 MANAGER ---
+    if (action === 'r2-list') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const cfg = getR2Config();
+      if (cfg.missing.length > 0) {
+        return res.status(200).json({
+          ok: true,
+          configured: false,
+          missing: cfg.missing,
+          bucket: cfg.bucket,
+          publicUrl: cfg.publicUrl,
+          folders: [],
+          files: [],
+        });
+      }
+
+      const prefix = String(req.query.prefix || '').trim();
+      const queryObj: Record<string, string> = {
+        'list-type': '2',
+        delimiter: '/',
+        'max-keys': '100',
+      };
+      if (prefix) queryObj.prefix = prefix;
+
+      const r2Resp = await r2SignedFetch(cfg, 'GET', '', queryObj);
+      if (!r2Resp.ok) {
+        const errText = await r2Resp.text();
+        return res.status(502).json({
+          ok: false,
+          error: `Ошибка R2 (${r2Resp.status}): ${errText.slice(0, 140)}`,
+        });
+      }
+
+      const xml = await r2Resp.text();
+      const parsed = parseR2ListXml(xml);
+      const totalSize = parsed.files.reduce((sum, f) => sum + f.size, 0);
+
+      return res.status(200).json({
+        ok: true,
+        configured: true,
+        missing: [],
+        bucket: cfg.bucket,
+        publicUrl: cfg.publicUrl,
+        prefix,
+        totalSize,
+        folders: parsed.folders,
+        files: parsed.files,
+      });
+    }
+
+    if (action === 'r2-delete' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const cfg = getR2Config();
+      if (cfg.missing.length > 0) {
+        return res.status(400).json({ ok: false, error: 'R2 не настроен' });
+      }
+      const body = (req.body || {}) as Record<string, unknown>;
+      const key = String(body.key || '').trim();
+      if (!key) return res.status(400).json({ ok: false, error: 'Не указан файл' });
+
+      const r2Resp = await r2SignedFetch(cfg, 'DELETE', key, {});
+      if (!r2Resp.ok && r2Resp.status !== 204) {
+        return res.status(502).json({ ok: false, error: `Ошибка удаления R2 (${r2Resp.status})` });
+      }
+
+      try {
+        const auditMeta = JSON.stringify({ key });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_r2_delete', ${cfg.bucket}, ${auditMeta})
+        `;
+      } catch (e) {
+        console.error('r2 audit log error:', e);
+      }
+
+      return res.status(200).json({ ok: true, key });
+    }
+
+    if (action === 'r2-presign' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const cfg = getR2Config();
+      if (cfg.missing.length > 0) {
+        return res.status(400).json({ ok: false, error: 'R2 не настроен' });
+      }
+      const body = (req.body || {}) as Record<string, unknown>;
+      const rawKey = String(body.key || '').trim().replace(/^\/+/, '');
+      if (!rawKey) return res.status(400).json({ ok: false, error: 'Не указано имя файла' });
+
+      const uploadUrl = r2PresignPut(cfg, rawKey);
+      return res.status(200).json({
+        ok: true,
+        key: rawKey,
+        uploadUrl,
+        publicUrl: cfg.publicUrl ? `${cfg.publicUrl}/${r2EncodePath(rawKey)}` : '',
+      });
+    }
+
+    // --- TELEGRAM OTP LOGIN ---
     if (action === 'otp-request' && req.method === 'POST') {
       const adminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
       const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
@@ -228,10 +628,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const tgResp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: adminId,
-          text: tgText,
-        }),
+        body: JSON.stringify({ chat_id: adminId, text: tgText }),
       });
 
       if (!tgResp.ok) {
@@ -249,7 +646,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, challengeId, ttlSec: 120 });
     }
 
-    // 2) Verify one-time 6-digit Telegram OTP (strict 3 tries/code, 5 fails/10min, single-use)
     if (action === 'otp-verify' && req.method === 'POST') {
       const adminId = (process.env.ADMIN_TELEGRAM_ID || '').trim();
       const botToken = (process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
@@ -330,7 +726,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // Burn OTP permanently & mint 12h HMAC session token
       const usedMeta = JSON.stringify({ used: true });
       await sql`
         INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
@@ -395,9 +790,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const page = String(body.page || 'welcome').slice(0, 64);
       const meta = body.meta ? JSON.stringify(body.meta).slice(0, 1000) : null;
 
-      if (!userId) {
-        return res.status(200).json({ ok: true, banned: false });
-      }
+      if (!userId) return res.status(200).json({ ok: true, banned: false });
 
       const banRows = await sql`
         SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
@@ -420,9 +813,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'stats') {
       const auth = authorizeAdmin(req);
-      if (!auth.ok) {
-        return res.status(403).json({ ok: false, error: 'Forbidden' });
-      }
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
       if (String(req.query.check || '') === '1') {
         return res.status(200).json({ ok: true, admin: true, via: auth.via });
