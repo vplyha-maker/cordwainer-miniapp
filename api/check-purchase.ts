@@ -277,6 +277,8 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
     if (obj.newKey) return `${String(obj.oldKey || '')} → ${String(obj.newKey)}`;
+    if (obj.op) return String(obj.op);
+    if (obj.deploymentId) return String(obj.deploymentId);
     if (obj.key) return String(obj.key);
     if (obj.pk) return `pk=${String(obj.pk)}`;
     return meta;
@@ -287,6 +289,8 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
     if (obj.newKey) return `${String(obj.oldKey || '')} → ${String(obj.newKey)}`;
+    if (obj.op) return String(obj.op);
+    if (obj.deploymentId) return String(obj.deploymentId);
     if (obj.key) return String(obj.key);
     if (obj.pk) return `pk=${String(obj.pk)}`;
     return JSON.stringify(obj);
@@ -998,7 +1002,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (search) {
         const allFiles = await listAllR2Objects(cfg, prefix);
-        const matched = allFiles.filter((f) => f.key.toLowerCase().includes(search));
+        const tokens = search.split(/[\s\-_/]+/).filter(Boolean);
+        const matched = allFiles.filter((f) => {
+          const hay = f.key.toLowerCase();
+          return tokens.every((t) => hay.includes(t));
+        });
         const limited = matched.slice(0, 100);
         const totalSize = matched.reduce((sum, f) => sum + f.size, 0);
         return res.status(200).json({
@@ -1336,6 +1344,298 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         uploadUrl,
         publicUrl: cfg.publicUrl ? `${cfg.publicUrl}/${r2EncodePath(rawKey)}` : '',
       });
+    }
+
+    // --- CLOUD OPS: VERCEL & RENDER ---
+    if (action === 'cloud-status') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const vToken = (process.env.VERCEL_TOKEN || '').trim();
+      const vProjectId = (process.env.VERCEL_PROJECT_ID || '').trim();
+      const vTeamId = (process.env.VERCEL_TEAM_ID || '').trim();
+      const rKey = (process.env.RENDER_API_KEY || '').trim();
+
+      const vMissing: string[] = [];
+      if (!vToken) vMissing.push('VERCEL_TOKEN');
+      if (!vProjectId) vMissing.push('VERCEL_PROJECT_ID');
+
+      const [vercelState, renderState] = await Promise.all([
+        (async () => {
+          if (vMissing.length > 0) {
+            return { configured: false, missing: vMissing, projectId: vProjectId, deployments: [], envKeys: [] };
+          }
+          try {
+            const teamQs = vTeamId ? `&teamId=${encodeURIComponent(vTeamId)}` : '';
+            const teamOnlyQs = vTeamId ? `?teamId=${encodeURIComponent(vTeamId)}` : '';
+            const headers = { Authorization: `Bearer ${vToken}` };
+
+            const [depResp, envResp] = await Promise.all([
+              fetch(`https://api.vercel.com/v6/deployments?projectId=${encodeURIComponent(vProjectId)}&limit=8${teamQs}`, { headers }),
+              fetch(`https://api.vercel.com/v9/projects/${encodeURIComponent(vProjectId)}/env${teamOnlyQs}`, { headers }),
+            ]);
+
+            if (!depResp.ok) {
+              const t = await depResp.text();
+              return {
+                configured: true,
+                missing: [],
+                projectId: vProjectId,
+                deployments: [],
+                envKeys: [],
+                error: `Vercel API (${depResp.status}): ${t.slice(0, 120)}`,
+              };
+            }
+
+            const depJson = (await depResp.json()) as {
+              deployments?: Array<{
+                uid?: string;
+                name?: string;
+                url?: string;
+                state?: string;
+                target?: string;
+                created?: number;
+                meta?: Record<string, string>;
+              }>;
+            };
+
+            const envKeysSet = new Set<string>();
+            if (envResp.ok) {
+              const envJson = (await envResp.json()) as { envs?: Array<{ key?: string }> };
+              for (const e of envJson.envs || []) {
+                if (e.key) envKeysSet.add(e.key);
+              }
+            }
+
+            const deployments = (depJson.deployments || []).map((d) => ({
+              uid: String(d.uid || ''),
+              name: String(d.name || ''),
+              url: String(d.url || ''),
+              state: String(d.state || 'UNKNOWN'),
+              target: String(d.target || 'preview'),
+              created: d.created ? new Date(d.created).toISOString() : '',
+              commitMsg: String(d.meta?.githubCommitMessage || '').split('\n')[0].slice(0, 100),
+              branch: String(d.meta?.githubCommitRef || ''),
+            }));
+
+            return {
+              configured: true,
+              missing: [],
+              projectId: vProjectId,
+              deployments,
+              envKeys: Array.from(envKeysSet).sort(),
+            };
+          } catch (e) {
+            return {
+              configured: true,
+              missing: [],
+              projectId: vProjectId,
+              deployments: [],
+              envKeys: [],
+              error: e instanceof Error ? e.message : 'Vercel fetch error',
+            };
+          }
+        })(),
+        (async () => {
+          if (!rKey) {
+            return { configured: false, missing: ['RENDER_API_KEY'], services: [] };
+          }
+          try {
+            const headers = { Authorization: `Bearer ${rKey}`, Accept: 'application/json' };
+            const resp = await fetch('https://api.render.com/v1/services?limit=20', { headers });
+            if (!resp.ok) {
+              const t = await resp.text();
+              return {
+                configured: true,
+                missing: [],
+                services: [],
+                error: `Render API (${resp.status}): ${t.slice(0, 120)}`,
+              };
+            }
+            const rawList = (await resp.json()) as Array<{
+              service?: {
+                id?: string;
+                name?: string;
+                type?: string;
+                suspended?: string;
+                updatedAt?: string;
+                serviceDetails?: { url?: string; region?: string };
+              };
+            }>;
+
+            const services = await Promise.all(
+              rawList.map(async (item) => {
+                const s = item.service || {};
+                const id = String(s.id || '');
+                let latestDeploy: { id: string; status: string; trigger: string; createdAt: string; commitMsg: string } | null = null;
+                if (id) {
+                  try {
+                    const dr = await fetch(`https://api.render.com/v1/services/${encodeURIComponent(id)}/deploys?limit=1`, { headers });
+                    if (dr.ok) {
+                      const dArr = (await dr.json()) as Array<{
+                        deploy?: { id?: string; status?: string; trigger?: string; createdAt?: string; commit?: { message?: string } };
+                      }>;
+                      const d0 = dArr[0]?.deploy;
+                      if (d0) {
+                        latestDeploy = {
+                          id: String(d0.id || ''),
+                          status: String(d0.status || ''),
+                          trigger: String(d0.trigger || ''),
+                          createdAt: String(d0.createdAt || ''),
+                          commitMsg: String(d0.commit?.message || '').split('\n')[0].slice(0, 100),
+                        };
+                      }
+                    }
+                  } catch {
+                    // ignore deploy lookup failure
+                  }
+                }
+                return {
+                  id,
+                  name: String(s.name || ''),
+                  type: String(s.type || ''),
+                  suspended: String(s.suspended || 'not_suspended'),
+                  url: String(s.serviceDetails?.url || ''),
+                  region: String(s.serviceDetails?.region || ''),
+                  updatedAt: String(s.updatedAt || ''),
+                  latestDeploy,
+                };
+              }),
+            );
+
+            return { configured: true, missing: [], services };
+          } catch (e) {
+            return {
+              configured: true,
+              missing: [],
+              services: [],
+              error: e instanceof Error ? e.message : 'Render fetch error',
+            };
+          }
+        })(),
+      ]);
+
+      return res.status(200).json({ ok: true, vercel: vercelState, render: renderState });
+    }
+
+    if (action === 'vercel-action' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const vToken = (process.env.VERCEL_TOKEN || '').trim();
+      const vTeamId = (process.env.VERCEL_TEAM_ID || '').trim();
+      if (!vToken) return res.status(400).json({ ok: false, error: 'VERCEL_TOKEN не задан' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const op = String(body.op || '').trim();
+      const deploymentId = String(body.deploymentId || '').trim();
+      const name = String(body.name || 'cordwainer-miniapp').trim();
+      const headers = { Authorization: `Bearer ${vToken}`, 'Content-Type': 'application/json' };
+      const teamQs = vTeamId ? `?teamId=${encodeURIComponent(vTeamId)}` : '';
+
+      if (op === 'logs' && deploymentId) {
+        const ampTeam = vTeamId ? `&teamId=${encodeURIComponent(vTeamId)}` : '';
+        const r = await fetch(
+          `https://api.vercel.com/v3/deployments/${encodeURIComponent(deploymentId)}/events?direction=backward&limit=40${ampTeam}`,
+          { headers },
+        );
+        if (!r.ok) return res.status(502).json({ ok: false, error: `Vercel logs (${r.status})` });
+        const events = (await r.json()) as Array<{ text?: string; payload?: { text?: string } }>;
+        const lines = events
+          .map((ev) => String(ev.text || ev.payload?.text || '').trim())
+          .filter(Boolean)
+          .slice(0, 30)
+          .reverse();
+        return res.status(200).json({ ok: true, lines });
+      }
+
+      if (op === 'redeploy' && deploymentId) {
+        const r = await fetch(`https://api.vercel.com/v13/deployments${teamQs}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ name, deploymentId, target: 'production' }),
+        });
+        if (!r.ok) {
+          const t = await r.text();
+          return res.status(502).json({ ok: false, error: `Vercel redeploy (${r.status}): ${t.slice(0, 120)}` });
+        }
+        try {
+          const auditMeta = JSON.stringify({ deploymentId, name });
+          await sql`
+            INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+            VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_vercel_redeploy', ${name}, ${auditMeta})
+          `;
+        } catch (e) {
+          console.error('vercel audit err:', e);
+        }
+        return res.status(200).json({ ok: true });
+      }
+
+      return res.status(400).json({ ok: false, error: 'Неизвестная операция Vercel' });
+    }
+
+    if (action === 'render-action' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const rKey = (process.env.RENDER_API_KEY || '').trim();
+      if (!rKey) return res.status(400).json({ ok: false, error: 'RENDER_API_KEY не задан' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const op = String(body.op || '').trim();
+      const serviceId = String(body.serviceId || '').trim();
+      const serviceName = String(body.serviceName || serviceId).trim();
+      if (!serviceId) return res.status(400).json({ ok: false, error: 'Не указан serviceId' });
+
+      const headers = { Authorization: `Bearer ${rKey}`, 'Content-Type': 'application/json', Accept: 'application/json' };
+      const base = `https://api.render.com/v1/services/${encodeURIComponent(serviceId)}`;
+
+      if (op === 'deploys') {
+        const r = await fetch(`${base}/deploys?limit=6`, { headers });
+        if (!r.ok) return res.status(502).json({ ok: false, error: `Render deploys (${r.status})` });
+        const arr = (await r.json()) as Array<{
+          deploy?: { id?: string; status?: string; trigger?: string; createdAt?: string; commit?: { message?: string } };
+        }>;
+        const deploys = arr.map((item) => ({
+          id: String(item.deploy?.id || ''),
+          status: String(item.deploy?.status || ''),
+          trigger: String(item.deploy?.trigger || ''),
+          createdAt: String(item.deploy?.createdAt || ''),
+          commitMsg: String(item.deploy?.commit?.message || '').split('\n')[0].slice(0, 100),
+        }));
+        return res.status(200).json({ ok: true, deploys });
+      }
+
+      const opPath: Record<string, { path: string; body?: string }> = {
+        restart: { path: '/restart' },
+        deploy: { path: '/deploys', body: JSON.stringify({ clearCache: 'do_not_clear' }) },
+        suspend: { path: '/suspend' },
+        resume: { path: '/resume' },
+      };
+      const target = opPath[op];
+      if (!target) return res.status(400).json({ ok: false, error: 'Неизвестная операция Render' });
+
+      const r = await fetch(`${base}${target.path}`, {
+        method: 'POST',
+        headers,
+        body: target.body,
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        return res.status(502).json({ ok: false, error: `Render ${op} (${r.status}): ${t.slice(0, 120)}` });
+      }
+
+      try {
+        const auditMeta = JSON.stringify({ op, serviceId });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', ${`admin_render_${op}`}, ${serviceName}, ${auditMeta})
+        `;
+      } catch (e) {
+        console.error('render audit err:', e);
+      }
+
+      return res.status(200).json({ ok: true });
     }
 
     // --- TELEGRAM OTP LOGIN ---
