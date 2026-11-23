@@ -44,8 +44,7 @@ const NEON_FREE_LIMIT_BYTES = 512 * 1024 * 1024;
 function previewCell(v: unknown): string {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'object') return JSON.stringify(v).slice(0, 44);
-  const s = String(v);
-  return s.length > 42 ? `${s.slice(0, 42)}…` : s;
+  return String(v);
 }
 
 export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
@@ -60,7 +59,7 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
   showToast,
 }) => {
   const [selectedTable, setSelectedTable] = useState<string>('');
-  const [pkCol, setPkCol] = useState<string | null>(null);
+  const [pkCols, setPkCols] = useState<string[]>([]);
   const [cols, setCols] = useState<string[]>([]);
   const [rows, setRows] = useState<RowList>([]);
   const [total, setTotal] = useState<number>(0);
@@ -70,7 +69,6 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [loadingRows, setLoadingRows] = useState<boolean>(false);
 
-  // Record Card Editor
   const [editingRow, setEditingRow] = useState<RowMap | null>(null);
   const [editValues, setEditValues] = useState<EditValuesMap>({});
   const [savingRow, setSavingRow] = useState<boolean>(false);
@@ -94,6 +92,7 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
         });
         const data = (await r.json()) as {
           ok?: boolean;
+          pkCols?: string[];
           pkCol?: string | null;
           total?: number;
           columns?: string[];
@@ -101,7 +100,13 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
           sortCol?: string;
         };
         if (r.ok && data.ok) {
-          setPkCol(data.pkCol ?? null);
+          const resolvedPks =
+            Array.isArray(data.pkCols) && data.pkCols.length > 0
+              ? data.pkCols
+              : data.pkCol
+                ? [data.pkCol]
+                : [];
+          setPkCols(resolvedPks);
           setTotal(data.total || 0);
           setCols(data.columns || []);
           setRows(data.rows || []);
@@ -140,14 +145,21 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
     setEditValues(map);
   };
 
+  const buildPkValues = (row: RowMap): RowMap => {
+    const res: RowMap = {};
+    for (const k of pkCols) res[k] = row[k];
+    return res;
+  };
+
   const handleSaveRow = async () => {
-    if (!editingRow || !pkCol || !selectedTable) return;
+    if (!editingRow || pkCols.length === 0 || !selectedTable) return;
     if (!window.confirm('Сохранить изменения в базе Neon?')) return;
     setSavingRow(true);
     try {
+      const pkSet = new Set(pkCols);
       const updates: RowMap = {};
       for (const c of cols) {
-        if (c === pkCol) continue;
+        if (pkSet.has(c)) continue;
         const orig = editingRow[c];
         const origStr = orig === null || orig === undefined ? '' : typeof orig === 'object' ? JSON.stringify(orig) : String(orig);
         if (editValues[c] !== origStr) {
@@ -165,8 +177,7 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
         headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
         body: JSON.stringify({
           table: selectedTable,
-          pkCol,
-          pkVal: editingRow[pkCol],
+          pkValues: buildPkValues(editingRow),
           updates,
         }),
       });
@@ -186,8 +197,9 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
   };
 
   const handleDeleteRow = async () => {
-    if (!editingRow || !pkCol || !selectedTable) return;
-    if (!window.confirm(`Удалить запись ${pkCol}=${String(editingRow[pkCol])} навсегда?`)) return;
+    if (!editingRow || pkCols.length === 0 || !selectedTable) return;
+    const pkSummary = pkCols.map((k) => `${k}=${String(editingRow[k])}`).join(', ');
+    if (!window.confirm(`Удалить только эту запись (${pkSummary}) навсегда?`)) return;
     setSavingRow(true);
     try {
       const r = await fetch('/api/check-purchase?action=db-delete', {
@@ -195,8 +207,7 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
         headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
         body: JSON.stringify({
           table: selectedTable,
-          pkCol,
-          pkVal: editingRow[pkCol],
+          pkValues: buildPkValues(editingRow),
         }),
       });
       const data = (await r.json()) as { ok?: boolean; error?: string };
@@ -266,7 +277,6 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Neon Health & 512MB Quota Bar */}
       <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -310,7 +320,6 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
         </div>
       </div>
 
-      {/* Tables List */}
       <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-2">
         <div className="text-[12px] font-semibold text-[#A8A095]">Выберите таблицу для просмотра и правки:</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -334,7 +343,6 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
         </div>
       </div>
 
-      {/* Interactive Table Browser */}
       {selectedTable && (
         <div className="rounded-2xl border border-[#C9A86A]/30 bg-[#141412] p-3.5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -362,33 +370,31 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setPage(1);
-                    loadRows(selectedTable, 1, search, sortCol, sortDir);
-                  }
-                }}
-                placeholder={`Поиск внутри ${selectedTable}...`}
-                style={DARK_INPUT_STYLE}
-                className="w-full rounded-xl border border-white/15 pl-3 pr-9 py-2 text-[12px] focus:outline-none focus:border-[#C9A86A]"
-              />
-              <button
-                type="button"
-                onClick={() => {
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
                   setPage(1);
                   loadRows(selectedTable, 1, search, sortCol, sortDir);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#C9A86A]"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-            </div>
+                }
+              }}
+              placeholder={`Поиск внутри ${selectedTable}...`}
+              style={DARK_INPUT_STYLE}
+              className="w-full rounded-xl border border-white/15 pl-3 pr-9 py-2 text-[12px] focus:outline-none focus:border-[#C9A86A]"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setPage(1);
+                loadRows(selectedTable, 1, search, sortCol, sortDir);
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#C9A86A]"
+            >
+              <Search className="w-4 h-4" />
+            </button>
           </div>
 
           {loadingRows ? (
@@ -431,7 +437,7 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
                         <Edit3 className="w-3.5 h-3.5" />
                       </td>
                       {cols.slice(0, 7).map((c) => (
-                        <td key={c} className="px-2.5 py-1.5 whitespace-nowrap">
+                        <td key={c} className="px-2.5 py-1.5 max-w-[150px] truncate">
                           {previewCell(row[c])}
                         </td>
                       ))}
@@ -442,7 +448,6 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
             </div>
           )}
 
-          {/* Pagination */}
           <div className="flex items-center justify-between text-[12px] text-[#A8A095]">
             <span>
               Стр. {page} из {totalPages}
@@ -469,22 +474,24 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
         </div>
       )}
 
-      {/* Record Card Editor Modal */}
       {editingRow && (
         <div className="fixed inset-0 z-[135] bg-black/80 flex items-center justify-center p-4">
           <div className="w-full max-w-lg max-h-[85dvh] rounded-2xl border border-[#C9A86A]/35 bg-[#141412] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
-              <div className="font-mono text-[13px] font-semibold text-[#C9A86A]">
-                {selectedTable} {pkCol ? `· ${pkCol}=${String(editingRow[pkCol])}` : '(только просмотр)'}
+              <div className="font-mono text-[12px] font-semibold text-[#C9A86A] truncate">
+                {selectedTable}{' '}
+                {pkCols.length > 0
+                  ? `· ${pkCols.map((k) => `${k}=${String(editingRow[k])}`).join(' & ')}`
+                  : '(только просмотр)'}
               </div>
-              <button type="button" onClick={() => setEditingRow(null)} className="p-1 text-[#8D867C]">
+              <button type="button" onClick={() => setEditingRow(null)} className="p-1 text-[#8D867C] shrink-0">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {cols.map((c) => {
-                const isPk = c === pkCol;
+                const isPk = pkCols.includes(c);
                 return (
                   <div key={c}>
                     <label className="block text-[11px] font-mono text-[#A8A095] mb-1">
@@ -492,7 +499,7 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
                     </label>
                     <input
                       type="text"
-                      disabled={isPk || !pkCol}
+                      disabled={isPk || pkCols.length === 0}
                       value={editValues[c] ?? ''}
                       onChange={(e) => setEditValues((prev) => ({ ...prev, [c]: e.target.value }))}
                       style={DARK_INPUT_STYLE}
@@ -504,7 +511,7 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
             </div>
 
             <div className="px-4 py-3 border-t border-white/[0.08] flex items-center justify-between gap-2">
-              {pkCol ? (
+              {pkCols.length > 0 ? (
                 <>
                   <button
                     type="button"
@@ -535,4 +542,3 @@ export const NeonTableBrowser: React.FC<NeonTableBrowserProps> = ({
     </div>
   );
 };
-
