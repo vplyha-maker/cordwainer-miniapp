@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Activity,
   ChevronDown,
   ChevronUp,
   Cloud,
+  Copy,
   KeyRound,
   Pause,
   Play,
@@ -12,9 +14,11 @@ import {
   Server,
   Terminal,
 } from 'lucide-react';
+import { copyTextToClipboard } from './exportUtils';
+import { GitHubOpsPanel } from './GitHubOpsPanel';
 import { formatShortDate } from './types';
 
-type CloudSub = 'vercel' | 'render';
+type CloudSub = 'vercel' | 'render' | 'github';
 
 type VercelDeployItem = {
   uid: string;
@@ -62,6 +66,13 @@ type RenderState = {
   services: RenderServiceItem[];
 };
 
+type WebhookInfo = {
+  url: string;
+  pendingCount: number;
+  lastError: string;
+  lastErrorDate: string;
+};
+
 type CloudStatusData = {
   vercel: VercelState;
   render: RenderState;
@@ -102,10 +113,17 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
   const [logsLines, setLogsLines] = useState<string[]>([]);
   const [logsLoading, setLogsLoading] = useState<boolean>(false);
 
-  // Render deploys drawer per service
+  // Render extras: deploys, live logs, Telegram webhook
   const [deploysSvcId, setDeploysSvcId] = useState<string>('');
   const [deploysList, setDeploysList] = useState<RenderDeployItem[]>([]);
   const [deploysLoading, setDeploysLoading] = useState<boolean>(false);
+
+  const [rLogsSvcId, setRLogsSvcId] = useState<string>('');
+  const [rLogsLines, setRLogsLines] = useState<string[]>([]);
+  const [rLogsLoading, setRLogsLoading] = useState<boolean>(false);
+
+  const [webhook, setWebhook] = useState<WebhookInfo | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState<boolean>(false);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -170,11 +188,8 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
         body: JSON.stringify({ op: 'logs', deploymentId: uid }),
       });
       const json = (await r.json()) as { ok?: boolean; lines?: string[]; error?: string };
-      if (r.ok && json.ok) {
-        setLogsLines(json.lines || []);
-      } else {
-        showToast(json.error || 'Не удалось загрузить логи');
-      }
+      if (r.ok && json.ok) setLogsLines(json.lines || []);
+      else showToast(json.error || 'Не удалось загрузить логи');
     } catch {
       showToast('Ошибка сети');
     } finally {
@@ -216,6 +231,7 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
       return;
     }
     setDeploysSvcId(svcId);
+    setRLogsSvcId('');
     setDeploysList([]);
     setDeploysLoading(true);
     try {
@@ -225,11 +241,8 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
         body: JSON.stringify({ op: 'deploys', serviceId: svcId }),
       });
       const json = (await r.json()) as { ok?: boolean; deploys?: RenderDeployItem[]; error?: string };
-      if (r.ok && json.ok) {
-        setDeploysList(json.deploys || []);
-      } else {
-        showToast(json.error || 'Не удалось загрузить деплои');
-      }
+      if (r.ok && json.ok) setDeploysList(json.deploys || []);
+      else showToast(json.error || 'Не удалось загрузить деплои');
     } catch {
       showToast('Ошибка сети');
     } finally {
@@ -237,16 +250,60 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
     }
   };
 
+  const handleToggleRenderLogs = async (svcId: string) => {
+    if (rLogsSvcId === svcId) {
+      setRLogsSvcId('');
+      setRLogsLines([]);
+      return;
+    }
+    setRLogsSvcId(svcId);
+    setDeploysSvcId('');
+    setRLogsLines([]);
+    setRLogsLoading(true);
+    try {
+      const r = await fetch('/api/check-purchase?action=render-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+        body: JSON.stringify({ op: 'logs', serviceId: svcId }),
+      });
+      const json = (await r.json()) as { ok?: boolean; lines?: string[]; error?: string };
+      if (r.ok && json.ok) setRLogsLines(json.lines || []);
+      else showToast(json.error || 'Не удалось загрузить логи Render');
+    } catch {
+      showToast('Ошибка сети');
+    } finally {
+      setRLogsLoading(false);
+    }
+  };
+
+  const handleCheckWebhook = async () => {
+    setWebhookLoading(true);
+    try {
+      const r = await fetch('/api/check-purchase?action=render-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+        body: JSON.stringify({ op: 'webhook', serviceId: 'bot' }),
+      });
+      const json = (await r.json()) as { ok?: boolean; webhook?: WebhookInfo; error?: string };
+      if (r.ok && json.ok && json.webhook) setWebhook(json.webhook);
+      else showToast(json.error || 'Не удалось проверить вебхук');
+    } catch {
+      showToast('Ошибка сети');
+    } finally {
+      setWebhookLoading(false);
+    }
+  };
+
   const latestProd = data?.vercel.deployments.find((d) => d.target === 'production') || data?.vercel.deployments[0];
 
   return (
     <div className="space-y-3">
-      {/* Sub-switcher: Vercel / Render */}
-      <div className="grid grid-cols-2 gap-1.5">
+      {/* 3-way sub-switcher: Vercel / Render / GitHub */}
+      <div className="grid grid-cols-3 gap-1.5">
         <button
           type="button"
           onClick={() => setSub('vercel')}
-          className={`rounded-xl border py-2 text-[12px] font-semibold transition ${
+          className={`rounded-xl border py-2 text-[11px] font-semibold transition ${
             sub === 'vercel'
               ? 'border-[#C9A86A]/55 bg-[#C9A86A]/15 text-[#C9A86A]'
               : 'border-white/[0.07] bg-[#141412] text-[#A8A095]'
@@ -257,7 +314,7 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
         <button
           type="button"
           onClick={() => setSub('render')}
-          className={`rounded-xl border py-2 text-[12px] font-semibold transition ${
+          className={`rounded-xl border py-2 text-[11px] font-semibold transition ${
             sub === 'render'
               ? 'border-[#C9A86A]/55 bg-[#C9A86A]/15 text-[#C9A86A]'
               : 'border-white/[0.07] bg-[#141412] text-[#A8A095]'
@@ -265,15 +322,26 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
         >
           ⚡ Render {data?.render.services.length ? `(${data.render.services.length})` : ''}
         </button>
+        <button
+          type="button"
+          onClick={() => setSub('github')}
+          className={`rounded-xl border py-2 text-[11px] font-semibold transition ${
+            sub === 'github'
+              ? 'border-[#C9A86A]/55 bg-[#C9A86A]/15 text-[#C9A86A]'
+              : 'border-white/[0.07] bg-[#141412] text-[#A8A095]'
+          }`}
+        >
+          🐙 GitHub
+        </button>
       </div>
 
-      {err && (
+      {err && sub !== 'github' && (
         <div className="rounded-xl border border-[#F06A7E]/35 bg-[#F06A7E]/10 px-3 py-2 text-[12px] text-[#F06A7E]">
           {err}
         </div>
       )}
 
-      {loading && !data && (
+      {loading && !data && sub !== 'github' && (
         <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-6 text-center text-[12px] text-[#8D867C]">
           Загрузка статусов Vercel и Render...
         </div>
@@ -294,132 +362,142 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
               </div>
             </div>
           ) : (
-            <>
-              <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Cloud className="w-4 h-4 text-[#C9A86A] shrink-0" />
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold truncate">Vercel Deployments</div>
-                      <div className="text-[11px] font-mono text-[#8D867C] truncate">
-                        {data.vercel.projectId}
-                      </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Cloud className="w-4 h-4 text-[#C9A86A] shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold truncate">Vercel Deployments</div>
+                    <div className="text-[11px] font-mono text-[#8D867C] truncate">
+                      {data.vercel.projectId}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {latestProd && (
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {latestProd && (
+                    <button
+                      type="button"
+                      disabled={Boolean(busyKey)}
+                      onClick={() => handleVercelRedeploy(latestProd)}
+                      className="inline-flex items-center gap-1 rounded-xl bg-[#C9A86A] px-2.5 py-1.5 text-[11px] font-semibold text-[#121210] disabled:opacity-50"
+                    >
+                      <Rocket className="w-3.5 h-3.5" /> Redeploy
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={fetchStatus}
+                    className="p-1.5 rounded-xl border border-white/10 text-[#C9A86A]"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {data.vercel.error && (
+                <div className="rounded-xl border border-[#F06A7E]/35 bg-[#F06A7E]/10 px-3 py-2 text-[11px] text-[#F06A7E]">
+                  {data.vercel.error}
+                </div>
+              )}
+
+              {data.vercel.envKeys.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowEnvs((v) => !v)}
+                    className="inline-flex items-center gap-1.5 text-[11px] text-[#A8A095] hover:text-[#F5F1EB]"
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-[#C9A86A]" />
+                    Переменные окружения ({data.vercel.envKeys.length})
+                    {showEnvs ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                  {showEnvs && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {data.vercel.envKeys.map((k) => (
+                        <span
+                          key={k}
+                          className="rounded-lg border border-white/[0.08] bg-[#0F0F0E] px-2 py-0.5 font-mono text-[10px] text-[#DED7CC]"
+                        >
+                          {k}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {data.vercel.deployments.map((d) => (
+                  <div
+                    key={d.uid}
+                    className="rounded-xl border border-white/[0.07] bg-[#0F0F0E] p-2.5 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[12px] font-medium text-[#F5F1EB] break-words leading-snug">
+                          {d.commitMsg || d.name}
+                        </div>
+                        <div className="text-[10px] font-mono text-[#8D867C] mt-0.5">
+                          {d.branch || 'main'} · {d.target || 'preview'} · {formatShortDate(d.created)}
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-lg border px-2 py-0.5 font-mono text-[10px] font-semibold ${badgeClass(d.state)}`}
+                      >
+                        {d.state}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleVercelLogs(d.uid)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[#DED7CC]"
+                      >
+                        <Terminal className="w-3 h-3 text-[#5B9BFF]" />
+                        {logsUid === d.uid ? 'Скрыть логи' : 'Логи'}
+                      </button>
                       <button
                         type="button"
                         disabled={Boolean(busyKey)}
-                        onClick={() => handleVercelRedeploy(latestProd)}
-                        className="inline-flex items-center gap-1 rounded-xl bg-[#C9A86A] px-2.5 py-1.5 text-[11px] font-semibold text-[#121210] disabled:opacity-50"
+                        onClick={() => handleVercelRedeploy(d)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#C9A86A]/35 px-2 py-1 text-[11px] text-[#C9A86A] disabled:opacity-50"
                       >
-                        <Rocket className="w-3.5 h-3.5" /> Redeploy
+                        <RotateCcw className="w-3 h-3" /> Повторить
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={fetchStatus}
-                      className="p-1.5 rounded-xl border border-white/10 text-[#C9A86A]"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                  </div>
-                </div>
-
-                {data.vercel.error && (
-                  <div className="rounded-xl border border-[#F06A7E]/35 bg-[#F06A7E]/10 px-3 py-2 text-[11px] text-[#F06A7E]">
-                    {data.vercel.error}
-                  </div>
-                )}
-
-                {data.vercel.envKeys.length > 0 && (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowEnvs((v) => !v)}
-                      className="inline-flex items-center gap-1.5 text-[11px] text-[#A8A095] hover:text-[#F5F1EB]"
-                    >
-                      <KeyRound className="w-3.5 h-3.5 text-[#C9A86A]" />
-                      Переменные окружения ({data.vercel.envKeys.length})
-                      {showEnvs ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </button>
-                    {showEnvs && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {data.vercel.envKeys.map((k) => (
-                          <span
-                            key={k}
-                            className="rounded-lg border border-white/[0.08] bg-[#0F0F0E] px-2 py-0.5 font-mono text-[10px] text-[#DED7CC]"
-                          >
-                            {k}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  {data.vercel.deployments.map((d) => (
-                    <div
-                      key={d.uid}
-                      className="rounded-xl border border-white/[0.07] bg-[#0F0F0E] p-2.5 space-y-2"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[12px] font-medium text-[#F5F1EB] break-words leading-snug">
-                            {d.commitMsg || d.name}
-                          </div>
-                          <div className="text-[10px] font-mono text-[#8D867C] mt-0.5">
-                            {d.branch || 'main'} · {d.target || 'preview'} · {formatShortDate(d.created)}
-                          </div>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-lg border px-2 py-0.5 font-mono text-[10px] font-semibold ${badgeClass(d.state)}`}
-                        >
-                          {d.state}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
+                      {logsUid === d.uid && logsLines.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => handleVercelLogs(d.uid)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[#DED7CC]"
+                          onClick={async () => {
+                            await copyTextToClipboard(logsLines.join('\n'));
+                            showToast('Лог скопирован');
+                          }}
+                          className="ml-auto inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[#A8A095]"
                         >
-                          <Terminal className="w-3 h-3 text-[#5B9BFF]" />
-                          {logsUid === d.uid ? 'Скрыть логи' : 'Логи'}
+                          <Copy className="w-3 h-3" /> Копировать
                         </button>
-                        <button
-                          type="button"
-                          disabled={Boolean(busyKey)}
-                          onClick={() => handleVercelRedeploy(d)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[#C9A86A]/35 px-2 py-1 text-[11px] text-[#C9A86A] disabled:opacity-50"
-                        >
-                          <RotateCcw className="w-3 h-3" /> Повторить
-                        </button>
-                      </div>
-
-                      {logsUid === d.uid && (
-                        <div className="rounded-lg border border-white/10 bg-[#080807] p-2 font-mono text-[10px] text-[#CFC8BC] max-h-48 overflow-y-auto space-y-0.5">
-                          {logsLoading ? (
-                            <div className="text-[#8D867C]">Загрузка логов сборки...</div>
-                          ) : logsLines.length === 0 ? (
-                            <div className="text-[#8D867C]">Строк лога не найдено</div>
-                          ) : (
-                            logsLines.map((line, i) => (
-                              <div key={i} className="break-all leading-relaxed">
-                                {line}
-                              </div>
-                            ))
-                          )}
-                        </div>
                       )}
                     </div>
-                  ))}
-                </div>
+
+                    {logsUid === d.uid && (
+                      <div className="rounded-lg border border-white/10 bg-[#080807] p-2 font-mono text-[10px] text-[#CFC8BC] max-h-48 overflow-y-auto space-y-0.5">
+                        {logsLoading ? (
+                          <div className="text-[#8D867C]">Загрузка логов сборки...</div>
+                        ) : logsLines.length === 0 ? (
+                          <div className="text-[#8D867C]">Строк лога не найдено</div>
+                        ) : (
+                          logsLines.map((line, i) => (
+                            <div key={i} className="break-all leading-relaxed">
+                              {line}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
@@ -427,6 +505,42 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
       {/* RENDER PANEL */}
       {sub === 'render' && data && (
         <div className="space-y-3">
+          {/* Telegram Bot Webhook Health */}
+          <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[12px] font-semibold">
+                <Activity className="w-4 h-4 text-[#3FD08F]" /> Вебхук Telegram-бота
+              </div>
+              <button
+                type="button"
+                disabled={webhookLoading}
+                onClick={handleCheckWebhook}
+                className="rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-[#C9A86A]"
+              >
+                {webhookLoading ? 'Проверка...' : 'Проверить'}
+              </button>
+            </div>
+            {webhook && (
+              <div className="rounded-xl border border-white/[0.06] bg-[#0F0F0E] p-2.5 space-y-1 font-mono text-[10px]">
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#8D867C]">Режим:</span>
+                  <span className="text-[#F5F1EB] truncate">{webhook.url || 'Polling (webhook не задан)'}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#8D867C]">В очереди:</span>
+                  <span className={webhook.pendingCount > 0 ? 'text-[#C9A86A]' : 'text-[#3FD08F]'}>
+                    {webhook.pendingCount}
+                  </span>
+                </div>
+                {webhook.lastError && (
+                  <div className="text-[#F06A7E] pt-1 break-words">
+                    Ошибка ({webhook.lastErrorDate ? formatShortDate(webhook.lastErrorDate) : ''}): {webhook.lastError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {!data.render.configured ? (
             <div className="rounded-2xl border border-[#C9A86A]/30 bg-[#15130E] p-4 space-y-2 text-[12px]">
               <div className="font-semibold text-[#C9A86A]">
@@ -454,12 +568,6 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
               {data.render.error && (
                 <div className="rounded-xl border border-[#F06A7E]/35 bg-[#F06A7E]/10 px-3 py-2 text-[11px] text-[#F06A7E]">
                   {data.render.error}
-                </div>
-              )}
-
-              {data.render.services.length === 0 && !data.render.error && (
-                <div className="text-[12px] text-[#8D867C] text-center py-4">
-                  Сервисы в Render не найдены
                 </div>
               )}
 
@@ -516,32 +624,57 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleToggleRenderDeploys(svc.id)}
+                          onClick={() => handleToggleRenderLogs(svc.id)}
                           className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/10 py-1.5 px-2 text-[11px] text-[#DED7CC]"
                         >
-                          <Terminal className="w-3.5 h-3.5 text-[#C9A86A]" />
-                          {deploysSvcId === svc.id ? 'Скрыть' : 'Деплои'}
+                          <Terminal className="w-3.5 h-3.5 text-[#5B9BFF]" />
+                          {rLogsSvcId === svc.id ? 'Скрыть логи' : 'Логи бота'}
                         </button>
                         <button
                           type="button"
-                          disabled={Boolean(busyKey)}
-                          onClick={() =>
-                            handleRenderAction(
-                              svc,
-                              isSuspended ? 'resume' : 'suspend',
-                              isSuspended ? 'Запустить' : 'Остановить',
-                            )
-                          }
-                          className={`inline-flex items-center justify-center gap-1 rounded-xl border py-1.5 px-2 text-[11px] disabled:opacity-40 ${
-                            isSuspended
-                              ? 'border-[#3FD08F]/40 bg-[#3FD08F]/10 text-[#3FD08F]'
-                              : 'border-[#F06A7E]/35 bg-[#F06A7E]/10 text-[#F06A7E]'
-                          }`}
+                          onClick={() => handleToggleRenderDeploys(svc.id)}
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/10 py-1.5 px-2 text-[11px] text-[#DED7CC]"
                         >
-                          {isSuspended ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                          {isSuspended ? 'Resume' : 'Suspend'}
+                          <Server className="w-3.5 h-3.5 text-[#C9A86A]" />
+                          {deploysSvcId === svc.id ? 'Скрыть' : 'Деплои'}
                         </button>
                       </div>
+
+                      <button
+                        type="button"
+                        disabled={Boolean(busyKey)}
+                        onClick={() =>
+                          handleRenderAction(
+                            svc,
+                            isSuspended ? 'resume' : 'suspend',
+                            isSuspended ? 'Запустить' : 'Остановить',
+                          )
+                        }
+                        className={`w-full inline-flex items-center justify-center gap-1 rounded-xl border py-1.5 px-2 text-[11px] disabled:opacity-40 ${
+                          isSuspended
+                            ? 'border-[#3FD08F]/40 bg-[#3FD08F]/10 text-[#3FD08F]'
+                            : 'border-[#F06A7E]/35 bg-[#F06A7E]/10 text-[#F06A7E]'
+                        }`}
+                      >
+                        {isSuspended ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                        {isSuspended ? 'Resume (Запустить)' : 'Suspend (Остановить)'}
+                      </button>
+
+                      {rLogsSvcId === svc.id && (
+                        <div className="rounded-lg border border-white/10 bg-[#080807] p-2 font-mono text-[10px] text-[#CFC8BC] max-h-48 overflow-y-auto space-y-0.5">
+                          {rLogsLoading ? (
+                            <div className="text-[#8D867C]">Загрузка живых логов Render...</div>
+                          ) : rLogsLines.length === 0 ? (
+                            <div className="text-[#8D867C]">Свежих строк лога нет</div>
+                          ) : (
+                            rLogsLines.map((line, idx) => (
+                              <div key={idx} className="break-all leading-relaxed">
+                                {line}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
 
                       {deploysSvcId === svc.id && (
                         <div className="rounded-lg border border-white/10 bg-[#080807] p-2 space-y-1.5">
@@ -571,7 +704,11 @@ export const CloudOpsTab: React.FC<CloudOpsTabProps> = ({
           )}
         </div>
       )}
+
+      {/* GITHUB PANEL */}
+      {sub === 'github' && (
+        <GitHubOpsPanel buildAuthHeaders={buildAuthHeaders} showToast={showToast} />
+      )}
     </div>
   );
 };
-
