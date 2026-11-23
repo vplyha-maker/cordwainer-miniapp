@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BookmarkPlus, Play, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { DARK_INPUT_STYLE } from './types';
 
@@ -50,8 +50,7 @@ function loadSaved(): SavedFilterList {
 function previewCell(v: unknown): string {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'object') return JSON.stringify(v).slice(0, 50);
-  const s = String(v);
-  return s.length > 48 ? `${s.slice(0, 48)}…` : s;
+  return String(v);
 }
 
 export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
@@ -69,10 +68,12 @@ export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
 
   const [saved, setSaved] = useState<SavedFilterList>(loadSaved);
   const [running, setRunning] = useState<boolean>(false);
+  const [hasRun, setHasRun] = useState<boolean>(false);
   const [ms, setMs] = useState<number>(0);
   const [resCols, setResCols] = useState<string[]>([]);
   const [resRows, setResRows] = useState<RowList>([]);
   const [err, setErr] = useState<string>('');
+  const resRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!table && tables.length > 0) setTable(tables[0]);
@@ -131,9 +132,13 @@ export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
       if (!r.ok || !data.ok) {
         setErr(data.error || 'Ошибка выполнения');
       } else {
+        setHasRun(true);
         setMs(data.ms || 0);
         setResCols(data.columns || []);
         setResRows(data.rows || []);
+        setTimeout(() => {
+          resRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
       }
     } catch {
       setErr('Ошибка сети');
@@ -186,7 +191,6 @@ export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
           Визуальный конструктор (0% SQL)
         </div>
 
-        {/* Table picker pills */}
         <div>
           <div className="text-[11px] text-[#8D867C] mb-1.5">1. Таблица</div>
           <div className="flex flex-wrap gap-1.5">
@@ -207,7 +211,6 @@ export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
           </div>
         </div>
 
-        {/* Column picker pills */}
         {columns.length > 0 && (
           <div>
             <div className="text-[11px] text-[#8D867C] mb-1.5">2. Колонка для фильтра</div>
@@ -230,7 +233,6 @@ export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
           </div>
         )}
 
-        {/* Condition pills */}
         <div>
           <div className="text-[11px] text-[#8D867C] mb-1.5">3. Условие</div>
           <div className="flex flex-wrap gap-1.5">
@@ -292,7 +294,6 @@ export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
         </div>
       </div>
 
-      {/* Saved user buttons */}
       {saved.length > 0 && (
         <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-2">
           <div className="text-[12px] font-semibold text-[#A8A095]">★ Мои сохранённые кнопки</div>
@@ -336,38 +337,45 @@ export const NeonVisualBuilder: React.FC<NeonVisualBuilderProps> = ({
         </div>
       )}
 
-      {resRows.length > 0 && (
-        <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-2">
-          <div className="text-[12px] font-mono text-[#C9A86A]">
-            Найдено: {resRows.length} стр. ({ms} мс)
-          </div>
-          <div className="overflow-x-auto rounded-xl border border-white/[0.07] bg-[#0B0B0A]">
-            <table className="w-full text-left text-[11px] font-mono">
-              <thead className="border-b border-white/[0.08] text-[#8D867C]">
-                <tr>
-                  {resCols.slice(0, 8).map((c) => (
-                    <th key={c} className="px-2.5 py-2 whitespace-nowrap">
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.05] text-[#DED7CC]">
-                {resRows.map((row, idx) => (
-                  <tr key={idx}>
-                    {resCols.slice(0, 8).map((c) => (
-                      <td key={c} className="px-2.5 py-1.5 whitespace-nowrap">
-                        {previewCell(row[c])}
-                      </td>
+      <div ref={resRef}>
+        {hasRun && (
+          <div className="rounded-2xl border border-[#C9A86A]/30 bg-[#141412] p-3.5 space-y-2">
+            <div className="text-[12px] font-mono text-[#C9A86A]">
+              Найдено: {resRows.length} стр. ({ms} мс)
+            </div>
+            {resRows.length === 0 ? (
+              <div className="text-[12px] text-[#8D867C] py-2">
+                По заданному условию записей в таблице «{table}» нет.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-white/[0.07] bg-[#0B0B0A]">
+                <table className="w-full text-left text-[11px] font-mono">
+                  <thead className="border-b border-white/[0.08] text-[#8D867C]">
+                    <tr>
+                      {resCols.slice(0, 8).map((c) => (
+                        <th key={c} className="px-2.5 py-2 whitespace-nowrap">
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.05] text-[#DED7CC]">
+                    {resRows.map((row, idx) => (
+                      <tr key={idx}>
+                        {resCols.slice(0, 8).map((c) => (
+                          <td key={c} className="px-2.5 py-1.5 max-w-[150px] truncate">
+                            {previewCell(row[c])}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
-
