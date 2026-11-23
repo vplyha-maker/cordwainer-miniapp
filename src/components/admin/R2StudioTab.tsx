@@ -1,31 +1,30 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BarChart2,
-  Copy,
   Eye,
   Folder,
   FolderPlus,
   HardDrive,
+  LayoutGrid,
+  List,
   RefreshCw,
-  Replace,
   Search,
+  Sparkles,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react';
-import { copyTextToClipboard } from './exportUtils';
 import { DARK_INPUT_STYLE, formatShortDate } from './types';
+import { R2PreviewModal } from './R2PreviewModal';
+import {
+  formatBytes,
+  isImageKey,
+  optimizeImageToWebP,
+  type R2FileItem,
+} from './r2ImageUtils';
 
 type R2Mode = 'files' | 'analytics';
-type TopKind = 'largest' | 'newest';
-
-type R2FileItem = {
-  key: string;
-  size: number;
-  lastModified: string;
-};
-
-type R2FileList = R2FileItem[];
+type TopKind = 'largest' | 'newest' | 'duplicates';
+type ViewLayout = 'list' | 'gallery';
 
 type R2ListState = {
   configured: boolean;
@@ -36,9 +35,15 @@ type R2ListState = {
   searchTotal?: number;
   totalSize: number;
   folders: string[];
-  files: R2FileList;
+  files: R2FileItem[];
   isTruncated: boolean;
   nextToken: string;
+};
+
+type R2DuplicateGroup = {
+  etag: string;
+  size: number;
+  keys: string[];
 };
 
 type R2StatsData = {
@@ -47,14 +52,11 @@ type R2StatsData = {
   totalFiles: number;
   totalBytes: number;
   formats: Array<{ ext: string; count: number; bytes: number }>;
-  largest: R2FileList;
-  newest: R2FileList;
-};
-
-type PreviewFileState = {
-  file: R2FileItem;
-  signedUrl: string;
-  loading: boolean;
+  largest: R2FileItem[];
+  newest: R2FileItem[];
+  duplicates: R2DuplicateGroup[];
+  duplicateGroupsCount: number;
+  duplicateWastedBytes: number;
 };
 
 type R2StudioTabProps = {
@@ -64,32 +66,14 @@ type R2StudioTabProps = {
 
 const R2_FREE_LIMIT_BYTES = 10 * 1024 * 1024 * 1024;
 
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-function isImageKey(key: string): boolean {
-  return /\.(webp|jpe?g|png|gif|avif|svg)$/i.test(key);
-}
-
-function keyToModelName(key: string): string {
-  const fileName = key.split('/').pop() || key;
-  return fileName
-    .replace(/\.[^.]+$/, '')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 export const R2StudioTab: React.FC<R2StudioTabProps> = ({
   buildAuthHeaders,
   showToast,
 }) => {
   const [mode, setMode] = useState<R2Mode>('files');
+  const [viewLayout, setViewLayout] = useState<ViewLayout>('list');
+  const [autoWebp, setAutoWebp] = useState<boolean>(true);
+
   const [r2, setR2] = useState<R2ListState | null>(null);
   const [prefix, setPrefix] = useState<string>('');
   const [search, setSearch] = useState<string>('');
@@ -101,11 +85,13 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
   const [showNewFolder, setShowNewFolder] = useState<boolean>(false);
   const [newFolderName, setNewFolderName] = useState<string>('');
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-  const replaceInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Private preview modal
-  const [preview, setPreview] = useState<PreviewFileState | null>(null);
-  const [replacing, setReplacing] = useState<boolean>(false);
+  // Gallery signed thumbnail cache
+  const [thumbMap, setThumbMap] = useState<Record<string, string>>({});
+  const [thumbsLoading, setThumbsLoading] = useState<boolean>(false);
+
+  // Preview modal
+  const [previewFile, setPreviewFile] = useState<R2FileItem | null>(null);
 
   // Analytics tab
   const [stats, setStats] = useState<R2StatsData | null>(null);
@@ -178,24 +164,39 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
     }
   }, [mode, stats, r2?.configured, fetchStats]);
 
-  const openPrivatePreview = async (file: R2FileItem) => {
-    setPreview({ file, signedUrl: '', loading: true });
-    try {
-      const r = await fetch(`/api/check-purchase?action=r2-view&key=${encodeURIComponent(file.key)}`, {
-        headers: buildAuthHeaders(),
-      });
-      const data = (await r.json()) as { ok?: boolean; url?: string; error?: string };
-      if (r.ok && data.ok && data.url) {
-        setPreview({ file, signedUrl: data.url, loading: false });
-      } else {
-        setPreview({ file, signedUrl: '', loading: false });
-        showToast(data.error || 'Не удалось получить ссылку превью');
+  // Tool 5: Batch-sign thumbnails when Gallery mode is active
+  useEffect(() => {
+    if (viewLayout !== 'gallery' || !r2?.files.length) return;
+    const missingKeys = r2.files
+      .filter((f) => isImageKey(f.key) && !thumbMap[f.key])
+      .slice(0, 24)
+      .map((f) => f.key);
+    if (missingKeys.length === 0) return;
+
+    let active = true;
+    setThumbsLoading(true);
+    (async () => {
+      try {
+        const r = await fetch('/api/check-purchase?action=r2-view-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+          body: JSON.stringify({ keys: missingKeys }),
+        });
+        const data = (await r.json()) as { ok?: boolean; urls?: Record<string, string> };
+        if (active && r.ok && data.ok && data.urls) {
+          setThumbMap((prev) => ({ ...prev, ...data.urls }));
+        }
+      } catch {
+        // ignore thumbnail batch failure
+      } finally {
+        if (active) setThumbsLoading(false);
       }
-    } catch {
-      setPreview({ file, signedUrl: '', loading: false });
-      showToast('Ошибка сети');
-    }
-  };
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [viewLayout, r2?.files, thumbMap, buildAuthHeaders]);
 
   const handleMultiUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = Array.from(e.target.files || []);
@@ -203,12 +204,17 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
     if (fileList.length === 0) return;
 
     let okCount = 0;
+    let totalSaved = 0;
     for (let i = 0; i < fileList.length; i += 1) {
-      const file = fileList[i];
+      const rawFile = fileList[i];
       setUploadProgress(`${i + 1}/${fileList.length}`);
       try {
-        const cleanName = file.name.replace(/\s+/g, '_');
+        const opt = autoWebp
+          ? await optimizeImageToWebP(rawFile)
+          : { file: rawFile, originalSize: rawFile.size, finalSize: rawFile.size, savedBytes: 0, converted: false };
+        const cleanName = opt.file.name.replace(/\s+/g, '_');
         const targetKey = `${prefix}${cleanName}`;
+
         const r = await fetch('/api/check-purchase?action=r2-presign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
@@ -219,54 +225,25 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
 
         const putResp = await fetch(data.uploadUrl, {
           method: 'PUT',
-          headers: { 'Content-Type': file.type || 'application/octet-stream' },
-          body: file,
+          headers: { 'Content-Type': opt.file.type || 'application/octet-stream' },
+          body: opt.file,
         });
-        if (putResp.ok) okCount += 1;
+        if (putResp.ok) {
+          okCount += 1;
+          totalSaved += opt.savedBytes;
+        }
       } catch {
         // continue next file
       }
     }
 
     setUploadProgress('');
-    showToast(okCount > 0 ? `Загружено файлов: ${okCount} из ${fileList.length}` : 'Ошибка загрузки (проверьте CORS)');
-    if (okCount > 0) fetchList(prefix, search);
-  };
-
-  const handleReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !preview) return;
-
-    setReplacing(true);
-    try {
-      const targetKey = preview.file.key;
-      const r = await fetch('/api/check-purchase?action=r2-presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
-        body: JSON.stringify({ key: targetKey }),
-      });
-      const data = (await r.json()) as { ok?: boolean; uploadUrl?: string; error?: string };
-      if (!r.ok || !data.ok || !data.uploadUrl) {
-        showToast(data.error || 'Не удалось получить ссылку замены');
-        return;
-      }
-      const putResp = await fetch(data.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      });
-      if (!putResp.ok) {
-        showToast('Ошибка замены файла в R2');
-        return;
-      }
-      showToast('Файл успешно заменён (ссылка в Neon сохранена)');
-      openPrivatePreview({ ...preview.file, size: file.size, lastModified: new Date().toISOString() });
+    if (okCount > 0) {
+      const savedNote = totalSaved > 0 ? ` · WebP сэкономил ${formatBytes(totalSaved)}` : '';
+      showToast(`Загружено: ${okCount}/${fileList.length}${savedNote}`);
       fetchList(prefix, search);
-    } catch {
-      showToast('Ошибка сети при замене');
-    } finally {
-      setReplacing(false);
+    } else {
+      showToast('Ошибка загрузки (проверьте CORS)');
     }
   };
 
@@ -281,7 +258,6 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
       const data = (await r.json()) as { ok?: boolean; error?: string };
       if (r.ok && data.ok) {
         showToast('Файл удалён из R2');
-        if (preview?.file.key === key) setPreview(null);
         fetchList(prefix, search);
       } else {
         showToast(data.error || 'Не удалось удалить файл');
@@ -302,7 +278,9 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
   };
 
   const parentPrefix = prefix ? prefix.replace(/[^/]+\/$/, '') : '';
-  const quotaPct = stats ? Math.min(100, Math.max(0.5, Number(((stats.totalBytes / R2_FREE_LIMIT_BYTES) * 100).toFixed(1)))) : 0;
+  const quotaPct = stats
+    ? Math.min(100, Math.max(0.5, Number(((stats.totalBytes / R2_FREE_LIMIT_BYTES) * 100).toFixed(1))))
+    : 0;
 
   return (
     <div className="space-y-3">
@@ -412,6 +390,43 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
             </div>
           </div>
 
+          {/* Toolbar: Auto-WebP + List/Gallery switcher */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setAutoWebp((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-medium transition ${
+                autoWebp
+                  ? 'border-[#3FD08F]/45 bg-[#3FD08F]/10 text-[#3FD08F]'
+                  : 'border-white/10 bg-[#0F0F0E] text-[#8D867C]'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Авто-WebP: {autoWebp ? 'ВКЛ' : 'ВЫКЛ'}
+            </button>
+
+            <div className="inline-flex rounded-xl border border-white/10 bg-[#0F0F0E] p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewLayout('list')}
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] ${
+                  viewLayout === 'list' ? 'bg-[#C9A86A] text-[#121210] font-semibold' : 'text-[#A8A095]'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" /> Список
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewLayout('gallery')}
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] ${
+                  viewLayout === 'gallery' ? 'bg-[#C9A86A] text-[#121210] font-semibold' : 'text-[#A8A095]'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" /> Галерея
+              </button>
+            </div>
+          </div>
+
           {showNewFolder && (
             <div className="flex gap-2">
               <input
@@ -467,75 +482,123 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
             </button>
           )}
 
-          <div className="space-y-1.5">
-            {r2.folders.map((folder) => (
-              <button
-                key={folder}
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  fetchList(folder, '');
-                }}
-                className="w-full flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0F0F0E] px-3 py-2 text-left"
-              >
-                <span className="flex items-center gap-2 text-[13px] text-[#F5F1EB] font-mono">
-                  <Folder className="w-4 h-4 text-[#C9A86A]" /> {folder}
-                </span>
-                <span className="text-[11px] text-[#8D867C]">Открыть →</span>
-              </button>
-            ))}
-
-            {r2.files.map((f) => (
-              <div
-                key={f.key}
-                className="flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-[#0F0F0E] px-3 py-2"
-              >
+          {/* Folders */}
+          {r2.folders.length > 0 && (
+            <div className="space-y-1.5">
+              {r2.folders.map((folder) => (
                 <button
+                  key={folder}
                   type="button"
-                  onClick={() => openPrivatePreview(f)}
-                  className="min-w-0 flex-1 text-left"
+                  onClick={() => {
+                    setSearch('');
+                    fetchList(folder, '');
+                  }}
+                  className="w-full flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0F0F0E] px-3 py-2 text-left"
                 >
-                  <div className="font-mono text-[12px] text-[#F5F1EB] truncate">
-                    {f.key.slice(prefix.length) || f.key}
-                  </div>
-                  <div className="text-[11px] text-[#8D867C] font-mono">
-                    {formatBytes(f.size)} · {formatShortDate(f.lastModified)}
-                  </div>
+                  <span className="flex items-center gap-2 text-[13px] text-[#F5F1EB] font-mono">
+                    <Folder className="w-4 h-4 text-[#C9A86A]" /> {folder}
+                  </span>
+                  <span className="text-[11px] text-[#8D867C]">Открыть →</span>
                 </button>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => openPrivatePreview(f)}
-                    title="Просмотр"
-                    className="p-1.5 rounded-lg border border-white/10 text-[#5B9BFF]"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteKey(f.key)}
-                    title="Удалить"
-                    className="p-1.5 rounded-lg border border-[#F06A7E]/30 text-[#F06A7E]"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
 
-            {r2.folders.length === 0 && r2.files.length === 0 && !loading && (
-              <div className="text-center py-6 space-y-1">
-                <div className="text-[12px] text-[#8D867C]">
-                  {search.trim() ? 'Файлы не найдены' : 'Папка пуста'}
-                </div>
-                {!search.trim() && prefix && (
-                  <div className="text-[11px] text-[#C9A86A]/80">
-                    Папка сохранится в R2 после загрузки первого файла
+          {/* Files: List or Gallery */}
+          {viewLayout === 'list' ? (
+            <div className="space-y-1.5">
+              {r2.files.map((f) => (
+                <div
+                  key={f.key}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-[#0F0F0E] px-3 py-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFile(f)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="font-mono text-[12px] text-[#F5F1EB] truncate">
+                      {f.key.slice(prefix.length) || f.key}
+                    </div>
+                    <div className="text-[11px] text-[#8D867C] font-mono">
+                      {formatBytes(f.size)} · {formatShortDate(f.lastModified)}
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFile(f)}
+                      title="Просмотр"
+                      className="p-1.5 rounded-lg border border-white/10 text-[#5B9BFF]"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteKey(f.key)}
+                      title="Удалить"
+                      className="p-1.5 rounded-lg border border-[#F06A7E]/30 text-[#F06A7E]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {thumbsLoading && (
+                <div className="text-[11px] text-[#C9A86A] font-mono">Подпись миниатюр галереи...</div>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {r2.files.map((f) => {
+                  const thumb = thumbMap[f.key];
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setPreviewFile(f)}
+                      className="rounded-xl border border-white/[0.07] bg-[#0F0F0E] overflow-hidden text-left hover:border-[#C9A86A]/45"
+                    >
+                      <div className="h-24 bg-[#090908] flex items-center justify-center p-1.5 overflow-hidden">
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt={f.key}
+                            loading="lazy"
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        ) : (
+                          <span className="text-[10px] font-mono text-[#6F6960]">
+                            {isImageKey(f.key) ? '...' : 'FILE'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="px-2 py-1.5">
+                        <div className="font-mono text-[10px] text-[#F5F1EB] truncate">
+                          {f.key.slice(prefix.length) || f.key}
+                        </div>
+                        <div className="font-mono text-[10px] text-[#8D867C]">{formatBytes(f.size)}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {r2.folders.length === 0 && r2.files.length === 0 && !loading && (
+            <div className="text-center py-6 space-y-1">
+              <div className="text-[12px] text-[#8D867C]">
+                {search.trim() ? 'Файлы не найдены' : 'Папка пуста'}
+              </div>
+              {!search.trim() && prefix && (
+                <div className="text-[11px] text-[#C9A86A]/80">
+                  Папка сохранится в R2 после загрузки первого файла
+                </div>
+              )}
+            </div>
+          )}
 
           {r2.isTruncated && r2.nextToken && (
             <button
@@ -550,7 +613,7 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
         </div>
       )}
 
-      {/* MODE 2: R2 ANALYTICS & TOP-20 */}
+      {/* MODE 2: R2 ANALYTICS, TOP-20 & ETAG DUPLICATES */}
       {mode === 'analytics' && r2?.configured && (
         <div className="space-y-3">
           <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-3">
@@ -570,7 +633,7 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
 
             {statsLoading && !stats && (
               <div className="text-[12px] text-[#8D867C] py-4 text-center">
-                Сканирование всех файлов бакета...
+                Сканирование всех файлов и ETag-хешей...
               </div>
             )}
 
@@ -607,140 +670,114 @@ export const R2StudioTab: React.FC<R2StudioTabProps> = ({
 
           {stats && (
             <div className="rounded-2xl border border-white/[0.08] bg-[#141412] p-3.5 space-y-2.5">
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setTopKind('largest')}
-                  className={`rounded-xl py-1.5 text-[12px] font-semibold ${
+                  className={`rounded-xl py-1.5 text-[11px] font-semibold ${
                     topKind === 'largest'
                       ? 'bg-[#C9A86A]/20 text-[#C9A86A] border border-[#C9A86A]/45'
                       : 'bg-[#0F0F0E] text-[#A8A095] border border-white/[0.07]'
                   }`}
                 >
-                  ТОП-20 тяжёлых
+                  Тяжёлые
                 </button>
                 <button
                   type="button"
                   onClick={() => setTopKind('newest')}
-                  className={`rounded-xl py-1.5 text-[12px] font-semibold ${
+                  className={`rounded-xl py-1.5 text-[11px] font-semibold ${
                     topKind === 'newest'
                       ? 'bg-[#5B9BFF]/20 text-[#5B9BFF] border border-[#5B9BFF]/45'
                       : 'bg-[#0F0F0E] text-[#A8A095] border border-white/[0.07]'
                   }`}
                 >
-                  ТОП-20 свежих
+                  Свежие
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTopKind('duplicates')}
+                  className={`rounded-xl py-1.5 text-[11px] font-semibold ${
+                    topKind === 'duplicates'
+                      ? 'bg-[#F06A7E]/20 text-[#F06A7E] border border-[#F06A7E]/45'
+                      : 'bg-[#0F0F0E] text-[#A8A095] border border-white/[0.07]'
+                  }`}
+                >
+                  Дубли ({stats.duplicateGroupsCount})
                 </button>
               </div>
 
-              <div className="space-y-1.5">
-                {(topKind === 'largest' ? stats.largest : stats.newest).map((f) => (
-                  <button
-                    key={f.key}
-                    type="button"
-                    onClick={() => openPrivatePreview(f)}
-                    className="w-full flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-[#0F0F0E] px-3 py-2 text-left hover:border-[#C9A86A]/40"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-mono text-[12px] text-[#F5F1EB] truncate">{f.key}</div>
-                      <div className="text-[11px] font-mono text-[#8D867C]">
-                        {formatShortDate(f.lastModified)}
-                      </div>
+              {topKind === 'duplicates' ? (
+                <div className="space-y-2">
+                  {stats.duplicates.length === 0 ? (
+                    <div className="text-[12px] text-[#3FD08F] text-center py-4">
+                      Точных дубликатов по MD5 (ETag) не найдено!
                     </div>
-                    <span className="shrink-0 font-mono text-[12px] font-semibold text-[#C9A86A]">
-                      {formatBytes(f.size)}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                  ) : (
+                    <>
+                      <div className="text-[11px] font-mono text-[#F06A7E]">
+                        Групп дубликатов: {stats.duplicateGroupsCount} · лишний объём: {formatBytes(stats.duplicateWastedBytes)}
+                      </div>
+                      {stats.duplicates.map((grp) => (
+                        <div
+                          key={grp.etag}
+                          className="rounded-xl border border-[#F06A7E]/25 bg-[#0F0F0E] p-2.5 space-y-1.5"
+                        >
+                          <div className="flex justify-between text-[10px] font-mono text-[#8D867C]">
+                            <span>ETag: {grp.etag.slice(0, 12)}...</span>
+                            <span className="text-[#C9A86A]">{grp.keys.length}× · {formatBytes(grp.size)}</span>
+                          </div>
+                          {grp.keys.map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              onClick={() => setPreviewFile({ key: k, size: grp.size, lastModified: '' })}
+                              className="w-full text-left font-mono text-[11px] text-[#F5F1EB] truncate hover:text-[#C9A86A]"
+                            >
+                              • {k}
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {(topKind === 'largest' ? stats.largest : stats.newest).map((f) => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setPreviewFile(f)}
+                      className="w-full flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-[#0F0F0E] px-3 py-2 text-left hover:border-[#C9A86A]/40"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-mono text-[12px] text-[#F5F1EB] truncate">{f.key}</div>
+                        <div className="text-[11px] font-mono text-[#8D867C]">
+                          {formatShortDate(f.lastModified)}
+                        </div>
+                      </div>
+                      <span className="shrink-0 font-mono text-[12px] font-semibold text-[#C9A86A]">
+                        {formatBytes(f.size)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* PRIVATE FILE PREVIEW MODAL (Presigned GET 5 min + Replace + Delete) */}
-      {preview && (
-        <div className="fixed inset-0 z-[135] bg-black/85 flex items-center justify-center p-4">
-          <div className="w-full max-w-md max-h-[88dvh] rounded-2xl border border-[#C9A86A]/35 bg-[#141412] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
-              <div className="font-mono text-[12px] font-semibold text-[#C9A86A] truncate">
-                {preview.file.key}
-              </div>
-              <button type="button" onClick={() => setPreview(null)} className="p-1 text-[#8D867C]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-3 overflow-y-auto">
-              <div className="rounded-xl border border-white/[0.08] bg-[#0B0B0A] min-h-[200px] flex items-center justify-center overflow-hidden p-2">
-                {preview.loading ? (
-                  <div className="text-[12px] text-[#8D867C]">Подпись временной ссылки (5 мин)...</div>
-                ) : preview.signedUrl && isImageKey(preview.file.key) ? (
-                  <img
-                    src={preview.signedUrl}
-                    alt={preview.file.key}
-                    className="max-h-[300px] w-auto object-contain rounded-lg"
-                  />
-                ) : (
-                  <div className="text-[12px] text-[#8D867C] text-center p-4">
-                    Предпросмотр доступен для изображений.
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-between text-[11px] font-mono text-[#A8A095]">
-                <span>Размер: {formatBytes(preview.file.size)}</span>
-                <span>{formatShortDate(preview.file.lastModified)}</span>
-              </div>
-
-              <input
-                ref={replaceInputRef}
-                type="file"
-                accept={isImageKey(preview.file.key) ? 'image/*' : undefined}
-                onChange={handleReplaceFile}
-                className="hidden"
-              />
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const modelName = keyToModelName(preview.file.key);
-                    await copyTextToClipboard(modelName);
-                    showToast(`Скопировано: ${modelName}`);
-                  }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 py-2 px-2.5 text-[12px] text-[#F5F1EB]"
-                >
-                  <Copy className="w-3.5 h-3.5" /> Название
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await copyTextToClipboard(preview.file.key);
-                    showToast('Путь скопирован');
-                  }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 py-2 px-2.5 text-[12px] text-[#F5F1EB]"
-                >
-                  <Copy className="w-3.5 h-3.5" /> Путь
-                </button>
-                <button
-                  type="button"
-                  disabled={replacing}
-                  onClick={() => replaceInputRef.current?.click()}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#C9A86A] py-2 px-2.5 text-[12px] font-semibold text-[#121210] disabled:opacity-50"
-                >
-                  <Replace className="w-3.5 h-3.5" /> {replacing ? '...' : 'Заменить'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteKey(preview.file.key)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#F06A7E]/40 bg-[#F06A7E]/10 py-2 px-2.5 text-[12px] text-[#F06A7E]"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Удалить
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {previewFile && (
+        <R2PreviewModal
+          file={previewFile}
+          autoWebp={autoWebp}
+          buildAuthHeaders={buildAuthHeaders}
+          showToast={showToast}
+          onClose={() => setPreviewFile(null)}
+          onRefresh={() => fetchList(prefix, search)}
+          onFileChanged={(nextFile) => setPreviewFile(nextFile)}
+        />
       )}
     </div>
   );
