@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Activity, Copy, Database, ExternalLink } from 'lucide-react';
+import { CloudOpsTab } from './CloudOpsTab';
 import { copyTextToClipboard } from './exportUtils';
 import { NeonQuickCommands } from './NeonQuickCommands';
 import { NeonTableBrowser, type NeonTableSummary } from './NeonTableBrowser';
@@ -8,7 +9,7 @@ import { R2StudioTab } from './R2StudioTab';
 import type { HealthData } from './types';
 import { formatShortDate } from './types';
 
-type SubTab = 'health' | 'neon' | 'r2';
+type SubTab = 'health' | 'neon' | 'r2' | 'cloud';
 type NeonMode = 'commands' | 'tables' | 'builder';
 
 type TgWindow = {
@@ -123,12 +124,13 @@ export const AdminSystemTab: React.FC<AdminSystemTabProps> = ({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-white/[0.08] bg-[#141412] p-1">
+      <div className="grid grid-cols-4 gap-1 rounded-2xl border border-white/[0.08] bg-[#141412] p-1">
         {(
           [
             { id: 'health', label: 'Обзор' },
-            { id: 'neon', label: 'Neon Studio' },
-            { id: 'r2', label: 'R2 Studio' },
+            { id: 'neon', label: 'Neon' },
+            { id: 'r2', label: 'R2' },
+            { id: 'cloud', label: 'Cloud' },
           ] as const
         ).map((item) => (
           <button
@@ -313,6 +315,10 @@ export const AdminSystemTab: React.FC<AdminSystemTabProps> = ({
 
       {subTab === 'r2' && (
         <R2StudioTab buildAuthHeaders={buildAuthHeaders} showToast={showToast} />
+      )}
+
+      {subTab === 'cloud' && (
+        <CloudOpsTab buildAuthHeaders={buildAuthHeaders} showToast={showToast} />
       )}
     </div>
   );
