@@ -42,6 +42,13 @@ type R2Config = {
   missing: string[];
 };
 
+type R2ObjectRow = {
+  key: string;
+  size: number;
+  lastModified: string;
+  etag: string;
+};
+
 function getR2Config(): R2Config {
   const accountId = (process.env.R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
   const accessKeyId = (process.env.R2_ACCESS_KEY_ID || process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || '').trim();
@@ -86,9 +93,10 @@ function getSigningKey(secretKey: string, dateStamp: string): Buffer {
 
 async function r2SignedFetch(
   cfg: R2Config,
-  method: 'GET' | 'DELETE',
+  method: 'GET' | 'PUT' | 'DELETE',
   key: string,
   queryObj: Record<string, string>,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Response> {
   const host = `${cfg.accountId}.r2.cloudflarestorage.com`;
   const now = new Date();
@@ -104,8 +112,18 @@ async function r2SignedFetch(
     .map((k) => `${r2Encode(k)}=${r2Encode(queryObj[k])}`)
     .join('&');
 
-  const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${EMPTY_SHA256}\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+  const headersLower: Record<string, string> = {
+    host,
+    'x-amz-content-sha256': EMPTY_SHA256,
+    'x-amz-date': amzDate,
+  };
+  for (const [hk, hv] of Object.entries(extraHeaders)) {
+    headersLower[hk.toLowerCase()] = hv.trim();
+  }
+  const sortedHeaderKeys = Object.keys(headersLower).sort();
+  const canonicalHeaders = sortedHeaderKeys.map((k) => `${k}:${headersLower[k]}\n`).join('');
+  const signedHeaders = sortedHeaderKeys.join(';');
+
   const canonicalRequest = [
     method,
     canonicalUri,
@@ -122,16 +140,18 @@ async function r2SignedFetch(
     .update(stringToSign, 'utf8')
     .digest('hex');
 
+  const fetchHeaders: Record<string, string> = {
+    Host: host,
+    'x-amz-content-sha256': EMPTY_SHA256,
+    'x-amz-date': amzDate,
+    Authorization: `AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${sig}`,
+  };
+  for (const [hk, hv] of Object.entries(extraHeaders)) {
+    fetchHeaders[hk] = hv.trim();
+  }
+
   const url = `https://${host}${canonicalUri}${canonicalQuery ? `?${canonicalQuery}` : ''}`;
-  return fetch(url, {
-    method,
-    headers: {
-      Host: host,
-      'x-amz-content-sha256': EMPTY_SHA256,
-      'x-amz-date': amzDate,
-      Authorization: `AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${sig}`,
-    },
-  });
+  return fetch(url, { method, headers: fetchHeaders });
 }
 
 function r2PresignUrl(cfg: R2Config, method: 'GET' | 'PUT', key: string, expiresSec = 300): string {
@@ -191,7 +211,7 @@ function parseR2ListXml(xml: string) {
     fm = folderRe.exec(xml);
   }
 
-  const files: Array<{ key: string; size: number; lastModified: string }> = [];
+  const files: R2ObjectRow[] = [];
   const itemRe = /<Contents>([\s\S]*?)<\/Contents>/g;
   let im: RegExpExecArray | null = itemRe.exec(xml);
   while (im) {
@@ -199,11 +219,13 @@ function parseR2ListXml(xml: string) {
     const keyM = block.match(/<Key>([\s\S]*?)<\/Key>/);
     const sizeM = block.match(/<Size>(\d+)<\/Size>/);
     const modM = block.match(/<LastModified>([\s\S]*?)<\/LastModified>/);
+    const etagM = block.match(/<ETag>([\s\S]*?)<\/ETag>/);
     if (keyM) {
       files.push({
         key: decodeXml(keyM[1]),
         size: sizeM ? Number(sizeM[1]) : 0,
         lastModified: modM ? decodeXml(modM[1]) : '',
+        etag: etagM ? decodeXml(etagM[1]).replace(/^"+|"+$/g, '') : '',
       });
     }
     im = itemRe.exec(xml);
@@ -217,7 +239,7 @@ function parseR2ListXml(xml: string) {
 }
 
 async function listAllR2Objects(cfg: R2Config, prefix = '') {
-  const allFiles: Array<{ key: string; size: number; lastModified: string }> = [];
+  const allFiles: R2ObjectRow[] = [];
   let token = '';
   for (let i = 0; i < 10; i += 1) {
     const q: Record<string, string> = { 'list-type': '2', 'max-keys': '1000' };
@@ -254,6 +276,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.productId) return String(obj.productId);
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
+    if (obj.newKey) return `${String(obj.oldKey || '')} → ${String(obj.newKey)}`;
     if (obj.key) return String(obj.key);
     if (obj.pk) return `pk=${String(obj.pk)}`;
     return meta;
@@ -263,6 +286,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.productId) return String(obj.productId);
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
+    if (obj.newKey) return `${String(obj.oldKey || '')} → ${String(obj.newKey)}`;
     if (obj.key) return String(obj.key);
     if (obj.pk) return `pk=${String(obj.pk)}`;
     return JSON.stringify(obj);
@@ -385,6 +409,21 @@ function getSql() {
 
 function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
+}
+
+async function getSneakersCols(sql: ReturnType<typeof neon>) {
+  const snCols = await sql`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'sneakers'
+  `;
+  const colList = snCols.map((c) => String(c.column_name));
+  return {
+    exists: colList.length > 0,
+    imgCol: colList.find((c) => /image|img|photo|pic|url|file/i.test(c)) || '',
+    nameCol: colList.find((c) => /name|title|model/i.test(c)) || colList[0] || '',
+    brandCol: colList.find((c) => /brand/i.test(c)) || '',
+    idCol: colList.includes('id') ? 'id' : colList[0] || '',
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -783,21 +822,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (cfg.missing.length > 0) {
           return res.status(400).json({ ok: false, error: 'Cloudflare R2 не настроен в Vercel' });
         }
-        const snExists = await sql`
-          SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sneakers' LIMIT 1
-        `;
-        if (snExists.length === 0) {
+        const meta = await getSneakersCols(sql);
+        if (!meta.exists) {
           return res.status(400).json({ ok: false, error: 'Таблица sneakers не найдена в Neon' });
         }
-
-        const snCols = await sql`
-          SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = 'sneakers'
-        `;
-        const colList = snCols.map((c) => String(c.column_name));
-        const imgCol = colList.find((c) => /image|img|photo|pic|url|file/i.test(c)) || '';
-        const nameCol = colList.find((c) => /name|title|model/i.test(c)) || colList[0];
-        const idCol = colList.includes('id') ? 'id' : colList[0];
 
         const allR2Files = await listAllR2Objects(cfg);
         const r2Keys = new Set<string>();
@@ -807,9 +835,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           r2Basenames.add(f.key.split('/').pop() || f.key);
         }
 
-        const selectCols = imgCol
-          ? `${quoteIdent(idCol)} AS id, ${quoteIdent(nameCol)} AS title, ${quoteIdent(imgCol)} AS img`
-          : `${quoteIdent(idCol)} AS id, ${quoteIdent(nameCol)} AS title, NULL AS img`;
+        const selectCols = meta.imgCol
+          ? `${quoteIdent(meta.idCol)} AS id, ${quoteIdent(meta.nameCol)} AS title, ${quoteIdent(meta.imgCol)} AS img`
+          : `${quoteIdent(meta.idCol)} AS id, ${quoteIdent(meta.nameCol)} AS title, NULL AS img`;
         const snRows = await sql.query(`SELECT ${selectCols} FROM "public"."sneakers"`);
 
         const usedKeys = new Set<string>();
@@ -859,8 +887,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             emptyImgCount,
             brokenNeonCount,
             orphanR2Count,
-            idCol,
-            imgCol,
+            idCol: meta.idCol,
+            imgCol: meta.imgCol,
             brokenNeon,
             orphanR2,
           },
@@ -1033,8 +1061,172 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const key = String(req.query.key || '').trim();
       if (!key) return res.status(400).json({ ok: false, error: 'Не указан ключ файла' });
 
-      const url = r2PresignUrl(cfg, 'GET', key, 300);
-      return res.status(200).json({ ok: true, key, url, ttlSec: 300 });
+      const reqTtl = Number(req.query.ttl || 300);
+      const ttlSec = reqTtl === 3600 || reqTtl === 86400 ? reqTtl : 300;
+      const url = r2PresignUrl(cfg, 'GET', key, ttlSec);
+
+      let neonMatches: Array<{ id: string; brand: string; title: string; img: string }> = [];
+      if (String(req.query.withNeon || '') === '1') {
+        try {
+          const meta = await getSneakersCols(sql);
+          if (meta.exists && meta.imgCol) {
+            const baseName = key.split('/').pop() || key;
+            const brandSelect = meta.brandCol ? `${quoteIdent(meta.brandCol)} AS brand` : `'' AS brand`;
+            const rows = await sql.query(
+              `SELECT ${quoteIdent(meta.idCol)} AS id, ${brandSelect}, ${quoteIdent(meta.nameCol)} AS title, ${quoteIdent(meta.imgCol)} AS img
+               FROM "public"."sneakers"
+               WHERE ${quoteIdent(meta.imgCol)} = $1 OR ${quoteIdent(meta.imgCol)} LIKE $2 OR ${quoteIdent(meta.imgCol)} = $3
+               LIMIT 5`,
+              [key, `%/${baseName}`, baseName],
+            );
+            neonMatches = (rows as Array<Record<string, unknown>>).map((r) => ({
+              id: String(r.id ?? ''),
+              brand: String(r.brand ?? ''),
+              title: String(r.title ?? ''),
+              img: String(r.img ?? ''),
+            }));
+          }
+        } catch (e) {
+          console.error('r2-view neon lookup error:', e);
+        }
+      }
+
+      return res.status(200).json({ ok: true, key, url, ttlSec, neonMatches });
+    }
+
+    if (action === 'r2-view-batch' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const cfg = getR2Config();
+      if (cfg.missing.length > 0) return res.status(400).json({ ok: false, error: 'R2 не настроен' });
+      const body = (req.body || {}) as Record<string, unknown>;
+      const rawKeys = Array.isArray(body.keys) ? body.keys : [];
+      const urls: Record<string, string> = {};
+      for (const item of rawKeys.slice(0, 30)) {
+        const k = String(item || '').trim();
+        if (k) urls[k] = r2PresignUrl(cfg, 'GET', k, 300);
+      }
+      return res.status(200).json({ ok: true, urls });
+    }
+
+    if (action === 'r2-rename' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const cfg = getR2Config();
+      if (cfg.missing.length > 0) return res.status(400).json({ ok: false, error: 'R2 не настроен' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const oldKey = String(body.oldKey || '').trim().replace(/^\/+/, '');
+      const newKey = String(body.newKey || '').trim().replace(/^\/+/, '');
+      const syncNeon = body.syncNeon !== false;
+
+      if (!oldKey || !newKey || oldKey === newKey) {
+        return res.status(400).json({ ok: false, error: 'Укажите новое имя файла' });
+      }
+
+      const copySource = `/${r2Encode(cfg.bucket)}/${r2EncodePath(oldKey)}`;
+      const copyResp = await r2SignedFetch(cfg, 'PUT', newKey, {}, { 'x-amz-copy-source': copySource });
+      if (!copyResp.ok) {
+        const txt = await copyResp.text();
+        return res.status(502).json({ ok: false, error: `Ошибка копирования R2 (${copyResp.status}): ${txt.slice(0, 100)}` });
+      }
+
+      const delResp = await r2SignedFetch(cfg, 'DELETE', oldKey, {});
+      if (!delResp.ok && delResp.status !== 204) {
+        return res.status(502).json({ ok: false, error: `Файл скопирован, но старый не удалён (${delResp.status})` });
+      }
+
+      let neonUpdated = 0;
+      if (syncNeon) {
+        try {
+          const meta = await getSneakersCols(sql);
+          if (meta.exists && meta.imgCol) {
+            const oldBase = oldKey.split('/').pop() || oldKey;
+            const newBase = newKey.split('/').pop() || newKey;
+            const matched = await sql.query(
+              `SELECT ${quoteIdent(meta.idCol)} AS id, ${quoteIdent(meta.imgCol)} AS img
+               FROM "public"."sneakers"
+               WHERE ${quoteIdent(meta.imgCol)} = $1 OR ${quoteIdent(meta.imgCol)} LIKE $2 OR ${quoteIdent(meta.imgCol)} = $3`,
+              [oldKey, `%/${oldBase}`, oldBase],
+            );
+            for (const row of matched as Array<{ id: unknown; img: unknown }>) {
+              const rawImg = String(row.img || '');
+              const updatedImg = rawImg.includes(oldKey)
+                ? rawImg.replace(oldKey, newKey)
+                : rawImg.includes(oldBase)
+                  ? rawImg.replace(oldBase, newBase)
+                  : newKey;
+              await sql.query(
+                `UPDATE "public"."sneakers" SET ${quoteIdent(meta.imgCol)} = $1 WHERE ${quoteIdent(meta.idCol)} = $2`,
+                [updatedImg, row.id],
+              );
+              neonUpdated += 1;
+            }
+          }
+        } catch (e) {
+          console.error('r2-rename neon sync error:', e);
+        }
+      }
+
+      try {
+        const auditMeta = JSON.stringify({ oldKey, newKey, neonUpdated });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_r2_rename', ${cfg.bucket}, ${auditMeta})
+        `;
+      } catch (e) {
+        console.error('r2-rename audit error:', e);
+      }
+
+      return res.status(200).json({ ok: true, oldKey, newKey, neonUpdated });
+    }
+
+    if (action === 'r2-link-sneaker' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const key = String(body.key || '').trim().replace(/^\/+/, '');
+      const brand = String(body.brand || '').trim();
+      const title = String(body.title || '').trim();
+      if (!key || !title) return res.status(400).json({ ok: false, error: 'Укажите файл и название модели' });
+
+      const meta = await getSneakersCols(sql);
+      if (!meta.exists || !meta.imgCol || !meta.nameCol) {
+        return res.status(400).json({ ok: false, error: 'Таблица sneakers не поддерживает автодобавление' });
+      }
+
+      const sample = await sql.query(
+        `SELECT ${quoteIdent(meta.imgCol)} AS img FROM "public"."sneakers" WHERE ${quoteIdent(meta.imgCol)} IS NOT NULL AND ${quoteIdent(meta.imgCol)} <> '' LIMIT 1`,
+      );
+      const sampleImg = String((sample[0] as { img?: unknown } | undefined)?.img || '');
+      let imgValue = key;
+      if (/^https?:\/\//i.test(sampleImg)) {
+        const originM = sampleImg.match(/^(https?:\/\/[^/]+)/i);
+        if (originM) imgValue = `${originM[1]}/${key}`;
+      } else if (!sampleImg.includes('/') && key.includes('/')) {
+        imgValue = key.split('/').pop() || key;
+      }
+
+      const cols: string[] = [quoteIdent(meta.nameCol), quoteIdent(meta.imgCol)];
+      const vals: unknown[] = [title, imgValue];
+      if (meta.brandCol && brand) {
+        cols.push(quoteIdent(meta.brandCol));
+        vals.push(brand);
+      }
+      const placeholders = vals.map((_, idx) => `$${idx + 1}`).join(', ');
+      const inserted = await sql.query(
+        `INSERT INTO "public"."sneakers" (${cols.join(', ')}) VALUES (${placeholders}) RETURNING ${quoteIdent(meta.idCol)} AS id`,
+        vals,
+      );
+      const newId = String((inserted[0] as { id?: unknown } | undefined)?.id ?? '');
+
+      return res.status(200).json({
+        ok: true,
+        match: { id: newId, brand, title, img: imgValue },
+      });
     }
 
     if (action === 'r2-stats' && req.method === 'POST') {
@@ -1048,6 +1240,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const allFiles = await listAllR2Objects(cfg);
       let totalBytes = 0;
       const extMap: Record<string, { count: number; bytes: number }> = {};
+      const etagMap: Record<string, { size: number; keys: string[] }> = {};
 
       for (const f of allFiles) {
         totalBytes += f.size;
@@ -1057,11 +1250,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!extMap[ext]) extMap[ext] = { count: 0, bytes: 0 };
         extMap[ext].count += 1;
         extMap[ext].bytes += f.size;
+
+        if (f.etag) {
+          if (!etagMap[f.etag]) etagMap[f.etag] = { size: f.size, keys: [] };
+          etagMap[f.etag].keys.push(f.key);
+        }
       }
 
       const formats = Object.keys(extMap)
         .map((ext) => ({ ext, count: extMap[ext].count, bytes: extMap[ext].bytes }))
         .sort((a, b) => b.bytes - a.bytes);
+
+      const allDupGroups = Object.keys(etagMap)
+        .filter((etag) => etagMap[etag].keys.length > 1)
+        .map((etag) => ({ etag, size: etagMap[etag].size, keys: etagMap[etag].keys }))
+        .sort((a, b) => (b.keys.length - 1) * b.size - (a.keys.length - 1) * a.size);
+
+      const duplicateWastedBytes = allDupGroups.reduce(
+        (sum, g) => sum + (g.keys.length - 1) * g.size,
+        0,
+      );
 
       const largest = [...allFiles].sort((a, b) => b.size - a.size).slice(0, 20);
       const newest = [...allFiles]
@@ -1077,6 +1285,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         formats,
         largest,
         newest,
+        duplicates: allDupGroups.slice(0, 40),
+        duplicateGroupsCount: allDupGroups.length,
+        duplicateWastedBytes,
       });
     }
 
