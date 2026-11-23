@@ -234,6 +234,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
     if (obj.key) return String(obj.key);
+    if (obj.pk) return `pk=${String(obj.pk)}`;
     return meta;
   }
   if (typeof meta === 'object') {
@@ -242,6 +243,7 @@ function formatAuditMeta(meta: unknown): string {
     if (obj.reason) return String(obj.reason);
     if (obj.ttl) return String(obj.ttl);
     if (obj.key) return String(obj.key);
+    if (obj.pk) return `pk=${String(obj.pk)}`;
     return JSON.stringify(obj);
   }
   return String(meta);
@@ -360,6 +362,10 @@ function getSql() {
   return neon(dbUrl);
 }
 
+function quoteIdent(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -371,37 +377,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const sql = getSql();
 
-    // --- NEON DB EXPLORER ---
+    // --- NEON STUDIO: TABLES + HEALTH METRICS ---
     if (action === 'db-tables') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
-      const [tables, dbSizeRows] = await Promise.all([
+      const [tables, dbStats, pkRows] = await Promise.all([
         sql`
           SELECT
             relname AS name,
             n_live_tup::int AS rows,
+            n_dead_tup::int AS dead_rows,
             pg_size_pretty(pg_total_relation_size(relid)) AS size_pretty,
             pg_total_relation_size(relid)::bigint AS size_bytes
           FROM pg_stat_user_tables
           WHERE schemaname = 'public'
           ORDER BY pg_total_relation_size(relid) DESC
         `,
-        sql`SELECT pg_size_pretty(pg_database_size(current_database())) AS db_size`,
+        sql`
+          SELECT
+            pg_size_pretty(pg_database_size(current_database())) AS db_size,
+            pg_database_size(current_database())::bigint AS db_bytes,
+            (SELECT numbackends::int FROM pg_stat_database WHERE datname = current_database()) AS active_conns,
+            (SELECT CASE WHEN (blks_hit + blks_read) > 0
+              THEN ROUND((blks_hit::numeric / (blks_hit + blks_read)) * 100, 1)
+              ELSE 100 END
+             FROM pg_stat_database WHERE datname = current_database()) AS cache_hit
+        `,
+        sql`
+          SELECT tc.table_name, kcu.column_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+          WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public'
+        `,
       ]);
 
+      const pkMap: Record<string, string> = {};
+      for (const pk of pkRows) {
+        const tn = String(pk.table_name);
+        if (!pkMap[tn]) pkMap[tn] = String(pk.column_name);
+      }
+
+      const st = dbStats[0] || {};
       return res.status(200).json({
         ok: true,
-        dbSize: String(dbSizeRows[0]?.db_size || '—'),
-        tables: tables.map((t) => ({
-          name: String(t.name),
-          rows: Number(t.rows || 0),
-          sizePretty: String(t.size_pretty || '0 bytes'),
-          sizeBytes: Number(t.size_bytes || 0),
-        })),
+        dbSize: String(st.db_size || '—'),
+        dbBytes: Number(st.db_bytes || 0),
+        activeConns: Number(st.active_conns || 1),
+        cacheHitPct: Number(st.cache_hit || 100),
+        tables: tables.map((t) => {
+          const name = String(t.name);
+          return {
+            name,
+            rows: Number(t.rows || 0),
+            deadRows: Number(t.dead_rows || 0),
+            sizePretty: String(t.size_pretty || '0 bytes'),
+            sizeBytes: Number(t.size_bytes || 0),
+            pkCol: pkMap[name] || null,
+          };
+        }),
       });
     }
 
+    // --- NEON STUDIO: BROWSER (SEARCH + SORT + PAGINATION + SCHEMA) ---
     if (action === 'db-rows') {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -415,20 +454,385 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const safeTable = String(validTables[0].tablename);
 
+      const [cols, pkRows] = await Promise.all([
+        sql`
+          SELECT column_name, data_type
+          FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = ${safeTable}
+          ORDER BY ordinal_position ASC
+        `,
+        sql`
+          SELECT kcu.column_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+          WHERE tc.constraint_type = 'PRIMARY KEY'
+            AND tc.table_schema = 'public'
+            AND tc.table_name = ${safeTable}
+          LIMIT 1
+        `,
+      ]);
+
+      const colNames = cols.map((c) => String(c.column_name));
+      const pkCol = pkRows.length > 0 ? String(pkRows[0].column_name) : null;
+
+      const limit = Math.min(100, Math.max(10, Number(req.query.limit || 25) || 25));
+      const page = Math.max(1, Number(req.query.page || 1) || 1);
+      const offset = (page - 1) * limit;
+      const search = String(req.query.search || '').trim();
+      const reqSortCol = String(req.query.sortCol || '').trim();
+      const sortDir = String(req.query.sortDir || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+      let sortCol = '';
+      if (reqSortCol && colNames.includes(reqSortCol)) sortCol = reqSortCol;
+      else if (colNames.includes('created_at')) sortCol = 'created_at';
+      else if (colNames.includes('id')) sortCol = 'id';
+      else if (colNames.length > 0) sortCol = colNames[0];
+
+      const orderSql = sortCol ? `ORDER BY ${quoteIdent(sortCol)} ${sortDir}` : '';
+      let whereSql = '';
+      const params: unknown[] = [];
+
+      if (search && colNames.length > 0) {
+        params.push(`%${search}%`);
+        const conds = colNames.map((c) => `CAST(${quoteIdent(c)} AS TEXT) ILIKE $1`);
+        whereSql = `WHERE (${conds.join(' OR ')})`;
+      }
+
+      const countRows = await sql.query(
+        `SELECT COUNT(*)::int AS total FROM "public".${quoteIdent(safeTable)} ${whereSql}`,
+        params,
+      );
+      const total = Number((countRows[0] as { total?: number })?.total || 0);
+
+      const rows = await sql.query(
+        `SELECT * FROM "public".${quoteIdent(safeTable)} ${whereSql} ${orderSql} LIMIT ${limit} OFFSET ${offset}`,
+        params,
+      );
+
+      return res.status(200).json({
+        ok: true,
+        table: safeTable,
+        pkCol,
+        total,
+        page,
+        limit,
+        sortCol,
+        sortDir: sortDir.toLowerCase(),
+        columns: colNames,
+        columnTypes: cols.map((c) => ({ name: String(c.column_name), type: String(c.data_type) })),
+        rows,
+      });
+    }
+
+    // --- NEON STUDIO: EXPORT TABLE BACKUP (UP TO 1000 ROWS) ---
+    if (action === 'db-export') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const reqTable = String(req.query.table || '').trim();
+      const validTables = await sql`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ${reqTable} LIMIT 1
+      `;
+      if (validTables.length === 0) return res.status(400).json({ ok: false, error: 'Таблица не найдена' });
+      const safeTable = String(validTables[0].tablename);
+
+      const rows = await sql.query(`SELECT * FROM "public".${quoteIdent(safeTable)} LIMIT 1000`);
+      const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
+      return res.status(200).json({ ok: true, table: safeTable, columns, rows });
+    }
+
+    // --- NEON STUDIO: SAFE ROW UPDATE BY PK ---
+    if (action === 'db-update' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const reqTable = String(body.table || '').trim();
+      const pkCol = String(body.pkCol || '').trim();
+      const pkVal = body.pkVal;
+      const updates = (body.updates || {}) as Record<string, unknown>;
+
+      if (!reqTable || !pkCol || pkVal === undefined || pkVal === null) {
+        return res.status(400).json({ ok: false, error: 'Не указаны таблица или первичный ключ' });
+      }
+
+      const validTables = await sql`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ${reqTable} LIMIT 1
+      `;
+      if (validTables.length === 0) return res.status(400).json({ ok: false, error: 'Таблица не найдена' });
+      const safeTable = String(validTables[0].tablename);
+
       const cols = await sql`
         SELECT column_name FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = ${safeTable}
       `;
-      const colNames = cols.map((c) => String(c.column_name));
-      let orderClause = '';
-      if (colNames.includes('created_at')) orderClause = 'ORDER BY created_at DESC';
-      else if (colNames.includes('id')) orderClause = 'ORDER BY id DESC';
+      const validCols = new Set(cols.map((c) => String(c.column_name)));
+      if (!validCols.has(pkCol)) return res.status(400).json({ ok: false, error: 'Неверный ключ' });
 
-      const rows = await sql.query(`SELECT * FROM "public"."${safeTable}" ${orderClause} LIMIT 25`);
+      const keys = Object.keys(updates).filter((k) => validCols.has(k) && k !== pkCol);
+      if (keys.length === 0) return res.status(400).json({ ok: false, error: 'Нет полей для обновления' });
+
+      const setParts: string[] = [];
+      const params: unknown[] = [];
+      keys.forEach((k, idx) => {
+        setParts.push(`${quoteIdent(k)} = $${idx + 1}`);
+        params.push(updates[k] === '' ? null : updates[k]);
+      });
+      params.push(pkVal);
+
+      await sql.query(
+        `UPDATE "public".${quoteIdent(safeTable)} SET ${setParts.join(', ')} WHERE ${quoteIdent(pkCol)} = $${params.length}`,
+        params,
+      );
+
+      try {
+        const meta = JSON.stringify({ pk: String(pkVal), fields: keys });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_db_update', ${safeTable}, ${meta})
+        `;
+      } catch (e) {
+        console.error('db-update audit err:', e);
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
+    // --- NEON STUDIO: SAFE ROW DELETE BY PK ---
+    if (action === 'db-delete' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const body = (req.body || {}) as Record<string, unknown>;
+      const reqTable = String(body.table || '').trim();
+      const pkCol = String(body.pkCol || '').trim();
+      const pkVal = body.pkVal;
+
+      const validTables = await sql`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ${reqTable} LIMIT 1
+      `;
+      if (validTables.length === 0) return res.status(400).json({ ok: false, error: 'Таблица не найдена' });
+      const safeTable = String(validTables[0].tablename);
+
+      const cols = await sql`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = ${safeTable}
+      `;
+      if (!cols.some((c) => String(c.column_name) === pkCol)) {
+        return res.status(400).json({ ok: false, error: 'Неверный ключ' });
+      }
+
+      await sql.query(
+        `DELETE FROM "public".${quoteIdent(safeTable)} WHERE ${quoteIdent(pkCol)} = $1`,
+        [pkVal],
+      );
+
+      try {
+        const meta = JSON.stringify({ pk: String(pkVal) });
+        await sql`
+          INSERT INTO app_events (user_id, username, first_name, source, platform, lang, event, page, meta)
+          VALUES (${auth.adminId}, '', 'Admin', 'admin', ${auth.via}, 'ru', 'admin_db_delete', ${safeTable}, ${meta})
+        `;
+      } catch (e) {
+        console.error('db-delete audit err:', e);
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
+    // --- NEON STUDIO: NO-CODE VISUAL QUERY BUILDER ---
+    if (action === 'db-builder' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const t0 = Date.now();
+      const body = (req.body || {}) as Record<string, unknown>;
+      const reqTable = String(body.table || '').trim();
+      const column = String(body.column || '').trim();
+      const op = String(body.op || 'contains').trim();
+      const value = String(body.value || '').trim();
+      const sortCol = String(body.sortCol || '').trim();
+      const sortDir = String(body.sortDir || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+      const validTables = await sql`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ${reqTable} LIMIT 1
+      `;
+      if (validTables.length === 0) return res.status(400).json({ ok: false, error: 'Выберите таблицу' });
+      const safeTable = String(validTables[0].tablename);
+
+      const cols = await sql`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = ${safeTable}
+      `;
+      const validCols = new Set(cols.map((c) => String(c.column_name)));
+
+      let whereSql = '';
+      const params: unknown[] = [];
+
+      if (column && validCols.has(column)) {
+        const qCol = quoteIdent(column);
+        if (op === 'is_null') {
+          whereSql = `WHERE (${qCol} IS NULL OR CAST(${qCol} AS TEXT) = '')`;
+        } else if (op === 'not_null') {
+          whereSql = `WHERE (${qCol} IS NOT NULL AND CAST(${qCol} AS TEXT) <> '')`;
+        } else if (value) {
+          if (op === 'contains') {
+            whereSql = `WHERE CAST(${qCol} AS TEXT) ILIKE $1`;
+            params.push(`%${value}%`);
+          } else if (op === 'eq') {
+            whereSql = `WHERE CAST(${qCol} AS TEXT) = $1`;
+            params.push(value);
+          } else if (op === 'neq') {
+            whereSql = `WHERE CAST(${qCol} AS TEXT) <> $1`;
+            params.push(value);
+          } else if (op === 'gt') {
+            whereSql = `WHERE CAST(${qCol} AS NUMERIC) > $1`;
+            params.push(Number(value));
+          } else if (op === 'lt') {
+            whereSql = `WHERE CAST(${qCol} AS NUMERIC) < $1`;
+            params.push(Number(value));
+          }
+        }
+      }
+
+      const orderSql = sortCol && validCols.has(sortCol) ? `ORDER BY ${quoteIdent(sortCol)} ${sortDir}` : '';
+      const rows = await sql.query(
+        `SELECT * FROM "public".${quoteIdent(safeTable)} ${whereSql} ${orderSql} LIMIT 50`,
+        params,
+      );
+      const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
+
       return res.status(200).json({
         ok: true,
-        table: safeTable,
-        columns: colNames,
+        ms: Date.now() - t0,
+        columns,
+        rows,
+      });
+    }
+
+    // --- NEON STUDIO: 1-TAP PRO QUICK COMMANDS + R2 AUDIT ---
+    if (action === 'db-preset' && req.method === 'POST') {
+      const auth = authorizeAdmin(req);
+      if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
+
+      const t0 = Date.now();
+      const body = (req.body || {}) as Record<string, unknown>;
+      const preset = String(body.preset || '').trim();
+
+      if (preset === 'analyze') {
+        await sql.query('ANALYZE');
+        return res.status(200).json({
+          ok: true,
+          ms: Date.now() - t0,
+          message: 'Статистика планировщика PostgreSQL (ANALYZE) обновлена',
+          columns: ['status', 'duration_ms'],
+          rows: [{ status: 'OK · ANALYZE выполнен', duration_ms: Date.now() - t0 }],
+        });
+      }
+
+      if (preset === 'r2_audit') {
+        const cfg = getR2Config();
+        if (cfg.missing.length > 0) {
+          return res.status(400).json({ ok: false, error: 'Cloudflare R2 не настроен в Vercel' });
+        }
+        const snExists = await sql`
+          SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sneakers' LIMIT 1
+        `;
+        if (snExists.length === 0) {
+          return res.status(400).json({ ok: false, error: 'Таблица sneakers не найдена в Neon' });
+        }
+
+        const snCols = await sql`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'sneakers'
+        `;
+        const colList = snCols.map((c) => String(c.column_name));
+        const imgCol = colList.find((c) => /image|img|photo|pic|url|file/i.test(c)) || '';
+        const nameCol = colList.find((c) => /name|title|model/i.test(c)) || colList[0];
+        const idCol = colList.includes('id') ? 'id' : colList[0];
+
+        // Collect R2 keys (up to 1000)
+        const r2Resp = await r2SignedFetch(cfg, 'GET', '', { 'list-type': '2', 'max-keys': '1000' });
+        if (!r2Resp.ok) {
+          return res.status(502).json({ ok: false, error: `Ошибка чтения R2 (${r2Resp.status})` });
+        }
+        const r2Parsed = parseR2ListXml(await r2Resp.text());
+        const r2Keys = new Set<string>();
+        const r2Basenames = new Set<string>();
+        for (const f of r2Parsed.files) {
+          r2Keys.add(f.key);
+          const base = f.key.split('/').pop() || f.key;
+          r2Basenames.add(base);
+        }
+
+        const selectCols = imgCol
+          ? `${quoteIdent(idCol)} AS id, ${quoteIdent(nameCol)} AS title, ${quoteIdent(imgCol)} AS img`
+          : `${quoteIdent(idCol)} AS id, ${quoteIdent(nameCol)} AS title, NULL AS img`;
+        const snRows = await sql.query(`SELECT ${selectCols} FROM "public"."sneakers" LIMIT 1000`);
+
+        let emptyImg = 0;
+        const missingSamples: Array<{ id: string; title: string; issue: string }> = [];
+        for (const r of snRows as Array<{ id?: unknown; title?: unknown; img?: unknown }>) {
+          const raw = String(r.img || '').trim();
+          if (!raw) {
+            emptyImg += 1;
+            if (missingSamples.length < 20) {
+              missingSamples.push({ id: String(r.id ?? ''), title: String(r.title ?? ''), issue: 'Пустая ссылка на фото' });
+            }
+            continue;
+          }
+          const cleanName = raw.split('?')[0].split('/').pop() || raw;
+          if (!r2Keys.has(raw) && !r2Basenames.has(cleanName)) {
+            if (missingSamples.length < 20) {
+              missingSamples.push({ id: String(r.id ?? ''), title: String(r.title ?? ''), issue: `Нет в R2 (из 1000): ${cleanName}` });
+            }
+          }
+        }
+
+        const summaryRows = [
+          {
+            id: 'ИТОГО',
+            title: `Neon sneakers: ${snRows.length} · R2 проверено: ${r2Parsed.files.length}`,
+            issue: `Без фото: ${emptyImg} · Потенц. битых: ${missingSamples.length}`,
+          },
+          ...missingSamples,
+        ];
+
+        return res.status(200).json({
+          ok: true,
+          ms: Date.now() - t0,
+          columns: ['id', 'title', 'issue'],
+          rows: summaryRows,
+        });
+      }
+
+      const presetQueries: Record<string, string> = {
+        pro_owners:
+          'SELECT user_id, COUNT(DISTINCT product_id)::int AS modules, STRING_AGG(DISTINCT product_id, \', \') AS list FROM user_purchases GROUP BY user_id ORDER BY modules DESC LIMIT 50',
+        pro_dupes:
+          'SELECT user_id, product_id, COUNT(*)::int AS duplicates FROM user_purchases GROUP BY user_id, product_id HAVING COUNT(*) > 1 LIMIT 50',
+        today_activity:
+          'SELECT source, page, COUNT(*)::int AS events, COUNT(DISTINCT user_id)::int AS users FROM app_events WHERE created_at >= CURRENT_DATE AND source IN (\'telegram\', \'web\') GROUP BY source, page ORDER BY events DESC LIMIT 50',
+        recent_orders:
+          'SELECT * FROM orders ORDER BY 1 DESC LIMIT 25',
+        top_brands:
+          'SELECT brand, COUNT(*)::int AS models FROM sneakers GROUP BY brand ORDER BY models DESC LIMIT 30',
+        top_favorites:
+          'SELECT * FROM user_favorites ORDER BY 1 DESC LIMIT 25',
+        indexes_info:
+          'SELECT tablename AS table_name, indexname AS index_name FROM pg_indexes WHERE schemaname = \'public\' ORDER BY tablename, indexname LIMIT 50',
+      };
+
+      const chosenSql = presetQueries[preset];
+      if (!chosenSql) return res.status(400).json({ ok: false, error: 'Неизвестная команда' });
+
+      const rows = await sql.query(chosenSql);
+      const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
+      return res.status(200).json({
+        ok: true,
+        ms: Date.now() - t0,
+        columns,
         rows,
       });
     }
@@ -437,6 +841,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const auth = authorizeAdmin(req);
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
+      const t0 = Date.now();
       const body = (req.body || {}) as Record<string, unknown>;
       const rawSql = String(body.query || '').trim().replace(/;+\s*$/, '');
       if (!rawSql) return res.status(400).json({ ok: false, error: 'Введите SELECT-запрос' });
@@ -444,7 +849,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ ok: false, error: 'Разрешён только один SELECT-запрос' });
       }
       if (!/^(SELECT|WITH)\b/i.test(rawSql)) {
-        return res.status(400).json({ ok: false, error: 'Консоль работает в режиме только чтения (SELECT)' });
+        return res.status(400).json({ ok: false, error: 'Консоль работает только на чтение (SELECT)' });
       }
       if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|COPY|EXECUTE|CALL)\b/i.test(rawSql)) {
         return res.status(400).json({ ok: false, error: 'Изменяющие команды запрещены в консоли' });
@@ -453,7 +858,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const wrapped = `SELECT * FROM (${rawSql}) AS _q LIMIT 50`;
       const rows = await sql.query(wrapped);
       const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
-      return res.status(200).json({ ok: true, columns, rows });
+      return res.status(200).json({ ok: true, ms: Date.now() - t0, columns, rows });
     }
 
     if (action === 'db-cleanup' && req.method === 'POST') {
@@ -543,9 +948,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
       const cfg = getR2Config();
-      if (cfg.missing.length > 0) {
-        return res.status(400).json({ ok: false, error: 'R2 не настроен' });
-      }
+      if (cfg.missing.length > 0) return res.status(400).json({ ok: false, error: 'R2 не настроен' });
       const body = (req.body || {}) as Record<string, unknown>;
       const key = String(body.key || '').trim();
       if (!key) return res.status(400).json({ ok: false, error: 'Не указан файл' });
@@ -573,9 +976,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!auth.ok) return res.status(403).json({ ok: false, error: 'Forbidden' });
 
       const cfg = getR2Config();
-      if (cfg.missing.length > 0) {
-        return res.status(400).json({ ok: false, error: 'R2 не настроен' });
-      }
+      if (cfg.missing.length > 0) return res.status(400).json({ ok: false, error: 'R2 не настроен' });
       const body = (req.body || {}) as Record<string, unknown>;
       const rawKey = String(body.key || '').trim().replace(/^\/+/, '');
       if (!rawKey) return res.status(400).json({ ok: false, error: 'Не указано имя файла' });
@@ -1348,9 +1749,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const mode = body.mode === 'unban' ? 'unban' : 'ban';
       const reason = String(body.reason || 'Ограничено администратором').slice(0, 200);
 
-      if (!targetId) {
-        return res.status(400).json({ ok: false, error: 'Укажите ID пользователя' });
-      }
+      if (!targetId) return res.status(400).json({ ok: false, error: 'Укажите ID пользователя' });
       if (mode === 'ban' && auth.adminId && targetId === auth.adminId) {
         return res.status(400).json({ ok: false, error: 'Нельзя заблокировать самого себя' });
       }
@@ -1382,9 +1781,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const userId = String(req.query.userId || '').trim();
     const productId = String(req.query.productId || '').trim();
 
-    if (!userId) {
-      return res.status(200).json({ purchased: false, banned: false });
-    }
+    if (!userId) return res.status(200).json({ purchased: false, banned: false });
 
     const banCheck = await sql`
       SELECT reason FROM banned_users WHERE user_id = ${userId} LIMIT 1
@@ -1397,9 +1794,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    if (!productId) {
-      return res.status(200).json({ purchased: false, banned: false });
-    }
+    if (!productId) return res.status(200).json({ purchased: false, banned: false });
 
     const rows = await sql`
       SELECT 1 FROM user_purchases
