@@ -411,7 +411,7 @@ function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-async function getSneakersCols(sql: ReturnType<typeof neon>) {
+async function getSneakersCols(sql: ReturnType<typeof getSql>) {
   const snCols = await sql`
     SELECT column_name FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'sneakers'
