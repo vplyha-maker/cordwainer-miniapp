@@ -1,1 +1,73 @@
 
+name: 🟢 Починить PG12 и убрать дубль
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Calibrate pg_12_naphthol_green.txt and remove unused duplicate
+        run: |
+          node << 'EOF'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          function findFiles(dir, nameLower, out = []) {
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, e.name);
+              if (e.isDirectory()) findFiles(full, nameLower, out);
+              else if (e.isFile() && e.name.toLowerCase() === nameLower) out.push(full);
+            }
+            return out;
+          }
+
+          const targets = findFiles('public', 'pg_12_naphthol_green.txt');
+          if (!targets.length) throw new Error('pg_12_naphthol_green.txt not found in public/');
+
+          const target = targets[0];
+          const raw = fs.readFileSync(target, 'utf8');
+          const pts = raw.trim().split(/\r?\n/).map((l) => l.trim().split(/\s+/).map(Number));
+
+          const rFromKS = (ks) => {
+            const k = Math.max(0.0001, ks);
+            return 1 + k - Math.sqrt(k * k + 2 * k);
+          };
+
+          const out = pts.map(([wl]) => {
+            const kBlue = 22.0 / (1 + Math.exp((wl - 468) / 20));
+            const kRed = 24.0 * Math.exp(-0.5 * Math.pow((wl - 672) / 58, 2));
+            const kGreenFloor = 3.2;
+            const kNirRelease = 1 / (1 + Math.exp((wl - 800) / 30));
+            const ks = kBlue + kRed + kGreenFloor * kNirRelease + 0.8;
+            return `${wl.toFixed(3)} ${(rFromKS(ks) * 100).toFixed(3)}`;
+          });
+
+          fs.writeFileSync(target, out.join('\n') + '\n', 'utf8');
+          console.log('Updated:', target, 'lines:', out.length);
+
+          for (const dup of findFiles('public', 'acrylic binder.txt')) {
+            fs.unlinkSync(dup);
+            console.log('Removed unused duplicate:', dup);
+          }
+          EOF
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A public/
+          git diff --cached --quiet || git commit -m "fix(spectral): calibrate pg_12_naphthol_green and remove acrylic binder duplicate"
+          git push
+
+      - name: Verify with pigment audit
+        run: node scripts/audit-pigments.mjs public
