@@ -4,65 +4,63 @@ export function getHomePalette(isDark: boolean): HomePalette {
   if (isDark) {
     return {
       isDark: true,
-      bg: '#09090B',
+      bg: '#08080A',
       bgMesh:
-        'radial-gradient(ellipse 70% 45% at 85% 0%, rgba(212, 163, 115, 0.11) 0%, transparent 60%), radial-gradient(ellipse 55% 40% at 5% 30%, rgba(56, 189, 248, 0.05) 0%, transparent 55%)',
-      headerBg: 'rgba(9, 9, 11, 0.76)',
-      surface: '#131316',
-      surfaceElevated: '#1A1A1F',
-      surfaceHover: '#222228',
-      surfaceSubtle: 'rgba(255, 255, 255, 0.055)',
+        'radial-gradient(ellipse 80% 45% at 85% 0%, rgba(212, 163, 115, 0.09) 0%, transparent 60%)',
+      headerBg: 'rgba(8, 8, 10, 0.72)',
+      surface: '#0F0F12',
+      surfaceElevated: '#16161B',
+      surfaceHover: '#1D1D24',
+      surfaceSubtle: 'rgba(255, 255, 255, 0.05)',
       cardioBg:
-        'linear-gradient(135deg, #161518 0%, #0E0E11 55%, #111827 100%)',
+        'linear-gradient(135deg, #121114 0%, #0A0A0D 52%, #101624 100%)',
       tributeBg:
-        'linear-gradient(125deg, rgba(212, 163, 115, 0.14) 0%, #131316 65%)',
+        'linear-gradient(120deg, rgba(212, 163, 115, 0.16) 0%, rgba(22, 22, 27, 0.92) 70%)',
       text: '#F5F4F0',
-      textMuted: 'rgba(245, 244, 240, 0.64)',
-      textSubtle: 'rgba(245, 244, 240, 0.38)',
-      border: 'rgba(255, 255, 255, 0.085)',
+      textMuted: 'rgba(245, 244, 240, 0.62)',
+      textSubtle: 'rgba(245, 244, 240, 0.36)',
+      border: 'rgba(255, 255, 255, 0.08)',
       borderStrong: 'rgba(255, 255, 255, 0.18)',
       shadowCard:
-        '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 14px 36px -16px rgba(0, 0, 0, 0.75)',
-      shadowHero:
-        '0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 28px 64px -20px rgba(0, 0, 0, 0.85)',
+        '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 50px -24px rgba(0, 0, 0, 0.85)',
+      shadowHero: '0 24px 64px -24px rgba(0, 0, 0, 0.9)',
       accentBronze: '#D4A373',
-      accentBronzeSoft: 'rgba(212, 163, 115, 0.16)',
+      accentBronzeSoft: 'rgba(212, 163, 115, 0.15)',
       accentRed: '#F04E37',
       pillActiveBg: '#F5F4F0',
-      pillActiveText: '#09090B',
+      pillActiveText: '#08080A',
       pillActiveBorder: '#F5F4F0',
     }
   }
 
   return {
     isDark: false,
-    bg: '#ECEAE4',
+    bg: '#EAE7E0',
     bgMesh:
-      'radial-gradient(ellipse 75% 45% at 90% -5%, rgba(196, 148, 98, 0.16) 0%, transparent 58%), radial-gradient(ellipse 60% 40% at 8% 28%, rgba(255, 255, 255, 0.85) 0%, transparent 60%)',
-    headerBg: 'rgba(236, 234, 228, 0.78)',
-    surface: '#F7F6F2',
-    surfaceElevated: '#FFFFFF',
-    surfaceHover: '#EFECE5',
-    surfaceSubtle: 'rgba(17, 17, 20, 0.05)',
+      'radial-gradient(ellipse 80% 45% at 88% 0%, rgba(176, 126, 74, 0.12) 0%, transparent 58%)',
+    headerBg: 'rgba(234, 231, 224, 0.78)',
+    surface: '#F4F2EC',
+    surfaceElevated: '#FBFAF7',
+    surfaceHover: '#ECE9E1',
+    surfaceSubtle: 'rgba(16, 16, 19, 0.05)',
     cardioBg:
-      'linear-gradient(135deg, #171619 0%, #111114 58%, #151C2B 100%)',
+      'linear-gradient(135deg, #151418 0%, #0C0C0F 55%, #131B2A 100%)',
     tributeBg:
-      'linear-gradient(125deg, rgba(168, 118, 68, 0.15) 0%, #F7F6F2 68%)',
-    text: '#111114',
-    textMuted: 'rgba(17, 17, 20, 0.62)',
-    textSubtle: 'rgba(17, 17, 20, 0.42)',
-    border: 'rgba(17, 17, 20, 0.085)',
-    borderStrong: 'rgba(17, 17, 20, 0.18)',
+      'linear-gradient(120deg, rgba(166, 114, 63, 0.16) 0%, rgba(251, 250, 247, 0.95) 72%)',
+    text: '#101013',
+    textMuted: 'rgba(16, 16, 19, 0.60)',
+    textSubtle: 'rgba(16, 16, 19, 0.40)',
+    border: 'rgba(16, 16, 19, 0.09)',
+    borderStrong: 'rgba(16, 16, 19, 0.18)',
     shadowCard:
-      '0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 10px 28px -14px rgba(17, 17, 20, 0.14)',
-    shadowHero:
-      '0 1px 0 rgba(255, 255, 255, 0.16) inset, 0 24px 56px -18px rgba(17, 17, 20, 0.34)',
+      '0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 16px 40px -22px rgba(16, 16, 19, 0.18)',
+    shadowHero: '0 24px 60px -24px rgba(16, 16, 19, 0.35)',
     accentBronze: '#A6723F',
     accentBronzeSoft: 'rgba(166, 114, 63, 0.13)',
     accentRed: '#D93B26',
-    pillActiveBg: '#111114',
+    pillActiveBg: '#101013',
     pillActiveText: '#F5F4F0',
-    pillActiveBorder: '#111114',
+    pillActiveBorder: '#101013',
   }
 }
 
@@ -74,10 +72,10 @@ export const HOME_STYLE_SHEET = `
 
   .cw-reveal-block {
     opacity: 0;
-    transform: translate3d(0, 18px, 0);
+    transform: translate3d(0, 16px, 0);
     transition:
-      opacity 0.56s cubic-bezier(0.22, 1, 0.36, 1),
-      transform 0.56s cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 0.54s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.54s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .cw-reveal-block[data-visible="true"] {
@@ -87,71 +85,75 @@ export const HOME_STYLE_SHEET = `
 
   @keyframes cwPulseBeacon {
     0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.78); }
+    50% { opacity: 0.38; transform: scale(0.76); }
   }
 
   .cw-beacon {
     animation: cwPulseBeacon 2.2s ease-in-out infinite;
   }
 
-  .cw-interactive {
+  .cw-pane {
     transition:
-      background-color 0.22s ease,
-      border-color 0.22s ease,
-      box-shadow 0.26s ease,
-      transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 0.24s ease,
+      border-color 0.24s ease,
       opacity 0.18s ease;
   }
 
-  .cw-interactive:hover:not(:disabled) {
-    transform: translate3d(0, -2px, 0);
+  .cw-pane:active:not(:disabled) {
+    opacity: 0.88;
   }
 
-  .cw-interactive:active:not(:disabled) {
-    transform: translate3d(0, 0, 0);
-    opacity: 0.9;
-  }
-
-  .cw-interactive:focus-visible {
+  .cw-pane:focus-visible {
     outline: 2px solid var(--cw-accent);
-    outline-offset: 2px;
+    outline-offset: -2px;
   }
 
   .cw-hero-media {
-    transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .cw-hero-stage:hover .cw-hero-media {
-    transform: scale(1.03);
+    transform: scale(1.035);
   }
 
-  .cw-spectrum-strip {
+  .cw-pigment-col {
     flex: 1 1 0%;
-    transition: flex-grow 0.38s cubic-bezier(0.22, 1, 0.36, 1), filter 0.28s ease;
+    transition: flex-grow 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .cw-spectrum-block:hover .cw-spectrum-strip:nth-child(2) { flex-grow: 1.45; }
-  .cw-spectrum-block:hover .cw-spectrum-strip:nth-child(4) { flex-grow: 1.3; }
+  .cw-pigment-stage:hover .cw-pigment-col:nth-child(2) { flex-grow: 1.55; }
+  .cw-pigment-stage:hover .cw-pigment-col:nth-child(4) { flex-grow: 1.35; }
 
-  .cw-cad-grid {
-    background-image: radial-gradient(circle, var(--cw-dot) 1px, transparent 1px);
-    background-size: 16px 16px;
+  .cw-blueprint-bg {
+    background-image:
+      linear-gradient(to right, var(--cw-grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--cw-grid) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
 
-  .cw-cad-svg {
-    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  .cw-blueprint-svg {
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .cw-interactive:hover .cw-cad-svg {
-    transform: translate3d(3px, 0, 0);
+  .cw-pane:hover .cw-blueprint-svg {
+    transform: translate3d(5px, -2px, 0);
   }
 
   .cw-glide {
     transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .cw-interactive:hover:not(:disabled) .cw-glide {
-    transform: translate3d(3px, 0, 0);
+  .cw-pane:hover:not(:disabled) .cw-glide,
+  .cw-hero-stage:hover .cw-glide {
+    transform: translate3d(4px, 0, 0);
+  }
+
+  .cw-dock-btn {
+    transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.18s ease;
+  }
+
+  .cw-dock-btn:active:not(:disabled) {
+    opacity: 0.84;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -163,11 +165,12 @@ export const HOME_STYLE_SHEET = `
     .cw-beacon {
       animation: none !important;
     }
-    .cw-interactive,
+    .cw-pane,
     .cw-hero-media,
-    .cw-spectrum-strip,
-    .cw-cad-svg,
-    .cw-glide {
+    .cw-pigment-col,
+    .cw-blueprint-svg,
+    .cw-glide,
+    .cw-dock-btn {
       transition: none !important;
     }
   }
