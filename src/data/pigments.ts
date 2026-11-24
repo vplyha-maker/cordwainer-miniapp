@@ -79,11 +79,11 @@ export const PIGMENTS: Pigment[] = [
 
   // Зелёные
   { id: 'phthalo_green', name: { uk: 'Фталоціанін зелений', ru: 'Фталоцианин зелёный', en: 'Phthalo Green', de: 'Phthalogrün' } },
-  { id: 'viridian', name: { uk: 'Віридіанова зелень', ru: 'Виридоновая зелень', en: 'Viridian', de: 'Viridiangrün' } },
+  { id: 'viridian', name: { uk: 'Віридіанова зелень', ru: 'Виридиановая зелень', en: 'Viridian', de: 'Viridiangrün' } },
   { id: 'chrome_oxide_green', name: { uk: 'Оксид хрому зелений', ru: 'Оксид хрома зелёный', en: 'Chrome Oxide Green', de: 'Chromoxidgrün' } },
   { id: 'cadmium_green', name: { uk: 'Кадмій зелений', ru: 'Кадмий зелёный', en: 'Cadmium Green', de: 'Kadmiumgrün' } },
   { id: 'cobalt_titanate_green', name: { uk: 'Кобальт титанатовий зелений', ru: 'Кобальт титанатовый зелёный', en: 'Cobalt Titanate Green', de: 'Kobalttitanatgrün' } },
-  { id: 'green_earth', name: { uk: 'Зелена земля', ru: 'Зелёна земля', en: 'Green Earth', de: 'Grüne Erde' } },
+  { id: 'green_earth', name: { uk: 'Зелена земля', ru: 'Зелёная земля', en: 'Green Earth', de: 'Grüne Erde' } },
   { id: 'malachite', name: { uk: 'Малахіт', ru: 'Малахит', en: 'Malachite', de: 'Malachit' } },
   { id: 'verdigris', name: { uk: 'Ярь-медянка', ru: 'Ярь-медянка', en: 'Verdigris', de: 'Grünspan' } },
   { id: 'copper_resinate', name: { uk: 'Мідний резинат', ru: 'Медный резинат', en: 'Copper Resinate', de: 'Kupferresinat' } },
@@ -112,7 +112,7 @@ export const PIGMENTS: Pigment[] = [
 
   // Прочие
   { id: 'iron_gall_ink', name: { uk: 'Залізогалові чорнила', ru: 'Железогалловые чернила', en: 'Iron Gall Ink', de: 'Eisengallustinte' } },
-  { id: 'bismuth', name: { uk: 'Вісмут', ru: 'Висмут', en: 'Bismuth', de: 'Bismut' } },
+  { id: 'bismuth', name: { uk: 'Вісмут (металевий)', ru: 'Висмут (металлический)', en: 'Bismuth (Metallic)', de: 'Bismut (Metallisch)' } },
   { id: 'acrylic_binder', name: { uk: 'Акриловий біндер', ru: 'Акриловый биндер', en: 'Acrylic Binder', de: 'Acrylbinder' } },
   { id: 'cardboard', name: { uk: 'Картон', ru: 'Картон', en: 'Cardboard', de: 'Karton' } },
 
