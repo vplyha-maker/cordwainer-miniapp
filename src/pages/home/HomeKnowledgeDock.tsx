@@ -194,7 +194,7 @@ export function HomeKnowledgeDock({
       {/* STRATUM 5: UNIFIED FLOATING OS UTILITY DOCK */}
       <section className="w-full px-4 sm:px-8 lg:px-14 xl:px-20 py-8 sm:py-10 cw-reveal-block">
         <div
-          className="rounded-2xl sm:rounded-full p-2 border backdrop-blur-xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2"
+          className="rounded-2xl sm:rounded-full p-2 border flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2"
           style={{
             backgroundColor: palette.surfaceElevated,
             borderColor: palette.border,
