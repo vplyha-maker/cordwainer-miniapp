@@ -166,11 +166,11 @@ export function HomePage({
 
       {/* FLOATING SPATIAL COMMAND BAR */}
       <header
-        className="fixed top-0 inset-x-0 z-40 border-b backdrop-blur-xl"
+        className="fixed top-0 inset-x-0 z-40 border-b md:backdrop-blur-md"
         style={{
           backgroundColor: normalizedQuery
             ? palette.headerBg
-            : 'rgba(10, 10, 13, 0.54)',
+            : 'rgba(10, 10, 13, 0.88)',
           borderColor: normalizedQuery
             ? palette.border
             : 'rgba(255, 255, 255, 0.10)',
