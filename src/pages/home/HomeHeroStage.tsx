@@ -78,7 +78,7 @@ export function HomeHeroStage({
             >
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="max-w-[720px]">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border backdrop-blur-md mb-4 bg-black/35 border-white/15">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border mb-4 bg-black/65 border-white/15">
                     <span className="w-1.5 h-1.5 rounded-full cw-beacon bg-[#D4A373]" />
                     <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/90">
                       {t.heroTag}
@@ -141,10 +141,6 @@ export function HomeHeroStage({
                   src={transparentLogoSrc}
                   alt="Cardio Men's Footwear Emblem"
                   className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
-                  style={{
-                    filter:
-                      'drop-shadow(0 12px 26px rgba(59, 130, 246, 0.28)) contrast(1.06)',
-                  }}
                 />
               </div>
             </div>
