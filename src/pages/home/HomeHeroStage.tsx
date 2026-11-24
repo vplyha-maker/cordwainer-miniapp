@@ -73,11 +73,11 @@ export function HomeHeroStage({
             />
 
             <div
-              className="relative h-full max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-20 sm:pt-24 pb-8 sm:pb-12 flex flex-col justify-end text-[#F5F4F0]"
+              className="relative h-full w-full px-5 sm:px-8 lg:px-14 xl:px-20 pt-20 sm:pt-24 pb-8 sm:pb-12 flex flex-col justify-end text-[#F5F4F0]"
               style={{ zIndex: 3 }}
             >
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="max-w-[680px]">
+                <div className="max-w-[720px]">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border backdrop-blur-md mb-4 bg-black/35 border-white/15">
                     <span className="w-1.5 h-1.5 rounded-full cw-beacon bg-[#D4A373]" />
                     <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/90">
@@ -109,7 +109,7 @@ export function HomeHeroStage({
         </section>
       )}
 
-      {/* STRATUM 2: MAISON CARDIO — SEAMLESS FULL-BLEED BRAND BAND */}
+      {/* STRATUM 2: MAISON CARDIO — SEAMLESS FULL-WIDTH BRAND BAND */}
       <section
         className="w-full relative overflow-hidden border-t border-b"
         style={{
@@ -129,7 +129,7 @@ export function HomeHeroStage({
           type="button"
           onClick={onOpenMaterials}
           disabled={!onOpenMaterials}
-          className={`cw-pane group relative z-10 w-full max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 py-8 sm:py-10 lg:py-12 text-left outline-none block ${
+          className={`cw-pane group relative z-10 w-full px-5 sm:px-8 lg:px-14 xl:px-20 py-8 sm:py-10 lg:py-12 text-left outline-none block ${
             onOpenMaterials ? 'cursor-pointer' : 'opacity-45 cursor-default'
           }`}
           style={{ color: '#F5F4F0' }}
@@ -168,7 +168,7 @@ export function HomeHeroStage({
                 </span>
               </div>
 
-              <p className="text-[13.5px] sm:text-[15px] font-sans leading-[1.52] text-white/68 max-w-[480px]">
+              <p className="text-[13.5px] sm:text-[15px] font-sans leading-[1.52] text-white/68 max-w-[520px]">
                 {t.cardioDesc}
               </p>
             </div>
@@ -194,4 +194,3 @@ export function HomeHeroStage({
     </div>
   )
 }
-
