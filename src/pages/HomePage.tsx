@@ -13,9 +13,9 @@ import {
   useTransparentLogo,
 } from './home/hooks'
 import { buildSearchResults } from './home/searchUtils'
-import { HomeHeroCockpit } from './home/HomeHeroCockpit'
-import { HomeStudioGrid } from './home/HomeStudioGrid'
-import { HomeWorkspaceDock } from './home/HomeWorkspaceDock'
+import { HomeHeroStage } from './home/HomeHeroStage'
+import { HomeStudioWorkbench } from './home/HomeStudioWorkbench'
+import { HomeKnowledgeDock } from './home/HomeKnowledgeDock'
 
 export function HomePage({
   onBack,
@@ -164,57 +164,67 @@ export function HomePage({
     >
       <style>{HOME_STYLE_SHEET}</style>
 
-      {/* FLOATING DIGITAL COMMAND BAR */}
+      {/* FLOATING SPATIAL COMMAND BAR */}
       <header
-        className="sticky top-0 z-30 border-b backdrop-blur-xl"
+        className="fixed top-0 inset-x-0 z-40 border-b backdrop-blur-xl"
         style={{
-          backgroundColor: palette.headerBg,
-          borderColor: palette.border,
+          backgroundColor: normalizedQuery
+            ? palette.headerBg
+            : 'rgba(10, 10, 13, 0.54)',
+          borderColor: normalizedQuery
+            ? palette.border
+            : 'rgba(255, 255, 255, 0.10)',
+          color: normalizedQuery ? palette.text : '#F5F4F0',
         }}
       >
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3">
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-8 lg:px-12 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 shrink-0">
             {onBack && (
               <button
                 type="button"
                 onClick={onBack}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-sans font-medium border cursor-pointer outline-none transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-sans font-medium border cursor-pointer outline-none transition-colors"
                 style={{
-                  color: palette.text,
-                  borderColor: palette.border,
-                  backgroundColor: palette.surfaceSubtle,
+                  borderColor: normalizedQuery
+                    ? palette.border
+                    : 'rgba(255, 255, 255, 0.16)',
+                  backgroundColor: normalizedQuery
+                    ? palette.surfaceSubtle
+                    : 'rgba(255, 255, 255, 0.08)',
                 }}
               >
                 <span>←</span>
                 <span className="hidden sm:inline">{t.back}</span>
               </button>
             )}
-            <h1
-              className="font-sans font-semibold text-[18px] sm:text-[20px] tracking-[-0.03em]"
-              style={{ color: palette.text }}
-            >
+            <h1 className="font-sans font-semibold text-[16px] sm:text-[18px] tracking-[-0.03em]">
               Cordwainer
             </h1>
           </div>
 
-          {/* Integrated Command Search (Tablet / Desktop) */}
-          <div className="hidden md:flex flex-1 max-w-[440px] mx-4">
+          <div className="flex-1 max-w-[460px] mx-1 sm:mx-4">
             <div
-              className="w-full flex items-center gap-2.5 px-3.5 h-10 rounded-full border transition-colors"
+              className="w-full flex items-center gap-2 px-3 h-9 rounded-full border transition-colors"
               style={{
-                backgroundColor: palette.surfaceElevated,
-                borderColor: searchQuery ? palette.accentBronze : palette.border,
+                backgroundColor: normalizedQuery
+                  ? palette.surfaceElevated
+                  : 'rgba(255, 255, 255, 0.10)',
+                borderColor: searchQuery
+                  ? palette.accentBronze
+                  : normalizedQuery
+                    ? palette.border
+                    : 'rgba(255, 255, 255, 0.14)',
               }}
             >
               <svg
-                width="14"
-                height="14"
+                width="13"
+                height="13"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke={palette.textMuted}
+                stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
-                className="shrink-0"
+                className="shrink-0 opacity-65"
                 aria-hidden="true"
               >
                 <circle cx="11" cy="11" r="7" />
@@ -225,17 +235,17 @@ export function HomePage({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
-                className="w-full bg-transparent outline-none border-0 text-[13px] font-sans placeholder:opacity-55"
-                style={{ color: palette.text }}
+                className="w-full bg-transparent outline-none border-0 text-[12.5px] sm:text-[13px] font-sans placeholder:opacity-65"
+                style={{ color: 'inherit' }}
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="text-[11px] font-sans font-medium px-2 py-0.5 rounded-full cursor-pointer outline-none border-0"
+                  className="text-[10.5px] font-sans font-semibold px-2 py-0.5 rounded-full cursor-pointer outline-none border-0 shrink-0"
                   style={{
-                    backgroundColor: palette.surfaceSubtle,
-                    color: palette.text,
+                    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                    color: 'inherit',
                   }}
                 >
                   {t.clear}
@@ -244,12 +254,15 @@ export function HomePage({
             </div>
           </div>
 
-          {/* Hardware Language Pill */}
           <div
-            className="inline-flex items-center p-1 rounded-full border shrink-0"
+            className="inline-flex items-center p-0.5 rounded-full border shrink-0"
             style={{
-              backgroundColor: palette.surfaceSubtle,
-              borderColor: palette.border,
+              backgroundColor: normalizedQuery
+                ? palette.surfaceSubtle
+                : 'rgba(255, 255, 255, 0.08)',
+              borderColor: normalizedQuery
+                ? palette.border
+                : 'rgba(255, 255, 255, 0.14)',
             }}
           >
             {(['ru', 'uk', 'de'] as Lang[]).map((l) => {
@@ -259,11 +272,19 @@ export function HomePage({
                   key={l}
                   type="button"
                   onClick={() => handleLangChange(l)}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-mono font-medium uppercase cursor-pointer outline-none border transition-colors"
+                  className="px-2 sm:px-2.5 py-1 rounded-full text-[10.5px] font-mono font-medium uppercase cursor-pointer outline-none border-0 transition-colors"
                   style={{
-                    backgroundColor: active ? palette.pillActiveBg : 'transparent',
-                    color: active ? palette.pillActiveText : palette.textMuted,
-                    borderColor: active ? palette.pillActiveBorder : 'transparent',
+                    backgroundColor: active
+                      ? normalizedQuery
+                        ? palette.pillActiveBg
+                        : '#F5F4F0'
+                      : 'transparent',
+                    color: active
+                      ? normalizedQuery
+                        ? palette.pillActiveText
+                        : '#08080A'
+                      : 'inherit',
+                    opacity: active ? 1 : 0.72,
                   }}
                 >
                   {l === 'uk' ? 'UA' : l.toUpperCase()}
@@ -274,60 +295,14 @@ export function HomePage({
         </div>
       </header>
 
-      {/* MAIN FLUID DIGITAL CANVAS */}
-      <main className="relative z-10 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16">
-        {/* Mobile-Only Compact Search Bar */}
-        <div className="md:hidden mb-4">
-          <div
-            className="flex items-center gap-2.5 px-3.5 h-11 rounded-2xl border transition-colors"
-            style={{
-              backgroundColor: palette.surfaceElevated,
-              borderColor: searchQuery ? palette.accentBronze : palette.border,
-              boxShadow: palette.shadowCard,
-            }}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={palette.textMuted}
-              strokeWidth="2"
-              strokeLinecap="round"
-              className="shrink-0"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <line x1="20" y1="20" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.search}
-              className="w-full bg-transparent outline-none border-0 text-[13.5px] font-sans placeholder:opacity-55"
-              style={{ color: palette.text }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="text-[11px] font-sans font-medium px-2.5 py-1 rounded-full cursor-pointer outline-none border-0 shrink-0"
-                style={{
-                  backgroundColor: palette.surfaceSubtle,
-                  color: palette.text,
-                }}
-              >
-                {t.clear}
-              </button>
-            )}
-          </div>
-        </div>
-
+      {/* MAIN SEAMLESS SPATIAL CANVAS */}
+      <main className="relative z-10 w-full">
         {normalizedQuery ? (
-          /* LIVE SEARCH RESULTS VIEW */
-          <section className="pt-2">
-            <div className="flex items-center justify-between mb-3 px-1">
+          <section className="max-w-[1000px] mx-auto px-4 sm:px-8 pt-20 pb-16">
+            <div
+              className="flex items-center justify-between pb-3 mb-2 border-b"
+              style={{ borderColor: palette.border }}
+            >
               <span
                 className="text-[12px] font-sans font-semibold uppercase tracking-[0.12em]"
                 style={{ color: palette.textMuted }}
@@ -343,45 +318,35 @@ export function HomePage({
             </div>
 
             {searchResults.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="divide-y" style={{ borderColor: palette.border }}>
                 {searchResults.map((res, i) => (
                   <button
                     key={`${res.type}-${res.id}-${i}`}
                     type="button"
                     onClick={() => handleResultClick(res)}
-                    className="cw-interactive group w-full flex items-center justify-between gap-4 px-4 py-3.5 rounded-2xl border text-left cursor-pointer outline-none"
-                    style={{
-                      backgroundColor: palette.surfaceElevated,
-                      borderColor: palette.border,
-                      boxShadow: palette.shadowCard,
-                    }}
+                    className="cw-pane group w-full flex items-center justify-between gap-4 py-4 px-2 text-left cursor-pointer outline-none bg-transparent border-0"
+                    style={{ borderColor: palette.border }}
                   >
                     <span
-                      className="font-sans font-medium text-[16px] leading-snug"
+                      className="font-sans font-medium text-[17px] leading-snug"
                       style={{ color: palette.text }}
                     >
                       {res.title}
                     </span>
                     <span
-                      className="text-[11px] font-mono uppercase px-2.5 py-1 rounded-full shrink-0"
-                      style={{
-                        backgroundColor: palette.surfaceSubtle,
-                        color: palette.textMuted,
-                      }}
+                      className="inline-flex items-center gap-2 text-[11px] font-mono uppercase shrink-0"
+                      style={{ color: palette.textMuted }}
                     >
-                      {res.subtitle}
+                      <span>{res.subtitle}</span>
+                      <span className="cw-glide">→</span>
                     </span>
                   </button>
                 ))}
               </div>
             ) : (
               <div
-                className="py-14 px-6 rounded-2xl border text-[15px] font-sans text-center"
-                style={{
-                  color: palette.textMuted,
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                }}
+                className="py-16 text-[15px] font-sans text-center"
+                style={{ color: palette.textMuted }}
               >
                 {t.noResults}
               </div>
@@ -389,7 +354,7 @@ export function HomePage({
           </section>
         ) : (
           <>
-            <HomeHeroCockpit
+            <HomeHeroStage
               palette={palette}
               t={t}
               onOpenStyles={onOpenStyles}
@@ -401,39 +366,26 @@ export function HomePage({
               transparentLogoSrc={transparentLogoSrc}
             />
 
-            <HomeStudioGrid
+            <HomeStudioWorkbench
               palette={palette}
               colorsItem={learningItems[1]}
               stylesItem={learningItems[2]}
               catalogItem={learningItems[3]}
+              calcItem={toolItems[0]}
             />
 
-            <HomeWorkspaceDock
+            <HomeKnowledgeDock
               palette={palette}
               t={t}
-              tools={toolItems}
+              blogItem={toolItems[1]}
+              glossaryItem={toolItems[2]}
+              pricesItem={toolItems[3]}
               systemItems={systemItems}
               articleFavorites={articleFavorites}
               onOpenArticle={onOpenArticle}
               onOpenFavorites={onOpenFavorites}
               onSupportClick={handleSupportClick}
             />
-
-            {/* Minimal Digital Colophon */}
-            <footer className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
-              <p
-                className="font-serif italic text-[15px]"
-                style={{ color: palette.textMuted }}
-              >
-                {t.quote}
-              </p>
-              <p
-                className="text-[11px] font-mono uppercase tracking-[0.18em] shrink-0"
-                style={{ color: palette.textSubtle }}
-              >
-                CORDWAINER × CARDIO • MMXXVI
-              </p>
-            </footer>
           </>
         )}
       </main>
