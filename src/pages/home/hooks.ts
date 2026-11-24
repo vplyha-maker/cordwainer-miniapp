@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type RefObject } from 'react'
 import type { ExtendedWindow } from './types'
 
 const HERO_FRAME_CACHE_KEY = 'cordwainer_hero_frame_v2'
@@ -39,8 +39,6 @@ function getOrCreateSharedVideo(): HTMLVideoElement {
   videoEl.setAttribute('webkit-playsinline', '')
   videoEl.setAttribute('muted', '')
 
-  // 48x48 + высокий z-index защищают видео от пометки Chromium как occluded,
-  // а opacity 0.001 делает элемент невидимым для пользователя.
   Object.assign(videoEl.style, {
     position: 'fixed',
     top: '0',
@@ -91,7 +89,7 @@ export function useHomeTheme(): boolean {
       const dark = document.documentElement.classList.contains('dark')
       setIsDark(dark)
       try {
-        const bgHex = dark ? '#0C0B0A' : '#F5F2EC'
+        const bgHex = dark ? '#09090B' : '#ECEAE4'
         tg?.setHeaderColor?.(bgHex)
         tg?.setBackgroundColor?.(bgHex)
       } catch {
@@ -109,6 +107,37 @@ export function useHomeTheme(): boolean {
   }, [])
 
   return isDark
+}
+
+export function useScrollReveal(rootRef: RefObject<HTMLDivElement>, active: boolean) {
+  useEffect(() => {
+    if (!active) return
+    const root = rootRef.current
+    if (!root) return
+
+    const targets = Array.from(root.querySelectorAll<HTMLElement>('.cw-reveal-block'))
+    if (targets.length === 0) return
+
+    if (typeof IntersectionObserver === 'undefined') {
+      targets.forEach((el) => el.setAttribute('data-visible', 'true'))
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.setAttribute('data-visible', 'true')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.08, rootMargin: '0px 0px -24px 0px' },
+    )
+
+    targets.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [rootRef, active])
 }
 
 export function useHeroVideoCanvas(enabled: boolean, isDark: boolean) {
@@ -136,7 +165,7 @@ export function useHeroVideoCanvas(enabled: boolean, isDark: boolean) {
 
     const syncCanvasSize = () => {
       const cw = canvasEl.clientWidth || containerEl.clientWidth || 360
-      const ch = canvasEl.clientHeight || containerEl.clientHeight || 340
+      const ch = canvasEl.clientHeight || containerEl.clientHeight || 360
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       const targetW = Math.max(1, Math.round(cw * dpr))
       const targetH = Math.max(1, Math.round(ch * dpr))
@@ -455,4 +484,3 @@ export function useTransparentLogo(src: string): string {
 
   return processedSrc
 }
-
