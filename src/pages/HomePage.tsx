@@ -177,7 +177,7 @@ export function HomePage({
           color: normalizedQuery ? palette.text : '#F5F4F0',
         }}
       >
-        <div className="max-w-[1320px] mx-auto px-4 sm:px-8 lg:px-12 h-14 flex items-center justify-between gap-3">
+        <div className="w-full px-4 sm:px-8 lg:px-14 xl:px-20 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 shrink-0">
             {onBack && (
               <button
@@ -197,14 +197,14 @@ export function HomePage({
                 <span className="hidden sm:inline">{t.back}</span>
               </button>
             )}
-            <h1 className="font-sans font-semibold text-[16px] sm:text-[18px] tracking-[-0.03em]">
-              Cordwainer
+            <h1 className="hidden md:block font-sans font-semibold text-[18px] tracking-[-0.03em]">
+              Cordwaine
             </h1>
           </div>
 
-          <div className="flex-1 max-w-[460px] mx-1 sm:mx-4">
+          <div className="flex-1 max-w-[520px] mx-1 sm:mx-4">
             <div
-              className="w-full flex items-center gap-2 px-3 h-9 rounded-full border transition-colors"
+              className="w-full flex items-center gap-2 px-3.5 h-9 rounded-full border transition-colors"
               style={{
                 backgroundColor: normalizedQuery
                   ? palette.surfaceElevated
@@ -235,7 +235,7 @@ export function HomePage({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
-                className="w-full bg-transparent outline-none border-0 text-[12.5px] sm:text-[13px] font-sans placeholder:opacity-65"
+                className="w-full bg-transparent outline-none border-0 text-[13px] font-sans placeholder:opacity-65"
                 style={{ color: 'inherit' }}
               />
               {searchQuery && (
@@ -298,7 +298,7 @@ export function HomePage({
       {/* MAIN SEAMLESS SPATIAL CANVAS */}
       <main className="relative z-10 w-full">
         {normalizedQuery ? (
-          <section className="max-w-[1000px] mx-auto px-4 sm:px-8 pt-20 pb-16">
+          <section className="w-full px-4 sm:px-8 lg:px-14 xl:px-20 pt-20 pb-16">
             <div
               className="flex items-center justify-between pb-3 mb-2 border-b"
               style={{ borderColor: palette.border }}
@@ -369,7 +369,6 @@ export function HomePage({
             <HomeStudioWorkbench
               palette={palette}
               colorsItem={learningItems[1]}
-              stylesItem={learningItems[2]}
               catalogItem={learningItems[3]}
               calcItem={toolItems[0]}
             />
