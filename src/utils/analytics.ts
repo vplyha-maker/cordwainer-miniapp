@@ -1,13 +1,26 @@
+type TgUser = {
+  id?: number | string
+  username?: string
+  first_name?: string
+  last_name?: string
+  language_code?: string
+}
+
 type TgWindow = {
   Telegram?: {
     WebApp?: {
       initData?: string
+      initDataUnsafe?: {
+        user?: TgUser
+      }
       platform?: string
     }
   }
 }
 
 export const BANNED_EVENT_NAME = 'cordwaine:user-banned'
+
+let sessionFallbackId = ''
 
 function getOrCreateDeviceId(): string {
   try {
@@ -19,8 +32,30 @@ function getOrCreateDeviceId(): string {
     }
     return id
   } catch {
-    return 'web_guest'
+    if (!sessionFallbackId) {
+      sessionFallbackId = 'web_' + Math.random().toString(36).slice(2, 12)
+    }
+    return sessionFallbackId
   }
+}
+
+function resolveTelegramUser(tg: NonNullable<TgWindow['Telegram']>['WebApp']): TgUser | null {
+  const direct = tg?.initDataUnsafe?.user
+  if (direct?.id != null) return direct
+
+  if (tg?.initData) {
+    try {
+      const rawUser = new URLSearchParams(tg.initData).get('user')
+      if (rawUser) {
+        const parsed = JSON.parse(rawUser) as TgUser
+        if (parsed?.id != null) return parsed
+      }
+    } catch {
+      return null
+    }
+  }
+
+  return null
 }
 
 export function trackEvent(
@@ -32,7 +67,22 @@ export function trackEvent(
   try {
     const tg = (window as unknown as TgWindow).Telegram?.WebApp
     const initData = tg?.initData || ''
-    const platform = tg?.platform || (initData ? 'telegram' : 'web')
+    const tgUser = resolveTelegramUser(tg)
+    const isTelegram = Boolean(tgUser?.id != null || initData)
+
+    const deviceId = getOrCreateDeviceId()
+    const userId = tgUser?.id != null ? String(tgUser.id) : deviceId
+    const username = tgUser?.username || ''
+    const firstName = [tgUser?.first_name, tgUser?.last_name].filter(Boolean).join(' ')
+    const source = isTelegram ? 'telegram' : 'web'
+
+    const rawPlatform = tg?.platform && tg.platform !== 'unknown' ? tg.platform : ''
+    const platform = rawPlatform || (isTelegram ? 'telegram' : 'web')
+
+    const metaLang = typeof meta?.lang === 'string' ? meta.lang : ''
+    const browserLang = typeof navigator !== 'undefined' ? (navigator.language || '').slice(0, 2) : ''
+    const lang = (metaLang || tgUser?.language_code || browserLang || 'unknown').toLowerCase()
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     }
@@ -45,10 +95,15 @@ export function trackEvent(
       headers,
       keepalive: true,
       body: JSON.stringify({
+        userId,
+        username,
+        firstName,
+        source,
+        platform,
+        lang,
         event,
         page,
-        platform,
-        deviceId: getOrCreateDeviceId(),
+        deviceId,
         meta,
       }),
     })
