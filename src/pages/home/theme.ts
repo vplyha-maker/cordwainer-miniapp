@@ -88,8 +88,43 @@ export const HOME_STYLE_SHEET = `
     50% { opacity: 0.38; transform: scale(0.76); }
   }
 
+  @keyframes cwKeyPress {
+    0%, 14%, 100% {
+      transform: translate3d(0, 0, 0) scale(1);
+      filter: brightness(1);
+    }
+    5% {
+      transform: translate3d(0, 2.5px, 0) scale(0.86);
+      filter: brightness(1.25);
+    }
+    10% {
+      transform: translate3d(0, 0.5px, 0) scale(0.96);
+      filter: brightness(1.08);
+    }
+  }
+
+  @keyframes cwDialTurn {
+    0%, 12% { transform: rotate(0deg) scale(1); }
+    16% { transform: rotate(0deg) scale(0.92); }
+    24%, 42% { transform: rotate(72deg) scale(1); }
+    46% { transform: rotate(72deg) scale(0.92); }
+    54%, 72% { transform: rotate(155deg) scale(1); }
+    76% { transform: rotate(155deg) scale(0.92); }
+    84%, 100% { transform: rotate(0deg) scale(1); }
+  }
+
   .cw-beacon {
     animation: cwPulseBeacon 2.2s ease-in-out infinite;
+  }
+
+  .cw-calc-key {
+    animation: cwKeyPress 4.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    will-change: transform;
+  }
+
+  .cw-dial-rotor {
+    animation: cwDialTurn 5.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    will-change: transform;
   }
 
   .cw-pane {
@@ -124,20 +159,13 @@ export const HOME_STYLE_SHEET = `
   .cw-pigment-stage:hover .cw-pigment-col:nth-child(2) { flex-grow: 1.55; }
   .cw-pigment-stage:hover .cw-pigment-col:nth-child(4) { flex-grow: 1.35; }
 
-  .cw-blueprint-bg {
-    background-image:
-      linear-gradient(to right, var(--cw-grid) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--cw-grid) 1px, transparent 1px);
-    background-size: 28px 28px;
+  .cw-look-frame {
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.24s ease;
   }
 
-  .cw-blueprint-svg {
-    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .cw-pane:hover .cw-blueprint-svg {
-    transform: translate3d(5px, -2px, 0);
-  }
+  .cw-pane:hover .cw-look-frame:nth-child(1) { transform: translate3d(0, -3px, 0); }
+  .cw-pane:hover .cw-look-frame:nth-child(2) { transform: translate3d(0, -6px, 0); }
+  .cw-pane:hover .cw-look-frame:nth-child(3) { transform: translate3d(0, -3px, 0); }
 
   .cw-glide {
     transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
@@ -162,13 +190,15 @@ export const HOME_STYLE_SHEET = `
       transform: none !important;
       transition: none !important;
     }
-    .cw-beacon {
+    .cw-beacon,
+    .cw-calc-key,
+    .cw-dial-rotor {
       animation: none !important;
     }
     .cw-pane,
     .cw-hero-media,
     .cw-pigment-col,
-    .cw-blueprint-svg,
+    .cw-look-frame,
     .cw-glide,
     .cw-dock-btn {
       transition: none !important;
