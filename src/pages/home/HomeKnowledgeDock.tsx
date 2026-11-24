@@ -30,7 +30,7 @@ export function HomeKnowledgeDock({
 
   return (
     <div className="w-full">
-      {/* STRATUM 4: KNOWLEDGE & MARKET TELEMETRY */}
+      {/* STRATUM 4: KNOWLEDGE & MARKET TELEMETRY — Full-Width Edge-to-Edge */}
       <section
         className="w-full border-b cw-reveal-block"
         style={{
@@ -38,13 +38,13 @@ export function HomeKnowledgeDock({
           backgroundColor: palette.surfaceElevated,
         }}
       >
-        <div className="max-w-[1320px] mx-auto grid grid-cols-1 md:grid-cols-12">
+        <div className="w-full grid grid-cols-1 md:grid-cols-12">
           {blogItem && (
             <button
               type="button"
               onClick={blogItem.action}
               disabled={!blogItem.action}
-              className={`cw-pane group relative md:col-span-6 p-6 sm:p-8 lg:p-10 flex flex-col justify-between text-left border-b md:border-b-0 md:border-r outline-none ${
+              className={`cw-pane group relative md:col-span-6 p-6 sm:p-8 lg:px-14 xl:px-20 lg:py-10 flex flex-col justify-between text-left border-b md:border-b-0 md:border-r outline-none ${
                 blogItem.action ? 'cursor-pointer' : 'opacity-45 cursor-default'
               }`}
               style={{ borderColor: palette.border }}
@@ -97,7 +97,7 @@ export function HomeKnowledgeDock({
                 type="button"
                 onClick={pricesItem.action}
                 disabled={!pricesItem.action}
-                className={`cw-pane group flex-1 px-6 sm:px-8 py-6 flex items-center justify-between gap-4 text-left border-b outline-none ${
+                className={`cw-pane group flex-1 px-6 sm:px-8 lg:px-12 xl:px-16 py-6 flex items-center justify-between gap-4 text-left border-b outline-none ${
                   pricesItem.action ? 'cursor-pointer' : 'opacity-45 cursor-default'
                 }`}
                 style={{ borderColor: palette.border }}
@@ -152,7 +152,7 @@ export function HomeKnowledgeDock({
                 type="button"
                 onClick={glossaryItem.action}
                 disabled={!glossaryItem.action}
-                className={`cw-pane group flex-1 px-6 sm:px-8 py-6 flex items-center justify-between gap-4 text-left outline-none ${
+                className={`cw-pane group flex-1 px-6 sm:px-8 lg:px-12 xl:px-16 py-6 flex items-center justify-between gap-4 text-left outline-none ${
                   glossaryItem.action ? 'cursor-pointer' : 'opacity-45 cursor-default'
                 }`}
               >
@@ -192,7 +192,7 @@ export function HomeKnowledgeDock({
       </section>
 
       {/* STRATUM 5: UNIFIED FLOATING OS UTILITY DOCK */}
-      <section className="max-w-[1320px] mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-10 cw-reveal-block">
+      <section className="w-full px-4 sm:px-8 lg:px-14 xl:px-20 py-8 sm:py-10 cw-reveal-block">
         <div
           className="rounded-2xl sm:rounded-full p-2 border backdrop-blur-xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2"
           style={{
@@ -349,11 +349,10 @@ export function HomeKnowledgeDock({
             className="text-[11px] font-mono uppercase tracking-[0.18em] shrink-0"
             style={{ color: palette.textSubtle }}
           >
-            CORDWAINER × CARDIO • MMXXVI
+            CORDWAINE • MMXXVI
           </p>
         </footer>
       </section>
     </div>
   )
 }
-
