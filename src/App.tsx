@@ -337,7 +337,12 @@ export default function App() {
     }
   }, [])
 
-  const isWideStudioScreen = screen === 'colors' || screen === 'color-calc' || screen === 'styles'
+  const isWideStudioScreen =
+    screen === 'home' ||
+    screen === 'calc-menu' ||
+    screen === 'colors' ||
+    screen === 'color-calc' ||
+    screen === 'styles'
 
   const appContent = (
     <div
