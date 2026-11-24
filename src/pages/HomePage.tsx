@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
 import { CALCULATORS_COUNT } from './CalcMenuPage'
@@ -13,6 +13,7 @@ import {
   useTransparentLogo,
 } from './home/hooks'
 import { buildSearchResults } from './home/searchUtils'
+import { hapticReset, hapticSwatch, hapticTap, triggerHaptic } from './home/haptics'
 import { HomeHeroStage } from './home/HomeHeroStage'
 import { HomeStudioWorkbench } from './home/HomeStudioWorkbench'
 import { HomeKnowledgeDock } from './home/HomeKnowledgeDock'
@@ -53,7 +54,45 @@ export function HomePage({
     }
   }, [lang, setLang])
 
+  const withTap = useCallback(
+    (fn?: () => void) =>
+      fn
+        ? () => {
+            hapticTap()
+            fn()
+          }
+        : undefined,
+    [],
+  )
+
+  const handleBack = useMemo(() => withTap(onBack), [withTap, onBack])
+  const handleOpenStyles = useMemo(() => withTap(onOpenStyles), [withTap, onOpenStyles])
+  const handleOpenMaterials = useMemo(() => withTap(onOpenMaterials), [withTap, onOpenMaterials])
+  const handleOpenColors = useMemo(() => withTap(onOpenColors), [withTap, onOpenColors])
+  const handleOpenSneakers = useMemo(() => withTap(onOpenSneakers), [withTap, onOpenSneakers])
+  const handleOpenCalcMenu = useMemo(() => withTap(onOpenCalcMenu), [withTap, onOpenCalcMenu])
+  const handleOpenBlog = useMemo(() => withTap(onOpenBlog), [withTap, onOpenBlog])
+  const handleOpenPrices = useMemo(() => withTap(onOpenPrices), [withTap, onOpenPrices])
+  const handleOpenFavorites = useMemo(() => withTap(onOpenFavorites), [withTap, onOpenFavorites])
+
+  const handleOpenGlossary = useCallback(
+    (termId?: string) => {
+      hapticTap()
+      onOpenGlossary?.(termId)
+    },
+    [onOpenGlossary],
+  )
+
+  const handleOpenArticle = useCallback(
+    (articleId: string) => {
+      hapticTap()
+      onOpenArticle?.(articleId)
+    },
+    [onOpenArticle],
+  )
+
   const handleLangChange = (newLang: Lang) => {
+    hapticSwatch()
     localStorage.setItem('app_lang', newLang)
     localStorage.setItem('cordwainer_lang', newLang)
     setLang(newLang)
@@ -80,28 +119,48 @@ export function HomePage({
 
   const learningItems: MenuItem[] = useMemo(
     () => [
-      { id: 'materials', roman: '01', tag: 'MAISON', title: t.materials, subtitle: t.materialsSub, action: onOpenMaterials },
-      { id: 'colors', roman: '02', tag: 'PALETTE', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
-      { id: 'styles', roman: '03', tag: 'LOOKBOOK', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
-      { id: 'sneakers', roman: '04', tag: 'CATALOG', title: t.sneakers, subtitle: t.sneakersSub, action: onOpenSneakers },
+      { id: 'materials', roman: '01', tag: 'MAISON', title: t.materials, subtitle: t.materialsSub, action: handleOpenMaterials },
+      { id: 'colors', roman: '02', tag: 'PALETTE', title: t.colors, subtitle: t.colorsSub, action: handleOpenColors },
+      { id: 'styles', roman: '03', tag: 'LOOKBOOK', title: t.styles, subtitle: t.stylesSub, action: handleOpenStyles },
+      { id: 'sneakers', roman: '04', tag: 'CATALOG', title: t.sneakers, subtitle: t.sneakersSub, action: handleOpenSneakers },
     ],
-    [t, onOpenMaterials, onOpenColors, onOpenStyles, onOpenSneakers],
+    [t, handleOpenMaterials, handleOpenColors, handleOpenStyles, handleOpenSneakers],
   )
 
   const toolItems: MenuItem[] = useMemo(
     () => [
-      { id: 'calc', roman: '05', tag: 'UTILITY', title: t.calc, subtitle: t.calcSub, action: onOpenCalcMenu },
-      { id: 'blog', roman: '06', tag: 'EDITORIAL', title: t.blog, subtitle: t.blogSub, action: onOpenBlog, dot: hasNewBlog },
-      { id: 'glossary', roman: '07', tag: 'LEXICON', title: t.glossary, subtitle: t.glossarySub, action: () => onOpenGlossary?.() },
-      { id: 'prices', roman: '08', tag: 'VALUATION', title: t.prices, subtitle: t.pricesSub, action: onOpenPrices },
+      { id: 'calc', roman: '05', tag: 'UTILITY', title: t.calc, subtitle: t.calcSub, action: handleOpenCalcMenu },
+      { id: 'blog', roman: '06', tag: 'EDITORIAL', title: t.blog, subtitle: t.blogSub, action: handleOpenBlog, dot: hasNewBlog },
+      { id: 'glossary', roman: '07', tag: 'LEXICON', title: t.glossary, subtitle: t.glossarySub, action: () => handleOpenGlossary() },
+      { id: 'prices', roman: '08', tag: 'VALUATION', title: t.prices, subtitle: t.pricesSub, action: handleOpenPrices },
     ],
-    [t, onOpenCalcMenu, onOpenBlog, hasNewBlog, onOpenGlossary, onOpenPrices],
+    [t, handleOpenCalcMenu, handleOpenBlog, hasNewBlog, handleOpenGlossary, handleOpenPrices],
   )
 
   const systemItems: MenuItem[] = useMemo(
     () => [
-      { id: 'settings', roman: '09', tag: 'PREFERENCES', title: t.settings, subtitle: t.settingsSub, action: () => onChangeTab?.('settings') },
-      { id: 'profile', roman: '10', tag: 'IDENTITY', title: t.profile, subtitle: t.profileSub, action: () => onChangeTab?.('profile') },
+      {
+        id: 'settings',
+        roman: '09',
+        tag: 'PREFERENCES',
+        title: t.settings,
+        subtitle: t.settingsSub,
+        action: () => {
+          hapticTap()
+          onChangeTab?.('settings')
+        },
+      },
+      {
+        id: 'profile',
+        roman: '10',
+        tag: 'IDENTITY',
+        title: t.profile,
+        subtitle: t.profileSub,
+        action: () => {
+          hapticTap()
+          onChangeTab?.('profile')
+        },
+      },
     ],
     [t, onChangeTab],
   )
@@ -131,14 +190,15 @@ export function HomePage({
       const match = allMenuItems.find((i) => i.id === res.id)
       match?.action?.()
     } else if (res.type === 'article') {
-      onOpenArticle?.(res.id)
+      handleOpenArticle(res.id)
     } else if (res.type === 'glossary') {
-      onOpenGlossary?.(res.id)
+      handleOpenGlossary(res.id)
     }
     setSearchQuery('')
   }
 
   const handleSupportClick = () => {
+    triggerHaptic('heavy')
     const tributeLink = 'https://t.me/tribute/app?startapp=dQO9'
     const tg = (window as ExtendedWindow).Telegram?.WebApp
 
@@ -179,10 +239,10 @@ export function HomePage({
       >
         <div className="w-full px-4 sm:px-8 lg:px-14 xl:px-20 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 shrink-0">
-            {onBack && (
+            {handleBack && (
               <button
                 type="button"
-                onClick={onBack}
+                onClick={handleBack}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-sans font-medium border cursor-pointer outline-none transition-colors"
                 style={{
                   borderColor: normalizedQuery
@@ -241,7 +301,10 @@ export function HomePage({
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => {
+                    hapticReset()
+                    setSearchQuery('')
+                  }}
                   className="text-[10.5px] font-sans font-semibold px-2 py-0.5 rounded-full cursor-pointer outline-none border-0 shrink-0"
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.16)',
@@ -357,8 +420,8 @@ export function HomePage({
             <HomeHeroStage
               palette={palette}
               t={t}
-              onOpenStyles={onOpenStyles}
-              onOpenMaterials={onOpenMaterials}
+              onOpenStyles={handleOpenStyles}
+              onOpenMaterials={handleOpenMaterials}
               heroContainerRef={heroContainerRef}
               heroCanvasRef={heroCanvasRef}
               posterSrc={posterSrc}
@@ -381,8 +444,8 @@ export function HomePage({
               pricesItem={toolItems[3]}
               systemItems={systemItems}
               articleFavorites={articleFavorites}
-              onOpenArticle={onOpenArticle}
-              onOpenFavorites={onOpenFavorites}
+              onOpenArticle={handleOpenArticle}
+              onOpenFavorites={handleOpenFavorites}
               onSupportClick={handleSupportClick}
             />
           </>
