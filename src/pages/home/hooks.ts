@@ -89,7 +89,7 @@ export function useHomeTheme(): boolean {
       const dark = document.documentElement.classList.contains('dark')
       setIsDark(dark)
       try {
-        const bgHex = dark ? '#09090B' : '#ECEAE4'
+        const bgHex = dark ? '#09090B' : '#EAE7E0'
         tg?.setHeaderColor?.(bgHex)
         tg?.setBackgroundColor?.(bgHex)
       } catch {
@@ -132,7 +132,7 @@ export function useScrollReveal(rootRef: RefObject<HTMLDivElement>, active: bool
           }
         })
       },
-      { threshold: 0.08, rootMargin: '0px 0px -24px 0px' },
+      { threshold: 0.06, rootMargin: '0px 0px -16px 0px' },
     )
 
     targets.forEach((el) => observer.observe(el))
@@ -160,112 +160,140 @@ export function useHeroVideoCanvas(enabled: boolean, isDark: boolean) {
 
     let rafId = 0
     let isCancelled = false
+    let isHeroVisible = true
     let lastDrawnVideoTime = -1
+    let lastRenderTs = 0
     let hasSavedPoster = Boolean(memoryCachedHeroFrame)
+    let verifiedNonBlack = hasValidBufferFrame
 
-    const syncCanvasSize = () => {
+    let cachedW = 0
+    let cachedH = 0
+
+    const computeCanvasSize = () => {
       const cw = canvasEl.clientWidth || containerEl.clientWidth || 360
       const ch = canvasEl.clientHeight || containerEl.clientHeight || 360
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      const targetW = Math.max(1, Math.round(cw * dpr))
-      const targetH = Math.max(1, Math.round(ch * dpr))
-      return { targetW, targetH }
+      const rawDpr = window.devicePixelRatio || 1
+      const dpr = window.innerWidth < 768 ? Math.min(rawDpr, 1.25) : Math.min(rawDpr, 1.5)
+      cachedW = Math.max(1, Math.round(cw * dpr))
+      cachedH = Math.max(1, Math.round(ch * dpr))
     }
 
+    computeCanvasSize()
+
     if (hasValidBufferFrame && sharedBufferCanvas) {
-      const { targetW, targetH } = syncCanvasSize()
-      if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
-        canvasEl.width = targetW
-        canvasEl.height = targetH
+      if (canvasEl.width !== cachedW || canvasEl.height !== cachedH) {
+        canvasEl.width = cachedW
+        canvasEl.height = cachedH
       }
-      displayCtx.drawImage(sharedBufferCanvas, 0, 0, targetW, targetH)
+      displayCtx.drawImage(sharedBufferCanvas, 0, 0, cachedW, cachedH)
       setHasCanvasFrame(true)
     }
 
     const ensurePlaying = () => {
-      if (isCancelled) return
+      if (isCancelled || !isHeroVisible) return
       videoEl.muted = true
       if (videoEl.paused || videoEl.ended) {
         videoEl.play().catch(() => {})
       }
     }
 
-    const renderLoop = () => {
+    let visibilityObserver: IntersectionObserver | null = null
+    if (typeof IntersectionObserver !== 'undefined') {
+      visibilityObserver = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0]
+          isHeroVisible = Boolean(entry?.isIntersecting)
+          if (isHeroVisible) {
+            ensurePlaying()
+          }
+        },
+        { threshold: 0.01 },
+      )
+      visibilityObserver.observe(containerEl)
+    }
+
+    const renderLoop = (now: number) => {
       if (isCancelled) return
 
-      const { targetW, targetH } = syncCanvasSize()
-      const bufCanvas = getOrCreateBufferCanvas(targetW, targetH)
-      const bufCtx = bufCanvas.getContext('2d', { willReadFrequently: true })
+      if (isHeroVisible && now - lastRenderTs >= 32) {
+        const isVideoReady =
+          videoEl.readyState >= 2 &&
+          videoEl.videoWidth > 0 &&
+          videoEl.videoHeight > 0 &&
+          !videoEl.seeking
 
-      const isVideoReady =
-        videoEl.readyState >= 2 &&
-        videoEl.videoWidth > 0 &&
-        videoEl.videoHeight > 0 &&
-        !videoEl.seeking
+        if (isVideoReady && videoEl.currentTime !== lastDrawnVideoTime) {
+          lastRenderTs = now
+          const targetW = cachedW
+          const targetH = cachedH
+          const bufCanvas = getOrCreateBufferCanvas(targetW, targetH)
+          const bufCtx = bufCanvas.getContext('2d', { willReadFrequently: true })
 
-      if (isVideoReady && bufCtx && videoEl.currentTime !== lastDrawnVideoTime) {
-        const vw = videoEl.videoWidth
-        const vh = videoEl.videoHeight
-        const scale = Math.max(targetW / vw, targetH / vh)
-        const sw = targetW / scale
-        const sh = targetH / scale
-        const sx = (vw - sw) * 0.5
-        const sy = (vh - sh) * 0.5
+          if (bufCtx) {
+            const vw = videoEl.videoWidth
+            const vh = videoEl.videoHeight
+            const scale = Math.max(targetW / vw, targetH / vh)
+            const sw = targetW / scale
+            const sh = targetH / scale
+            const sx = (vw - sw) * 0.5
+            const sy = (vh - sh) * 0.5
 
-        try {
-          bufCtx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetW, targetH)
+            try {
+              bufCtx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetW, targetH)
 
-          const p1 = bufCtx.getImageData(targetW >> 1, targetH >> 1, 1, 1).data
-          const p2 = bufCtx.getImageData(targetW >> 2, targetH >> 2, 1, 1).data
-          const p3 = bufCtx.getImageData((targetW * 3) >> 2, (targetH * 2) >> 2, 1, 1).data
+              let frameOk = verifiedNonBlack
+              if (!frameOk) {
+                const p1 = bufCtx.getImageData(targetW >> 1, targetH >> 1, 1, 1).data
+                const p2 = bufCtx.getImageData(targetW >> 2, targetH >> 2, 1, 1).data
+                const p3 = bufCtx.getImageData((targetW * 3) >> 2, (targetH * 2) >> 2, 1, 1).data
+                const brightness =
+                  Math.max(p1[0], p1[1], p1[2]) +
+                  Math.max(p2[0], p2[1], p2[2]) +
+                  Math.max(p3[0], p3[1], p3[2])
+                frameOk = p1[3] > 200 && brightness > 45
+                if (frameOk) {
+                  verifiedNonBlack = true
+                }
+              }
 
-          const brightness =
-            Math.max(p1[0], p1[1], p1[2]) +
-            Math.max(p2[0], p2[1], p2[2]) +
-            Math.max(p3[0], p3[1], p3[2])
+              if (frameOk) {
+                hasValidBufferFrame = true
+                lastDrawnVideoTime = videoEl.currentTime
 
-          if (p1[3] > 200 && brightness > 45) {
-            hasValidBufferFrame = true
-            lastDrawnVideoTime = videoEl.currentTime
+                if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
+                  canvasEl.width = targetW
+                  canvasEl.height = targetH
+                }
+                displayCtx.drawImage(bufCanvas, 0, 0, targetW, targetH)
+                setHasCanvasFrame(true)
 
-            if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
-              canvasEl.width = targetW
-              canvasEl.height = targetH
-            }
-            displayCtx.drawImage(bufCanvas, 0, 0, targetW, targetH)
-            setHasCanvasFrame(true)
-
-            if (!hasSavedPoster && videoEl.currentTime > 0.12) {
-              hasSavedPoster = true
-              try {
-                const dataUrl = bufCanvas.toDataURL('image/jpeg', 0.82)
-                if (dataUrl && dataUrl.length > 200) {
-                  memoryCachedHeroFrame = dataUrl
-                  setPosterSrc(dataUrl)
+                if (!hasSavedPoster && videoEl.currentTime > 0.12) {
+                  hasSavedPoster = true
                   try {
-                    localStorage.setItem(HERO_FRAME_CACHE_KEY, dataUrl)
+                    const dataUrl = bufCanvas.toDataURL('image/jpeg', 0.78)
+                    if (dataUrl && dataUrl.length > 200) {
+                      memoryCachedHeroFrame = dataUrl
+                      setPosterSrc(dataUrl)
+                      try {
+                        localStorage.setItem(HERO_FRAME_CACHE_KEY, dataUrl)
+                      } catch {
+                        // Ignore quota error
+                      }
+                      try {
+                        sessionStorage.setItem(HERO_FRAME_CACHE_KEY, dataUrl)
+                      } catch {
+                        // Ignore quota error
+                      }
+                    }
                   } catch {
-                    // Ignore quota error
-                  }
-                  try {
-                    sessionStorage.setItem(HERO_FRAME_CACHE_KEY, dataUrl)
-                  } catch {
-                    // Ignore quota error
+                    // Ignore tainted canvas
                   }
                 }
-              } catch {
-                // Ignore tainted canvas
               }
+            } catch {
+              // Ignore transient decode error
             }
           }
-        } catch {
-          // Ignore transient decode error
-        }
-      } else if (hasValidBufferFrame && sharedBufferCanvas) {
-        if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
-          canvasEl.width = targetW
-          canvasEl.height = targetH
-          displayCtx.drawImage(sharedBufferCanvas, 0, 0, targetW, targetH)
         }
       }
 
@@ -275,38 +303,42 @@ export function useHeroVideoCanvas(enabled: boolean, isDark: boolean) {
     ensurePlaying()
     rafId = window.requestAnimationFrame(renderLoop)
 
-    const keepAliveId = window.setInterval(ensurePlaying, 600)
+    const keepAliveId = window.setInterval(ensurePlaying, 1200)
 
-    const onScrollOrTouch = () => {
-      ensurePlaying()
+    const onResize = () => {
+      computeCanvasSize()
       if (hasValidBufferFrame && sharedBufferCanvas && canvasEl) {
-        const { targetW, targetH } = syncCanvasSize()
-        if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
-          canvasEl.width = targetW
-          canvasEl.height = targetH
+        if (canvasEl.width !== cachedW || canvasEl.height !== cachedH) {
+          canvasEl.width = cachedW
+          canvasEl.height = cachedH
         }
-        displayCtx.drawImage(sharedBufferCanvas, 0, 0, targetW, targetH)
+        displayCtx.drawImage(sharedBufferCanvas, 0, 0, cachedW, cachedH)
       }
     }
 
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
+    const onTouchEnd = () => {
+      if (isHeroVisible) {
         ensurePlaying()
       }
     }
 
-    window.addEventListener('scroll', onScrollOrTouch, { passive: true })
-    window.addEventListener('touchstart', onScrollOrTouch, { passive: true })
-    window.addEventListener('touchend', onScrollOrTouch, { passive: true })
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && isHeroVisible) {
+        ensurePlaying()
+      }
+    }
+
+    window.addEventListener('resize', onResize, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: true })
     document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
       isCancelled = true
+      visibilityObserver?.disconnect()
       window.cancelAnimationFrame(rafId)
       window.clearInterval(keepAliveId)
-      window.removeEventListener('scroll', onScrollOrTouch)
-      window.removeEventListener('touchstart', onScrollOrTouch)
-      window.removeEventListener('touchend', onScrollOrTouch)
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('touchend', onTouchEnd)
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [enabled, isDark])
