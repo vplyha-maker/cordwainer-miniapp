@@ -1,6 +1,17 @@
 import { useState } from 'react'
 import type { GlossaryTerm } from '../data/glossary'
 import type { Lang } from '../App'
+import {
+  CATEGORY_META,
+  GLOSSARY_I18N,
+  getAltTitle,
+  getGlossaryTheme,
+  getLocalizedDef,
+  getLocalizedEx,
+  getLocalizedTitle,
+  haptic,
+  resolveGlossaryLang,
+} from '../pages/glossary/glossaryConfig'
 
 export type FlipCardProps = {
   term: GlossaryTerm
@@ -16,278 +27,270 @@ export type FlipCardProps = {
   onOpenDossier?: (term: GlossaryTerm) => void
 }
 
-const CATEGORY_LABELS: Record<
-  NonNullable<GlossaryTerm['category']>,
-  { ru: string; uk: string; de: string; code: string }
-> = {
-  material: { ru: 'Материалы', uk: 'Матеріали', de: 'Materialien', code: 'MAT.01' },
-  part: { ru: 'Детали', uk: 'Деталі', de: 'Schuhteile', code: 'PRT.02' },
-  process: { ru: 'Процессы', uk: 'Процеси', de: 'Verfahren', code: 'PRC.03' },
-  tool: { ru: 'Инструменты', uk: 'Інструменти', de: 'Werkzeuge', code: 'TLS.04' },
-  type: { ru: 'Виды', uk: 'Види', de: 'Arten', code: 'TYP.05' },
-  defect: { ru: 'Дефекты', uk: 'Дефекти', de: 'Defekte', code: 'DFC.06' },
-  other: { ru: 'Прочее', uk: 'Інше', de: 'Sonstiges', code: 'ARC.07' },
-}
-
-function haptic(style: 'light' | 'medium' = 'light') {
-  try {
-    const tg = (window as any).Telegram?.WebApp
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
-  } catch {}
-}
-
 export function FlipCard({
   term,
   lang,
   index = 0,
   catalogNumber,
   isDark = true,
-  flipHint = 'TURN',
+  flipHint,
   isLocked = false,
   onUnlock,
   isPurchasing = false,
-  isFeatured = false,
   onOpenDossier,
 }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
 
-  const title =
-    lang === 'de' && (term as any).termDe
-      ? (term as any).termDe
-      : lang === 'uk' && term.termUk
-      ? term.termUk
-      : term.term
+  const safeLang = resolveGlossaryLang(lang)
+  const t = GLOSSARY_I18N[safeLang]
+  const theme = getGlossaryTheme(isDark)
 
-  // Второй язык для создания эффекта международного архива (DE / RU)
-  const altTitle =
-    lang === 'de'
-      ? term.term
-      : (term as any).termDe || (lang === 'ru' ? term.termUk : term.term)
-
-  const definition =
-    lang === 'de' && (term as any).definitionDe
-      ? (term as any).definitionDe
-      : lang === 'uk' && term.definitionUk
-      ? term.definitionUk
-      : term.definition
-
-  const example =
-    lang === 'de' && (term as any).exampleDe
-      ? (term as any).exampleDe
-      : lang === 'uk' && term.exampleUk
-      ? term.exampleUk
-      : term.example
+  const title = getLocalizedTitle(term, safeLang)
+  const altTitle = getAltTitle(term, safeLang)
+  const definition = getLocalizedDef(term, safeLang)
+  const example = getLocalizedEx(term, safeLang)
 
   const cat = term.category ?? 'other'
+  const catMeta = CATEGORY_META[cat]
+  const catPill = isDark ? catMeta.pillDark : catMeta.pillLight
+  const catDot = isDark ? catMeta.dotDark : catMeta.dotLight
   const numStr = String(catalogNumber ?? index + 1).padStart(3, '0')
 
-  const paywallText = {
-    ru: { badge: 'PRIVATE ARCHIVE', desc: 'Доступно в полном издании словаря', btn: 'ОТКРЫТЬ ДОСТУП • 1 ★' },
-    uk: { badge: 'PRIVATE ARCHIVE', desc: 'Доступно у повному виданні словника', btn: 'ВІДКРИТИ ДОСТУП • 1 ★' },
-    de: { badge: 'PRIVATE ARCHIVE', desc: 'Verfügbar in der Vollausgabe', btn: 'FREISCHALTEN • 1 ★' },
-  }[lang]
+  const handleFlip = () => {
+    haptic('light')
+    setFlipped((prev) => !prev)
+  }
 
-  const expandLabel = {
-    ru: 'ЧИТАТЬ ПОЛНОСТЬЮ ↗',
-    uk: 'ЧИТАТИ ПОВНІСТЮ ↗',
-    de: 'VOLLSTÄNDIG LESEN ↗',
-  }[lang]
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleFlip()
+    }
+  }
 
   const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
-
-  // Акцентная карточка-разворот (каждая 5-я в сетке) имеет инвертированную тему "Black Label"
-  const useInvertedPalette = isFeatured
-    ? !isDark
-    : isDark
-
-  const cSurface = useInvertedPalette
-    ? 'bg-[#121110] text-[#F4EFE6] border-[#F4EFE6]/15'
-    : 'bg-[#FAF8F5] text-[#141210] border-[#141210]/12'
-
-  const cSurfaceBack = isDark
-    ? 'bg-[#161412] text-[#F4EFE6] border-[#C5A880]/30'
-    : 'bg-[#EFECE6] text-[#141210] border-[#141210]/25'
-
-  const cMuted = useInvertedPalette ? 'text-[#F4EFE6]/45' : 'text-[#141210]/45'
-  const cMutedBack = isDark ? 'text-[#F4EFE6]/65' : 'text-[#141210]/65'
-  const cHairline = useInvertedPalette ? 'border-[#F4EFE6]/12' : 'border-[#141210]/10'
-  const cHairlineBack = isDark ? 'border-[#F4EFE6]/12' : 'border-[#141210]/12'
-  const cAccent = useInvertedPalette ? 'text-[#C5A880]' : 'text-[#8C6D46]'
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => {
-        haptic('light')
-        setFlipped((f) => !f)
-      }}
+      onClick={handleFlip}
+      onKeyDown={handleKeyDown}
       aria-expanded={flipped}
-      className={`group relative w-full text-left outline-none cursor-pointer select-none ${
-        isFeatured ? 'aspect-[16/10] min-h-[210px]' : 'aspect-[3/4.2] min-h-[250px]'
-      }`}
-      style={{ perspective: '1600px', WebkitPerspective: '1600px' }}
+      aria-label={title}
+      className="group relative w-full h-[238px] sm:h-[252px] text-left outline-none cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-[#C9A86A] rounded-[24px]"
+      style={{ perspective: '1400px', WebkitPerspective: '1400px' }}
     >
       <div
         className="relative w-full h-full"
         style={{
           transformStyle: 'preserve-3d',
           WebkitTransformStyle: 'preserve-3d',
-          transition: 'transform 0.65s cubic-bezier(0.22, 1, 0.36, 1)',
+          transition: 'transform 0.56s cubic-bezier(0.22, 1, 0.36, 1)',
           transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
           WebkitTransform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
         }}
       >
-        {/* ================= FRONT (ATELIER SPEC PLATE) ================= */}
+        {/* ================= FRONT ================= */}
         <div
-          className={`absolute inset-0 flex flex-col justify-between p-4 md:p-6 border ${cSurface} transition-colors duration-300`}
+          className={`absolute inset-0 flex flex-col justify-between p-5 rounded-[24px] border transition-all duration-250 ${theme.bgCard} ${theme.textPrimary} ${theme.hairline} ${theme.hairlineHover} ${theme.cardShadow} group-active:scale-[0.99]`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
-            transform: 'rotateY(0deg)',
-            WebkitTransform: 'rotateY(0deg)',
-            zIndex: 2,
+            transform: 'rotateY(0deg) translateZ(0)',
+            WebkitTransform: 'rotateY(0deg) translateZ(0)',
+            zIndex: flipped ? 1 : 2,
             pointerEvents: flipped ? 'none' : 'auto',
           }}
         >
-          {/* Архитектурные метки по углам в стиле лекал высокую моды */}
-          <span className={`absolute top-1.5 left-1.5 w-1.5 h-1.5 border-t border-l ${cHairline}`} />
-          <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 border-t border-r ${cHairline}`} />
-          <span className={`absolute bottom-1.5 left-1.5 w-1.5 h-1.5 border-b border-l ${cHairline}`} />
-          <span className={`absolute bottom-1.5 right-1.5 w-1.5 h-1.5 border-b border-r ${cHairline}`} />
+          {/* Верхняя строка: категория + индекс/замок */}
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-sans font-medium border ${catPill}`}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: catDot }}
+              />
+              <span className="truncate max-w-[140px]">{catMeta[safeLang]}</span>
+            </span>
 
-          {/* ВЕРХНИЙ КОЛОНТИТУЛ БИРКИ */}
-          <div className={`w-full flex items-center justify-between pb-2.5 border-b ${cHairline} z-10`}>
-            <span className={`font-mono text-[9px] tracking-[0.2em] ${cAccent}`}>
-              N° {numStr}
-            </span>
-            <span className={`text-[8px] font-sans uppercase tracking-[0.22em] truncate pl-2 ${cMuted}`}>
-              {isLocked ? '🔒 PRO' : CATEGORY_LABELS[cat].code}
-            </span>
+            {isLocked ? (
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold tracking-wider uppercase ${theme.bgSurfaceSoft} ${theme.accentText}`}
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                {t.lockedBadge}
+              </span>
+            ) : (
+              <span className={`font-mono text-[11px] tabular-nums ${theme.textTertiary}`}>
+                #{numStr}
+              </span>
+            )}
           </div>
 
-          {/* ЦЕНТРАЛЬНАЯ КОМПОЗИЦИЯ (ВОДЯНОЙ ЗНАК В СТИЛЕ VOGUE / MARGIELA) */}
-          <div className="relative flex-1 flex items-center justify-between overflow-hidden my-1">
-            <div
-              className={`font-serif italic font-light leading-none select-none pointer-events-none transition-transform duration-700 group-hover:scale-105 ${
-                isFeatured ? 'text-[88px] md:text-[110px] opacity-15' : 'text-[68px] opacity-[0.08]'
-              }`}
-            >
-              {title.charAt(0).toUpperCase()}
-              <span className="text-[0.4em] not-italic font-sans tracking-widest ml-1 opacity-60">
-                /{numStr.slice(-2)}
-              </span>
-            </div>
+          {/* Центральный блок: термин — главный объект */}
+          <div className="my-auto py-2 min-w-0">
+            <h3 className="font-serif text-[22px] sm:text-[23px] font-normal leading-[1.18] tracking-[-0.015em] line-clamp-2">
+              {title}
+            </h3>
 
-            {isFeatured && !isLocked && (
-              <p className={`hidden sm:block max-w-[52%] text-[11px] font-sans font-light leading-relaxed line-clamp-3 pl-4 border-l ${cHairline}${cMuted}`}>
+            {altTitle && altTitle !== title && (
+              <p className={`mt-1 text-[12.5px] font-sans truncate ${theme.textTertiary}`}>
+                {altTitle}
+              </p>
+            )}
+
+            {isLocked ? (
+              <p className={`mt-3 text-[12.5px] font-sans leading-relaxed line-clamp-2 ${theme.textTertiary}`}>
+                {t.paywallDesc}
+              </p>
+            ) : (
+              <p className={`mt-3 text-[13px] font-sans leading-[1.5] line-clamp-2 ${theme.textSecondary}`}>
                 {definition}
               </p>
             )}
           </div>
 
-          {/* НИЖНИЙ БЛОК: ЗАГОЛОВОК И МЕТАДАННЫЕ */}
-          <div className="w-full z-10 mt-auto">
-            <div className={`text-[7.5px] font-sans uppercase tracking-[0.28em] mb-1.5 ${cMuted}`}>
-              {CATEGORY_LABELS[cat][lang]}
-            </div>
+          {/* Нижняя панель взаимодействий */}
+          <div className={`flex items-center justify-between pt-3 border-t ${theme.hairline}`}>
+            <span className={`inline-flex items-center gap-1.5 text-[11.5px] font-sans font-medium ${theme.textSecondary}`}>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="transition-transform duration-300 group-hover:rotate-180"
+                style={{ color: theme.accentHex }}
+              >
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 16h5v5" />
+              </svg>
+              <span>{flipHint || t.flipHint}</span>
+            </span>
 
-            <h3
-              className={`font-serif font-normal tracking-[-0.01em] leading-[1.12] break-words hyphens-auto ${
-                isFeatured ? 'text-[22px] md:text-[26px]' : 'text-[16px] md:text-[18px]'
-              }`}
-            >
-              {title}
-            </h3>
-
-            {altTitle && altTitle !== title && (
-              <p className={`font-serif italic text-[11px] mt-1 truncate ${cMuted}`}>
-                {altTitle}
-              </p>
+            {!isLocked && onOpenDossier ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  haptic('light')
+                  onOpenDossier(term)
+                }}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-sans font-medium transition-colors cursor-pointer ${theme.bgSurface} ${theme.textPrimary} hover:opacity-85`}
+              >
+                <span>{t.openDossier}</span>
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M7 17 17 7" />
+                  <path d="M7 7h10v10" />
+                </svg>
+              </button>
+            ) : (
+              <span className={`text-[11px] font-sans font-semibold ${theme.accentText}`}>
+                1 ★
+              </span>
             )}
-
-            <div className={`w-full flex items-center justify-between pt-2.5 mt-3 border-t ${cHairline}`}>
-              <span className={`text-[7.5px] font-sans uppercase tracking-[0.28em] ${cMuted}`}>
-                {isLocked ? 'LOCKED ENTRY' : flipHint}
-              </span>
-              <span className={`text-[10px] transition-transform duration-300 group-hover:translate-x-0.5 ${cAccent}`}>
-                ↻
-              </span>
-            </div>
           </div>
         </div>
 
-        {/* ================= BACK (EDITORIAL DOSSIER PREVIEW) ================= */}
+        {/* ================= BACK ================= */}
         <div
-          className={`absolute inset-0 flex flex-col justify-between p-4 md:p-6 border ${cSurfaceBack}`}
+          className={`absolute inset-0 flex flex-col justify-between p-5 rounded-[24px] border ${theme.bgCardStatic} ${theme.textPrimary} ${
+            isDark ? 'border-[#C9A86A]/28' : 'border-[#9A6B2F]/28'
+          } ${theme.cardShadow}`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
-            WebkitTransform: 'rotateY(180deg)',
-            zIndex: 1,
+            transform: 'rotateY(180deg) translateZ(0)',
+            WebkitTransform: 'rotateY(180deg) translateZ(0)',
+            zIndex: flipped ? 2 : 1,
             pointerEvents: flipped ? 'auto' : 'none',
           }}
         >
           {isLocked ? (
-            /* ЗАКРЫТЫЙ АРХИВ (LUXURY PAYWALL) */
-            <div className="flex flex-col h-full justify-between text-left">
-              <div className={`flex items-center justify-between pb-2.5 border-b ${cHairlineBack}`}>
-                <span className={`font-mono text-[8.5px] tracking-[0.2em] ${cAccent}`}>
-                  N° {numStr} // VIP
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex items-center justify-between">
+                <span className={`text-[11px] font-sans font-semibold uppercase tracking-[0.12em] ${theme.accentText}`}>
+                  {t.paywallBadge}
                 </span>
-                <span className="text-[9px]">🔒</span>
+                <span className={`font-mono text-[11px] ${theme.textTertiary}`}>#{numStr}</span>
               </div>
 
               <div className="my-auto py-2">
-                <span className={`block text-[7.5px] font-sans uppercase tracking-[0.3em] mb-2 ${cAccent}`}>
-                  {paywallText.badge}
-                </span>
-                <h4 className="font-serif text-[17px] leading-snug mb-2 line-clamp-2">
+                <h4 className="font-serif text-[20px] leading-snug mb-1.5 line-clamp-2">
                   {title}
                 </h4>
-                <p className={`text-[10px] font-sans font-light leading-relaxed ${cMutedBack}`}>
-                  {paywallText.desc}
+                <p className={`text-[12.5px] font-sans leading-relaxed ${theme.textSecondary}`}>
+                  {t.paywallDesc}
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={onUnlock}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onUnlock?.(e)
+                }}
                 disabled={isPurchasing}
-                className={`w-full py-2.5 px-3 text-[8.5px] font-sans uppercase tracking-[0.22em] transition-all active:scale-[0.98] cursor-pointer border ${
-                  isDark
-                    ? 'bg-[#F4EFE6] text-[#121110] border-[#F4EFE6] hover:bg-transparent hover:text-[#F4EFE6]'
-                    : 'bg-[#141210] text-[#FAF8F5] border-[#141210] hover:bg-transparent hover:text-[#141210]'
-                }`}
+                className={`w-full min-h-[42px] py-2.5 px-4 rounded-2xl text-[11.5px] font-sans font-semibold uppercase tracking-[0.1em] transition-transform active:scale-[0.98] cursor-pointer ${theme.activeInvert}`}
               >
-                {isPurchasing ? '...' : paywallText.btn}
+                {isPurchasing ? '...' : t.paywallBtn}
               </button>
             </div>
           ) : (
-            /* ОТКРЫТАЯ КАРТОЧКА С ОПРЕДЕЛЕНИЕМ */
-            <div className="flex flex-col h-full justify-between">
-              <div className={`flex items-center justify-between pb-2 mb-2.5 border-b ${cHairlineBack} shrink-0`}>
-                <span className={`font-mono text-[8.5px] tracking-[0.18em] ${cAccent}`}>
-                  N° {numStr}
+            <div className="flex flex-col h-full justify-between min-h-0">
+              <div className="flex items-center justify-between gap-2 pb-2.5 shrink-0">
+                <span className={`font-serif text-[16px] font-medium truncate ${theme.textPrimary}`}>
+                  {title}
                 </span>
-                <span className={`text-[7.5px] font-sans uppercase tracking-[0.2em] ${cMutedBack}`}>
-                  {CATEGORY_LABELS[cat][lang]}
+                <span className={`text-[11px] font-sans shrink-0 ${theme.textTertiary}`}>
+                  {t.flipBack} ↻
                 </span>
               </div>
 
               <div
-                className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pr-0.5"
+                className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pr-0.5 space-y-2.5"
                 onClick={stopEvent}
                 onPointerDown={stopEvent}
                 onTouchStart={stopEvent}
                 onWheel={stopEvent}
               >
-                <h4 className="font-serif text-[14px] md:text-[16px] leading-snug mb-2">
-                  {title}
-                </h4>
-                <p className={`text-[11px] md:text-[12px] font-sans font-light leading-[1.55] ${cMutedBack}`}> {definition} </p>  {example && ( <div className={`mt-3 pt-2.5 border-t ${cHairlineBack}`}>
-                    <p className={`font-serif italic text-[11px] leading-[1.45] ${cMutedBack}`}>
+                <p className={`text-[13px] font-sans leading-[1.58] ${theme.textSecondary}`}>
+                  {definition}
+                </p>
+                {example && (
+                  <div
+                    className={`p-2.5 rounded-xl border-l-2 ${theme.bgSurface}`}
+                    style={{ borderLeftColor: theme.accentHex }}
+                  >
+                    <p className={`font-serif italic text-[12.5px] leading-[1.45] ${theme.textPrimary}`}>
                       «{example}»
                     </p>
                   </div>
@@ -302,9 +305,23 @@ export function FlipCard({
                     haptic('light')
                     onOpenDossier(term)
                   }}
-                  className={`w-full pt-2.5 mt-2 border-t ${cHairlineBack} flex items-center justify-between text-[7.5px] font-sans uppercase tracking-[0.25em]${cAccent} bg-transparent border-x-0 border-b-0 cursor-pointer outline-none`}
+                  className={`mt-3 w-full py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 text-[11.5px] font-sans font-medium transition-colors cursor-pointer ${theme.bgSurface} ${theme.textPrimary} hover:opacity-90 shrink-0`}
                 >
-                  <span>{expandLabel}</span>
+                  <span>{t.openDossier}</span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ color: theme.accentHex }}
+                  >
+                    <path d="M7 17 17 7" />
+                    <path d="M7 7h10v10" />
+                  </svg>
                 </button>
               )}
             </div>
